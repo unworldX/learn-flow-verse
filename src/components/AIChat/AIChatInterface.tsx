@@ -2,7 +2,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { Send, Loader2, Paperclip, Brain, Bot, Trash2, RotateCcw, Plus } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import {
@@ -14,7 +13,7 @@ import {
 } from "@/components/ui/select"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createChatCompletion, deleteChatSession, getChatMessages, getChatSessions, uploadPdf } from "@/lib/api";
-import { ChatMessage, ChatSession, CreateChatCompletionParams } from "@/types";
+import { ChatMessage, ChatSession } from "@/types";
 
 export default function AIChatInterface() {
   const [input, setInput] = useState('');
@@ -47,15 +46,14 @@ export default function AIChatInterface() {
   }, [initialMessages]);
 
   // Mutation for creating a chat completion
-  const { mutate: createCompletion } = useMutation<ChatMessage, Error, CreateChatCompletionParams>({
+  const { mutate: createCompletion } = useMutation({
     mutationFn: createChatCompletion,
     onSuccess: (newMessage) => {
       setMessages((prev) => [...prev, newMessage]);
       setInput('');
       setIsLoading(false);
     },
-    onError: (error) => {
-      console.error("Chat completion error:", error);
+    onError: () => {
       toast({
         title: "Something went wrong!",
         description: "There was an error sending your message. Please try again.",
@@ -66,7 +64,7 @@ export default function AIChatInterface() {
   });
 
   // Mutation for deleting a chat session
-  const { mutate: deleteSessionMutation } = useMutation<void, Error, string>({
+  const { mutate: deleteSessionMutation } = useMutation({
     mutationFn: deleteChatSession,
     onSuccess: () => {
       toast({
@@ -87,7 +85,7 @@ export default function AIChatInterface() {
   });
 
   // Mutation for uploading a PDF
-  const { mutate: uploadFileMutation } = useMutation<void, Error, FormData>({
+  const { mutate: uploadFileMutation } = useMutation({
     mutationFn: uploadPdf,
     onSuccess: () => {
       toast({
@@ -181,35 +179,21 @@ export default function AIChatInterface() {
   };
 
   return (
-    <div className="flex h-full w-full flex-col bg-muted/20">
-      {/* Top Header */}
-      <header className="flex h-20 items-center justify-between border-b bg-background px-8">
-        <div className="flex items-center gap-4">
-          <h1 className="text-2xl font-bold">AI Chat</h1>
-          <Badge variant="outline" className="border-green-500/50 bg-green-500/10 text-green-700">
-            AI Powered
-          </Badge>
-        </div>
-      </header>
-
-      <div className="flex flex-1 overflow-hidden">
-        {/* Session Management Bar */}
-        <div className="w-80 border-r bg-background p-4">
-          <div className="flex flex-col gap-4">
-            <Button onClick={createNewSession} variant="outline" className="w-full justify-start gap-2">
-              <Plus className="h-4 w-4" />
-              New Chat
-            </Button>
+    <div className="flex flex-col h-full bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
+      {/* Session Management Bar */}
+      <div className="border-b bg-white/90 backdrop-blur-sm px-6 py-4 shadow-sm">
+        <div className="flex items-center justify-between max-w-7xl mx-auto">
+          <div className="flex items-center gap-4">
             <Select value={currentSessionId || ""} onValueChange={switchSession}>
-              <SelectTrigger className="w-full">
-                <SelectValue placeholder="Select a session" />
+              <SelectTrigger className="w-72 h-10 bg-white shadow-sm border-gray-200 hover:border-gray-300 transition-colors">
+                <SelectValue placeholder="Select or create a session..." />
               </SelectTrigger>
               <SelectContent>
                 {sessions.map((session) => (
                   <SelectItem key={session.id} value={session.id}>
-                    <div className="flex w-full items-center justify-between">
-                      <span className="truncate">{session.name}</span>
-                      <span className="ml-2 text-xs text-muted-foreground">
+                    <div className="flex items-center justify-between w-full">
+                      <span className="truncate max-w-48 font-medium">{session.name}</span>
+                      <span className="text-xs text-gray-500 ml-3">
                         {new Date(session.createdAt).toLocaleDateString()}
                       </span>
                     </div>
@@ -217,110 +201,164 @@ export default function AIChatInterface() {
                 ))}
               </SelectContent>
             </Select>
+            
+            <Button onClick={createNewSession} variant="outline" size="sm" className="gap-2 h-10 px-4 bg-white hover:bg-gray-50 border-gray-200">
+              <Plus className="w-4 h-4" />
+              New Chat
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-2">
             {currentSessionId && (
               <Button
                 onClick={() => deleteSession(currentSessionId)}
                 variant="outline"
                 size="sm"
-                className="w-full justify-start gap-2 text-red-500 hover:bg-red-500/10 hover:text-red-600"
+                className="text-red-600 hover:text-red-700 hover:bg-red-50 h-10 px-4 border-red-200 hover:border-red-300"
               >
-                <Trash2 className="h-4 w-4" />
-                Delete Session
+                <Trash2 className="w-4 h-4" />
               </Button>
             )}
+            
+            <Button onClick={clearChat} variant="outline" size="sm" className="gap-2 h-10 px-4 bg-white hover:bg-gray-50 border-gray-200">
+              <RotateCcw className="w-4 h-4" />
+              Clear
+            </Button>
           </div>
         </div>
-        
-        {/* Main Chat Area */}
-        <div className="flex flex-1 flex-col">
-          <div className="flex-1 overflow-y-auto p-6">
-            <div className="mx-auto max-w-4xl space-y-8">
-              {messages.length === 0 ? (
-                <div className="py-16 text-center">
-                  <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-3xl bg-gradient-to-br from-blue-500 via-purple-500 to-indigo-600 shadow-lg">
-                    <Bot className="h-10 w-10 text-white" />
-                  </div>
-                  <h3 className="mb-3 text-2xl font-bold text-gray-900">
-                    AI Assistant
-                  </h3>
-                  <p className="mx-auto max-w-lg text-lg leading-relaxed text-gray-600">
-                    How can I help you today?
-                  </p>
+      </div>
+
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Messages Container */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-4xl mx-auto px-6 py-8">
+            {messages.length === 0 ? (
+              <div className="text-center py-16">
+                <div className="w-20 h-20 bg-gradient-to-br from-blue-500 via-purple-500 to-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+                  <Bot className="w-10 h-10 text-white" />
                 </div>
-              ) : (
-                messages.map((message, index) => (
-                  <div
-                    key={index}
-                    className={`flex items-start gap-4 ${
-                      message.role === 'user' ? 'justify-end' : 'justify-start'
-                    }`}
-                  >
+                <h3 className="text-2xl font-bold text-gray-900 mb-3">Welcome to AI Assistant</h3>
+                <p className="text-gray-600 max-w-lg mx-auto text-lg leading-relaxed">
+                  Start a conversation with our AI assistant. Ask questions, get help with your studies, or explore new topics together.
+                </p>
+              </div>
+            ) : (
+              <div className="space-y-8">
+                {messages.map((message, index) => (
+                  <div key={index} className={`flex items-start gap-4 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}>
                     {message.role !== 'user' && (
-                      <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-md">
-                        <Bot className="h-5 w-5 text-white" />
+                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 via-purple-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-md flex-shrink-0">
+                        <Bot className="w-5 h-5 text-white" />
                       </div>
                     )}
-                    <div
-                      className={`max-w-[75%] rounded-2xl px-5 py-3 shadow-sm ${
-                        message.role === 'user'
-                          ? 'rounded-br-none bg-blue-600 text-white'
-                          : 'rounded-bl-none border border-border bg-card text-card-foreground'
-                      }`}
-                    >
-                      <p className="leading-relaxed">{message.content}</p>
+                    <div className={`flex flex-col gap-2 max-w-[75%] ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
+                      <div 
+                        className={`px-6 py-4 rounded-3xl shadow-sm border text-[15px] leading-relaxed ${
+                          message.role === 'user' 
+                            ? 'bg-blue-600 text-white border-blue-600' 
+                            : 'bg-white text-gray-800 border-gray-100 shadow-md'
+                        }`}
+                      >
+                        {message.content}
+                      </div>
+                      <span className="text-xs text-gray-500 px-2">
+                        {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
                     </div>
                   </div>
-                ))
-              )}
-
-              {isLoading && (
-                <div className="flex items-start gap-4">
-                  <div className="flex h-10 w-10 flex-shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-md">
-                    <Bot className="h-5 w-5 animate-pulse text-white" />
-                  </div>
-                  <div className="max-w-[75%] rounded-2xl rounded-bl-none border border-border bg-card px-5 py-3 text-card-foreground shadow-sm">
-                    <div className="flex items-center gap-2">
-                      <Loader2 className="h-4 w-4 animate-spin" />
-                      Thinking...
-                    </div>
+                ))}
+              </div>
+            )}
+            
+            {isLoading && (
+              <div className="flex items-start gap-4 mt-8">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 via-purple-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-md">
+                  <Bot className="w-5 h-5 text-white animate-pulse" />
+                </div>
+                <div className="px-6 py-4 rounded-3xl bg-gray-100 text-gray-600 shadow-sm border border-gray-100">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Thinking...
                   </div>
                 </div>
-              )}
-              <div ref={messagesEndRef} />
-            </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
           </div>
-          
-          {/* Input Section */}
-          <div className="border-t bg-background/80 p-6 backdrop-blur-sm">
-            <div className="mx-auto max-w-4xl">
-              <div className="relative">
-                <Textarea
-                  value={input}
-                  onChange={(e) => setInput(e.target.value)}
-                  onKeyDown={handleKeyDown}
-                  placeholder={reasoning ? "Ask with detailed reasoning..." : "Type your message..."}
-                  className="min-h-[56px] w-full resize-none rounded-2xl border-border bg-card p-4 pr-32 text-base shadow-sm"
+        </div>
+
+        {/* Input Section */}
+        <div className="border-t bg-white/90 backdrop-blur-sm shadow-lg">
+          <div className="max-w-4xl mx-auto p-6">
+            {/* PDF Upload Section */}
+            {uploadedFile && (
+              <div className="mb-4 p-4 bg-blue-50 rounded-2xl border border-blue-200">
+                <p className="text-sm text-blue-700 font-medium">
+                  Uploaded File: {uploadedFile.name} ({Math.round(uploadedFile.size / 1024)} KB)
+                </p>
+              </div>
+            )}
+            
+            {/* Message Input */}
+            <div className="flex gap-3 items-end">
+              <div className="flex-1">
+                <div className="relative">
+                  <Textarea
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={reasoning ? "Ask with detailed reasoning..." : "Type your message..."}
+                    className="min-h-[56px] max-h-32 resize-none pr-32 text-base bg-white border-gray-200 focus:border-blue-400 focus:ring-blue-400/20 rounded-2xl shadow-sm"
+                    disabled={isLoading}
+                  />
+                  
+                  {/* Reasoning Toggle - positioned to the right side of input */}
+                  <div className="absolute right-3 top-3">
+                    <Button
+                      onClick={() => setReasoning(!reasoning)}
+                      variant={reasoning ? "default" : "outline"}
+                      size="sm"
+                      className={`gap-2 text-xs h-8 px-3 rounded-xl transition-all ${
+                        reasoning 
+                          ? "bg-purple-600 hover:bg-purple-700 text-white shadow-md" 
+                          : "bg-white hover:bg-gray-50 border-gray-200 text-gray-700"
+                      }`}
+                      type="button"
+                    >
+                      <Brain className="w-3 h-3" />
+                      {reasoning ? "ON" : "OFF"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="flex gap-2">
+                <input
+                  type="file"
+                  accept=".pdf"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  id="pdf-upload"
                   disabled={isLoading}
                 />
-                <div className="absolute right-3 top-1/2 flex -translate-y-1/2 items-center gap-2">
-                  <Button
-                    onClick={() => setReasoning(!reasoning)}
-                    variant={reasoning ? "secondary" : "ghost"}
-                    size="sm"
-                    className="gap-2 rounded-xl"
-                  >
-                    <Brain className={`h-4 w-4 ${reasoning ? 'text-primary' : ''}`} />
-                    Reasoning
-                  </Button>
-                  <Button
-                    onClick={sendMessage}
-                    disabled={isLoading || !input.trim()}
-                    className="h-10 w-10 shrink-0 rounded-full bg-primary text-primary-foreground"
-                    size="icon"
-                  >
-                    {isLoading ? <Loader2 className="h-5 w-5 animate-spin" /> : <Send className="h-5 w-5" />}
-                  </Button>
-                </div>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => document.getElementById('pdf-upload')?.click()}
+                  disabled={isLoading}
+                  className="shrink-0 h-14 w-14 rounded-2xl bg-white hover:bg-gray-50 border-gray-200 shadow-sm"
+                >
+                  <Paperclip className="w-5 h-5 text-gray-600" />
+                </Button>
+                
+                <Button
+                  onClick={sendMessage}
+                  disabled={isLoading || !input.trim()}
+                  className="shrink-0 h-14 w-14 rounded-2xl bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 hover:from-blue-700 hover:via-purple-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all"
+                >
+                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                </Button>
               </div>
             </div>
           </div>
