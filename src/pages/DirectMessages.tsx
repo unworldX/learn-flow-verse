@@ -9,8 +9,10 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Upload, Send, Image, Video, FileText, Search, MoreVertical, Phone, VideoIcon } from 'lucide-react';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Upload, Send, Image, Video, FileText, Search, MoreVertical, Phone, VideoIcon, Plus, MessageSquare } from 'lucide-react';
 import { encryptText, decryptText } from '@/lib/encryption';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface User {
   id: string;
@@ -41,6 +43,7 @@ interface Chat {
 const DirectMessages = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [chats, setChats] = useState<Chat[]>([]);
   const [selectedChat, setSelectedChat] = useState<User | null>(null);
   const [messages, setMessages] = useState<DirectMessage[]>([]);
@@ -393,6 +396,188 @@ const DirectMessages = () => {
     );
   };
 
+  if (isMobile) {
+    return (
+      <div className="h-full flex flex-col bg-gray-50">
+        {!selectedChat ? (
+          <>
+            {/* Mobile Header with Search */}
+            <div className="bg-white border-b border-gray-200 p-4">
+              <h1 className="text-2xl font-bold mb-4 text-gray-800">Messages</h1>
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search conversations..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 bg-gray-50 border-gray-200 focus:bg-white transition-colors"
+                />
+              </div>
+            </div>
+
+            {/* Chat List */}
+            <ScrollArea className="flex-1">
+              {/* Existing Chats */}
+              {chats.map((chat) => (
+                <div
+                  key={chat.user.id}
+                  onClick={() => setSelectedChat(chat.user)}
+                  className="p-4 cursor-pointer hover:bg-gray-50 border-b border-gray-100 transition-all duration-200 bg-white"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="relative">
+                      <Avatar className="w-12 h-12">
+                        <AvatarFallback className="bg-gradient-to-br from-blue-400 to-purple-500 text-white font-medium">
+                          {chat.user.full_name?.[0] || chat.user.email[0].toUpperCase()}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white rounded-full"></div>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <div className="flex items-center justify-between mb-1">
+                        <p className="font-medium text-gray-900 truncate">
+                          {chat.user.full_name || chat.user.email}
+                        </p>
+                        {chat.unreadCount > 0 && (
+                          <Badge className="bg-blue-500 text-white text-xs px-2 py-1 rounded-full">
+                            {chat.unreadCount}
+                          </Badge>
+                        )}
+                      </div>
+                      <p className="text-sm text-gray-500 truncate">
+                        {chat.lastMessage?.message_type === 'text' ? '💬 Text message' : 
+                         chat.lastMessage?.message_type === 'image' ? '📷 Photo' :
+                         chat.lastMessage?.message_type === 'video' ? '🎥 Video' : '📎 File'}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              ))}
+
+              {/* New Chat Options */}
+              {searchQuery && (
+                <>
+                  <Separator className="my-2" />
+                  <div className="p-2 bg-white">
+                    <p className="text-sm font-medium text-gray-500 mb-2 px-2">Start new chat</p>
+                    {filteredUsers.map((user) => (
+                      <div
+                        key={user.id}
+                        onClick={() => startNewChat(user)}
+                        className="p-3 cursor-pointer hover:bg-gray-50 rounded-lg flex items-center gap-3 transition-colors"
+                      >
+                        <Avatar className="w-10 h-10">
+                          <AvatarFallback className="text-sm bg-gradient-to-br from-green-400 to-blue-500 text-white">
+                            {user.full_name?.[0] || user.email[0].toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div>
+                          <p className="text-sm font-medium text-gray-900">{user.full_name || user.email}</p>
+                          <p className="text-xs text-gray-500">{user.email}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </>
+              )}
+            </ScrollArea>
+
+            {/* Floating Action Button */}
+            <div className="fixed bottom-6 right-6">
+              <Button 
+                onClick={() => setSearchQuery('')}
+                className="rounded-full w-14 h-14 bg-blue-500 hover:bg-blue-600 shadow-lg"
+                size="icon"
+              >
+                <MessageSquare className="w-6 h-6" />
+              </Button>
+            </div>
+          </>
+        ) : (
+          /* Chat View for Mobile */
+          <>
+            {/* Chat Header */}
+            <div className="p-4 bg-white border-b border-gray-200 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Button variant="ghost" size="icon" onClick={() => setSelectedChat(null)}>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </Button>
+                <Avatar className="w-10 h-10">
+                  <AvatarFallback className="bg-gradient-to-br from-blue-400 to-purple-500 text-white font-medium">
+                    {selectedChat.full_name?.[0] || selectedChat.email[0].toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <h3 className="font-semibold text-gray-900">{selectedChat.full_name || selectedChat.email}</h3>
+                  <p className="text-sm text-green-500">● Online</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="icon" className="rounded-full">
+                  <Phone className="w-4 h-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="rounded-full">
+                  <VideoIcon className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Messages */}
+            <ScrollArea className="flex-1 p-4 bg-gradient-to-b from-gray-50 to-white">
+              <div className="space-y-1">
+                {messages.map(renderMessage)}
+              </div>
+              <div ref={messagesEndRef} />
+            </ScrollArea>
+
+            {/* Message Input */}
+            <div className="p-4 bg-white border-t border-gray-200">
+              <div className="flex gap-3 items-end">
+                <div className="flex-1 relative">
+                  <Input
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Type a message..."
+                    onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendTextMessage()}
+                    className="pr-12 py-3 rounded-full border-gray-300 focus:border-blue-500 transition-colors"
+                  />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleFileUpload(file);
+                    }}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={loading}
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 rounded-full"
+                  >
+                    <Upload className="w-4 h-4" />
+                  </Button>
+                </div>
+                <Button 
+                  onClick={sendTextMessage} 
+                  disabled={loading || !newMessage.trim()}
+                  className="rounded-full px-6 bg-blue-500 hover:bg-blue-600"
+                >
+                  <Send className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  // Desktop Layout (existing code)
   return (
     <div className="h-full flex bg-gray-50">
       {/* Chat List */}
@@ -486,6 +671,11 @@ const DirectMessages = () => {
             {/* Chat Header */}
             <div className="p-4 bg-white border-b border-gray-200 flex items-center justify-between">
               <div className="flex items-center gap-3">
+                <Button variant="ghost" size="icon" onClick={() => setSelectedChat(null)}>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </Button>
                 <Avatar className="w-10 h-10">
                   <AvatarFallback className="bg-gradient-to-br from-blue-400 to-purple-500 text-white font-medium">
                     {selectedChat.full_name?.[0] || selectedChat.email[0].toUpperCase()}

@@ -19,6 +19,7 @@ import {
   User, Search, MessageCircle, Image, Video, FileText, Lock, MoreVertical 
 } from 'lucide-react';
 import { encryptText, decryptText } from '@/lib/encryption';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface StudyGroup {
   id: string;
@@ -63,6 +64,7 @@ interface GroupMember {
 const StudyGroups = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const isMobile = useIsMobile();
   const [groups, setGroups] = useState<StudyGroup[]>([]);
   const [selectedGroup, setSelectedGroup] = useState<StudyGroup | null>(null);
   const [messages, setMessages] = useState<GroupMessage[]>([]);
@@ -71,6 +73,7 @@ const StudyGroups = () => {
   const [showCreateDialog, setShowCreateDialog] = useState(false);
   const [showMembersDialog, setShowMembersDialog] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -477,6 +480,240 @@ const StudyGroups = () => {
     );
   };
 
+  if (isMobile) {
+    return (
+      <div className="h-full flex flex-col bg-gray-50">
+        {!selectedGroup ? (
+          <>
+            {/* Mobile Header with Search */}
+            <div className="bg-white border-b border-gray-200 p-4">
+              <h1 className="text-2xl font-bold mb-4 text-gray-800">Study Groups</h1>
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                <Input
+                  placeholder="Search groups..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10 bg-gray-50 border-gray-200 focus:bg-white transition-colors"
+                />
+              </div>
+            </div>
+
+            {/* Groups List */}
+            <ScrollArea className="flex-1">
+              {(searchQuery ? filteredGroups : groups).map((group) => (
+                <div
+                  key={group.id}
+                  onClick={() => setSelectedGroup(group)}
+                  className="p-4 cursor-pointer hover:bg-gray-50 border-b border-gray-100 transition-all duration-200 bg-white"
+                >
+                  <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-center gap-3">
+                      <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-blue-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                        {group.name[0].toUpperCase()}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2 mb-1">
+                          <h3 className="font-semibold text-gray-900">{group.name}</h3>
+                          {group.is_private && <Lock className="w-4 h-4 text-gray-400" />}
+                        </div>
+                        <Badge variant="outline" className="text-xs">
+                          {getRoleIcon(group.user_role || 'member')}
+                          <span className="ml-1 capitalize">{group.user_role}</span>
+                        </Badge>
+                      </div>
+                    </div>
+                  </div>
+                  {group.description && (
+                    <p className="text-sm text-gray-600 mb-3 line-clamp-2 leading-relaxed">{group.description}</p>
+                  )}
+                  <div className="flex items-center justify-between text-xs text-gray-500">
+                    <div className="flex items-center gap-1">
+                      <Users className="w-3 h-3" />
+                      <span>{group.member_count} members</span>
+                    </div>
+                    <span>{new Date(group.created_at).toLocaleDateString()}</span>
+                  </div>
+                </div>
+              ))}
+            </ScrollArea>
+
+            {/* Floating Action Button */}
+            <div className="fixed bottom-6 right-6">
+              <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
+                <DialogTrigger asChild>
+                  <Button className="rounded-full w-14 h-14 bg-green-500 hover:bg-green-600 shadow-lg" size="icon">
+                    <Plus className="w-6 h-6" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Create Study Group</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div>
+                      <Label htmlFor="name">Group Name</Label>
+                      <Input
+                        id="name"
+                        value={newGroup.name}
+                        onChange={(e) => setNewGroup(prev => ({ ...prev, name: e.target.value }))}
+                        placeholder="Enter group name"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="description">Description (Optional)</Label>
+                      <Textarea
+                        id="description"
+                        value={newGroup.description}
+                        onChange={(e) => setNewGroup(prev => ({ ...prev, description: e.target.value }))}
+                        placeholder="Describe your study group"
+                        className="mt-1"
+                      />
+                    </div>
+                    <div className="flex items-center space-x-2">
+                      <Switch
+                        id="private"
+                        checked={newGroup.is_private}
+                        onCheckedChange={(checked) => setNewGroup(prev => ({ ...prev, is_private: checked }))}
+                      />
+                      <Label htmlFor="private">Private Group</Label>
+                    </div>
+                    <div>
+                      <Label htmlFor="max_members">Max Members</Label>
+                      <Input
+                        id="max_members"
+                        type="number"
+                        min="2"
+                        max="100"
+                        value={newGroup.max_members}
+                        onChange={(e) => setNewGroup(prev => ({ ...prev, max_members: parseInt(e.target.value) }))}
+                        className="mt-1"
+                      />
+                    </div>
+                    <Button onClick={createGroup} disabled={loading || !newGroup.name.trim()} className="w-full">
+                      Create Group
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </>
+        ) : (
+          /* Group Chat View for Mobile */
+          <>
+            {/* Group Header */}
+            <div className="p-4 bg-white border-b border-gray-200 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Button variant="ghost" size="icon" onClick={() => setSelectedGroup(null)}>
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </Button>
+                <div className="w-10 h-10 bg-gradient-to-br from-green-400 to-blue-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                  {selectedGroup.name[0].toUpperCase()}
+                </div>
+                <div>
+                  <h3 className="font-semibold text-gray-900 flex items-center gap-2">
+                    {selectedGroup.name}
+                    {selectedGroup.is_private && <Lock className="w-4 h-4 text-gray-400" />}
+                  </h3>
+                  <p className="text-sm text-gray-500">{members.length} members</p>
+                </div>
+              </div>
+              <Dialog open={showMembersDialog} onOpenChange={setShowMembersDialog}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <Users className="w-4 h-4" />
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="sm:max-w-md">
+                  <DialogHeader>
+                    <DialogTitle>Group Members ({members.length})</DialogTitle>
+                  </DialogHeader>
+                  <ScrollArea className="max-h-96">
+                    <div className="space-y-3">
+                      {members.map((member) => (
+                        <div key={member.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50">
+                          <div className="flex items-center gap-3">
+                            <Avatar className="w-10 h-10">
+                              <AvatarFallback className="bg-gradient-to-br from-green-400 to-blue-500 text-white">
+                                {member.user?.full_name?.[0] || member.user?.email[0].toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div>
+                              <p className="text-sm font-medium text-gray-900">
+                                {member.user?.full_name || member.user?.email}
+                              </p>
+                              <p className="text-xs text-gray-500">{member.user?.email}</p>
+                            </div>
+                          </div>
+                          <Badge variant="outline" className="text-xs">
+                            {getRoleIcon(member.role)}
+                            <span className="ml-1 capitalize">{member.role}</span>
+                          </Badge>
+                        </div>
+                      ))}
+                    </div>
+                  </ScrollArea>
+                </DialogContent>
+              </Dialog>
+            </div>
+
+            {/* Messages */}
+            <ScrollArea className="flex-1 p-4 bg-gradient-to-b from-gray-50 to-white">
+              <div className="space-y-1">
+                {messages.map(renderMessage)}
+              </div>
+              <div ref={messagesEndRef} />
+            </ScrollArea>
+
+            {/* Message Input */}
+            <div className="p-4 bg-white border-t border-gray-200">
+              <div className="flex gap-3 items-end">
+                <div className="flex-1 relative">
+                  <Input
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Type a message..."
+                    onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendTextMessage()}
+                    className="pr-12 py-3 rounded-full border-gray-300 focus:border-green-500 transition-colors"
+                  />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleFileUpload(file);
+                    }}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={loading}
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 rounded-full"
+                  >
+                    <Upload className="w-4 h-4" />
+                  </Button>
+                </div>
+                <Button 
+                  onClick={sendTextMessage} 
+                  disabled={loading || !newMessage.trim()}
+                  className="rounded-full px-6 bg-green-500 hover:bg-green-600"
+                >
+                  <Send className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </>
+        )}
+      </div>
+    );
+  }
+
+  // Desktop Layout (existing code)
   return (
     <div className="h-full flex bg-gray-50">
       {/* Groups List */}
