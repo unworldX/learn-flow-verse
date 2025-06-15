@@ -50,6 +50,8 @@ const DirectMessages = () => {
   const { user } = useAuth();
   const { toast } = useToast();
   const isMobile = useIsMobile();
+
+  // All useState and useEffect hooks at the TOP, before any returns!
   const [chats, setChats] = useState<Chat[]>([]);
   const [selectedChat, setSelectedChat] = useState<User | null>(null);
   const [messages, setMessages] = useState<DirectMessage[]>([]);
@@ -61,49 +63,44 @@ const DirectMessages = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // New: Desktop state, for filters/groups etc
+  const [groups, setGroups] = useState<any[]>([]);
+  const [view, setView] = useState<'all'|'direct'|'group'>('all');
+  const [filters, setFilters] = useState({ showPinned: false, showUnread: false });
+
   useEffect(() => {
     if (user) {
       fetchUsers();
       fetchChats();
     }
   }, [user]);
-
   useEffect(() => {
     if (selectedChat && user) {
       fetchMessages();
       markMessagesAsRead();
     }
   }, [selectedChat, user]);
-
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
-
   useEffect(() => {
     if (!user) return;
-
-    // Subscribe to new messages
     const channel = supabase
       .channel('direct-messages')
-      .on(
-        'postgres_changes',
-        {
+      .on('postgres_changes', {
           event: 'INSERT',
           schema: 'public',
           table: 'direct_messages',
           filter: `receiver_id=eq.${user.id}`
-        },
-        (payload) => {
+        }, (payload) => {
           const newMessage = payload.new as DirectMessage;
           if (selectedChat && newMessage.sender_id === selectedChat.id) {
             setMessages(prev => [...prev, newMessage]);
             markMessagesAsRead();
           }
-          fetchChats(); // Update chat list
-        }
-      )
+          fetchChats();
+        })
       .subscribe();
-
     return () => {
       supabase.removeChannel(channel);
     };
