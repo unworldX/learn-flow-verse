@@ -1,6 +1,8 @@
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Send, Loader2, Paperclip, Brain, Bot, Trash2, RotateCcw, Plus } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import {
