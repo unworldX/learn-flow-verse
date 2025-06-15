@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -349,19 +350,21 @@ export default function AIChatInterface() {
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                <SelectLabel className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-2 py-1">
-                  {currentProvider?.name || selectedProvider} Models
-                </SelectLabel>
-                {availableModels.map((model) => (
-                  <SelectItem key={model.id} value={model.id}>
-                    <div className="flex items-center gap-2">
-                      <div className="flex flex-col">
-                        <span className="font-medium">{model.name}</span>
-                        {model.free && <span className="text-xs text-green-600">Free</span>}
+                <SelectGroup>
+                  <SelectLabel className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-2 py-1">
+                    {currentProvider?.name || selectedProvider} Models
+                  </SelectLabel>
+                  {availableModels.map((model) => (
+                    <SelectItem key={model.id} value={model.id}>
+                      <div className="flex items-center gap-2">
+                        <div className="flex flex-col">
+                          <span className="font-medium">{model.name}</span>
+                          {model.free && <span className="text-xs text-green-600">Free</span>}
+                        </div>
                       </div>
-                    </div>
-                  </SelectItem>
-                ))}
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
               </SelectContent>
             </Select>
             
