@@ -1,25 +1,19 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Eye, EyeOff, Bot, Key, Shield, Trash2, Save, RefreshCw } from 'lucide-react';
-import { useState, useEffect } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 
-const API_PROVIDERS = {
-  openrouter: {
-    name: 'OpenRouter',
-    description: 'Access to multiple AI models through one API',
-    keyName: 'openrouter_api_key',
-    website: 'https://openrouter.ai/',
-    placeholder: 'sk-or-...'
-  },
+const AI_PROVIDERS = {
   openai: {
     name: 'OpenAI',
+    models: ['gpt-4o-mini', 'gpt-4o'],
     description: 'GPT models and advanced AI capabilities',
     keyName: 'openai_api_key',
     website: 'https://platform.openai.com/',
@@ -27,6 +21,7 @@ const API_PROVIDERS = {
   },
   anthropic: {
     name: 'Anthropic',
+    models: ['claude-opus-4-20250514', 'claude-sonnet-4-20250514'],
     description: 'Claude models for thoughtful AI conversations',
     keyName: 'anthropic_api_key',
     website: 'https://console.anthropic.com/',
@@ -34,6 +29,7 @@ const API_PROVIDERS = {
   },
   google: {
     name: 'Google AI',
+    models: ['gemini-1.5-flash', 'gemini-1.5-pro'],
     description: 'Gemini models and Google AI services',
     keyName: 'google_api_key',
     website: 'https://makersuite.google.com/',
@@ -41,12 +37,15 @@ const API_PROVIDERS = {
   },
   deepseek: {
     name: 'DeepSeek',
+    models: ['deepseek-chat', 'deepseek-coder'],
     description: 'Advanced reasoning and coding models',
     keyName: 'deepseek_api_key',
     website: 'https://platform.deepseek.com/',
     placeholder: 'sk-...'
   }
 };
+
+const ALL_PROVIDER_KEYS = Object.keys(AI_PROVIDERS);
 
 const AISettings = () => {
   const { toast } = useToast();
@@ -55,6 +54,16 @@ const AISettings = () => {
   const [showApiKeys, setShowApiKeys] = useState<Record<string, boolean>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+
+  // New: Provider/model selection
+  const [provider, setProvider] = useState(() =>
+    localStorage.getItem('ai-provider') || ALL_PROVIDER_KEYS[0]
+  );
+  const [model, setModel] = useState(() =>
+    localStorage.getItem('ai-model') ||
+    AI_PROVIDERS[localStorage.getItem('ai-provider') as keyof typeof AI_PROVIDERS]?.models[0] ||
+    AI_PROVIDERS[ALL_PROVIDER_KEYS[0]].models[0]
+  );
 
   // Load API keys for the current user
   useEffect(() => {
@@ -67,7 +76,6 @@ const AISettings = () => {
     if (!user) return;
     setIsLoading(true);
     try {
-      // Use 'any' for the table to avoid type errors
       const { data, error } = await (supabase as any)
         .from('user_api_keys')
         .select('provider, encrypted_key')
@@ -108,17 +116,14 @@ const AISettings = () => {
 
     setIsSaving(true);
     try {
-      // Delete existing keys for this user
       await (supabase as any)
         .from('user_api_keys')
         .delete()
         .eq('user_id', user.id);
 
-      // Insert new keys
       const keysToInsert = Object.entries(apiKeys)
         .filter(([_, value]) => value.trim() !== '')
         .map(([keyName, encrypted_key]) => {
-          // Extract provider name from keyName, e.g. openai_api_key -> openai
           const provider = keyName.replace('_api_key', '');
           return {
             user_id: user.id,
@@ -134,9 +139,12 @@ const AISettings = () => {
         if (error) throw error;
       }
 
+      localStorage.setItem('ai-provider', provider);
+      localStorage.setItem('ai-model', model);
+
       toast({
-        title: "API keys saved",
-        description: "Your API keys have been securely saved."
+        title: "Settings saved",
+        description: "Your AI settings and keys have been saved."
       });
     } catch (error) {
       console.error('Error saving API keys:', error);
@@ -156,7 +164,6 @@ const AISettings = () => {
 
   const clearAllApiKeys = async () => {
     if (!user) return;
-
     try {
       await (supabase as any)
         .from('user_api_keys')
@@ -177,6 +184,13 @@ const AISettings = () => {
       });
     }
   };
+
+  // Update models when provider changes
+  useEffect(() => {
+    if (!AI_PROVIDERS[provider]?.models.includes(model)) {
+      setModel(AI_PROVIDERS[provider]?.models[0] || '');
+    }
+  }, [provider]);
 
   if (!user) {
     return (
@@ -205,11 +219,11 @@ const AISettings = () => {
             AI Provider Settings
           </CardTitle>
           <CardDescription className="text-blue-700">
-            Configure your AI provider API keys. All keys are securely encrypted and stored per user.
+            Configure your AI provider, preferred model, and API keys. All keys are encrypted and stored per user.
           </CardDescription>
         </CardHeader>
+
         <CardContent className="space-y-6">
-          {/* Security Notice */}
           <div className="p-4 bg-white/70 rounded-xl border border-blue-200">
             <div className="flex items-start gap-3">
               <Shield className="w-5 h-5 text-blue-600 mt-0.5" />
@@ -222,73 +236,82 @@ const AISettings = () => {
             </div>
           </div>
 
-          {/* API Keys */}
-          <div className="space-y-6">
-            <div className="flex items-center justify-between">
-              <Label className="text-lg font-semibold text-gray-800 flex items-center gap-2">
-                <Key className="w-5 h-5" />
-                API Keys
-              </Label>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                onClick={loadUserApiKeys}
-                disabled={isLoading}
-                className="gap-2"
-              >
-                <RefreshCw className={`w-4 h-4 ${isLoading ? 'animate-spin' : ''}`} />
-                Refresh
-              </Button>
-            </div>
-            
-            {Object.entries(API_PROVIDERS).map(([key, provider]) => (
-              <Card key={key} className="border-gray-200 hover:border-gray-300 transition-all duration-200 hover:shadow-md">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <CardTitle className="text-base font-semibold text-gray-800">{provider.name}</CardTitle>
-                      <CardDescription className="text-sm text-gray-600 mt-1">
-                        {provider.description}
-                      </CardDescription>
-                    </div>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => window.open(provider.website, '_blank')}
-                      className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+          {/* Provider Setting Toggle */}
+          <Tabs value={provider} onValueChange={setProvider}>
+            <TabsList className="grid grid-cols-4 w-full mb-6">
+              {ALL_PROVIDER_KEYS.map(p => (
+                <TabsTrigger 
+                  key={p}
+                  value={p}
+                  className="rounded-xl font-medium capitalize"
+                >
+                  {AI_PROVIDERS[p].name}
+                </TabsTrigger>
+              ))}
+            </TabsList>
+            {ALL_PROVIDER_KEYS.map((p) => (
+              <TabsContent value={p} key={p}>
+                <div className="space-y-4">
+                  <Card className="border-gray-200 hover:border-gray-300 transition-all duration-200 hover:shadow-md">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <CardTitle className="text-base font-semibold text-gray-800">{AI_PROVIDERS[p].name}</CardTitle>
+                          <CardDescription className="text-sm text-gray-600 mt-1">
+                            {AI_PROVIDERS[p].description}
+                          </CardDescription>
+                        </div>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => window.open(AI_PROVIDERS[p].website, '_blank')}
+                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
+                        >Get API Key</Button>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="pt-0">
+                      <div className="relative">
+                        <Input
+                          type={showApiKeys[AI_PROVIDERS[p].keyName] ? "text" : "password"}
+                          placeholder={AI_PROVIDERS[p].placeholder}
+                          value={apiKeys[AI_PROVIDERS[p].keyName] || ''}
+                          onChange={(e) => handleApiKeyChange(AI_PROVIDERS[p].keyName, e.target.value)}
+                          className="pr-12 font-mono text-sm border-gray-200 focus:border-blue-400 focus:ring-blue-400/20 transition-all duration-200"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          className="absolute right-1 top-1 h-8 w-8 p-0 hover:bg-gray-100"
+                          onClick={() => toggleApiKeyVisibility(AI_PROVIDERS[p].keyName)}
+                        >
+                          {showApiKeys[AI_PROVIDERS[p].keyName] ? 
+                            <EyeOff className="h-4 w-4 text-gray-500" /> : 
+                            <Eye className="h-4 w-4 text-gray-500" />
+                          }
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                  {/* Model select */}
+                  <div>
+                    <Label className="text-sm font-medium text-slate-800">Default Model</Label>
+                    <select
+                      value={provider === p ? model : AI_PROVIDERS[p].models[0]}
+                      onChange={e => setModel(e.target.value)}
+                      className="mt-2 w-full border-slate-200 rounded-xl h-11 px-3 text-base"
+                      disabled={provider !== p}
                     >
-                      Get API Key
-                    </Button>
+                      {AI_PROVIDERS[p].models.map(m => (
+                        <option key={m} value={m}>{m}</option>
+                      ))}
+                    </select>
                   </div>
-                </CardHeader>
-                <CardContent className="pt-0">
-                  <div className="relative">
-                    <Input
-                      type={showApiKeys[provider.keyName] ? "text" : "password"}
-                      placeholder={provider.placeholder}
-                      value={apiKeys[provider.keyName] || ''}
-                      onChange={(e) => handleApiKeyChange(provider.keyName, e.target.value)}
-                      className="pr-12 font-mono text-sm border-gray-200 focus:border-blue-400 focus:ring-blue-400/20 transition-all duration-200"
-                    />
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      className="absolute right-1 top-1 h-8 w-8 p-0 hover:bg-gray-100"
-                      onClick={() => toggleApiKeyVisibility(provider.keyName)}
-                    >
-                      {showApiKeys[provider.keyName] ? 
-                        <EyeOff className="h-4 w-4 text-gray-500" /> : 
-                        <Eye className="h-4 w-4 text-gray-500" />
-                      }
-                    </Button>
-                  </div>
-                </CardContent>
-              </Card>
+                </div>
+              </TabsContent>
             ))}
-          </div>
+          </Tabs>
 
-          {/* Action Buttons */}
           <div className="flex justify-between items-center pt-6 border-t border-gray-200">
             <Button 
               variant="outline" 
@@ -309,12 +332,11 @@ const AISettings = () => {
               ) : (
                 <Save className="w-4 h-4" />
               )}
-              {isSaving ? 'Saving...' : 'Save API Keys'}
+              {isSaving ? 'Saving...' : 'Save Settings'}
             </Button>
           </div>
-
           <div className="text-xs text-gray-500 text-center pt-4 border-t border-gray-100">
-            API keys are encrypted using industry-standard encryption and stored securely in your user account.
+            API keys and model selection are encrypted and securely stored in your user account.
           </div>
         </CardContent>
       </Card>

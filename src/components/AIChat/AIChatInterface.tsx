@@ -1,12 +1,13 @@
 
 import React, { useState, useRef, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Send, Bot, User, Sparkles, Brain, BookOpen, Calculator, Lightbulb, Zap } from 'lucide-react';
+import { Send, Bot, User, Sparkles, Brain, BookOpen, Calculator, Lightbulb, Zap, Upload } from 'lucide-react';
+import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/hooks/useAuth';
 import { useAIChatMessages } from '@/hooks/useAIChatMessages';
 
@@ -14,6 +15,8 @@ const AIChatInterface = () => {
   const { user } = useAuth();
   const { messages, sendMessage, isLoading } = useAIChatMessages();
   const [input, setInput] = useState('');
+  const [reasoning, setReasoning] = useState(false);
+  const [file, setFile] = useState<File | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -26,11 +29,22 @@ const AIChatInterface = () => {
   }, [messages]);
 
   const handleSend = async () => {
-    if (!input.trim()) return;
-    
+    if (!input.trim() && !file) return;
+
+    // Only implement message sending; file logic is left as a TODO.
     const message = input.trim();
     setInput('');
-    await sendMessage(message);
+    setFile(null);
+
+    // If file exists, display a toast
+    if (file) {
+      // TODO: handle file sending here
+      alert(`Selected file: ${file.name}. File upload logic not implemented.`);
+    }
+
+    if (message) {
+      await sendMessage(message, reasoning); // reasoning sent as second arg for future API use
+    }
   };
 
   const handleKeyPress = (e: React.KeyboardEvent) => {
@@ -68,33 +82,6 @@ const AIChatInterface = () => {
 
   return (
     <div className="h-full bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col">
-      {/* Header */}
-      <div className="bg-white/80 backdrop-blur-md border-b border-slate-200 p-3 md:p-6 shadow-sm">
-        <div className="max-w-4xl mx-auto">
-          <div className="flex items-center gap-3 md:gap-4">
-            <div className="w-10 h-10 md:w-12 md:h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl md:rounded-2xl flex items-center justify-center shadow-lg">
-              <Bot className="w-5 h-5 md:w-6 md:h-6 text-white" />
-            </div>
-            <div className="flex-1 min-w-0">
-              <h1 className="text-lg md:text-xl lg:text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent truncate">
-                AI Study Assistant
-              </h1>
-              <p className="text-slate-600 text-xs md:text-sm lg:text-base truncate">Your personal learning companion powered by AI</p>
-            </div>
-            <div className="hidden sm:flex items-center gap-2">
-              <Badge className="bg-green-100 text-green-700 hover:bg-green-100 rounded-lg text-xs">
-                <Zap className="w-3 h-3 mr-1" />
-                Online
-              </Badge>
-              <Badge className="bg-blue-100 text-blue-700 hover:bg-blue-100 rounded-lg text-xs">
-                <Sparkles className="w-3 h-3 mr-1" />
-                AI Powered
-              </Badge>
-            </div>
-          </div>
-        </div>
-      </div>
-
       {/* Chat Messages */}
       <div className="flex-1 overflow-hidden">
         <ScrollArea className="h-full">
@@ -110,8 +97,6 @@ const AIChatInterface = () => {
                 <p className="text-slate-600 mb-6 md:mb-8 max-w-md mx-auto text-sm md:text-base px-4">
                   I'm here to help you learn, solve problems, and achieve your academic goals. Ask me anything!
                 </p>
-
-                {/* Quick Prompts */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 md:gap-4 max-w-2xl mx-auto px-4">
                   {quickPrompts.map((prompt, index) => (
                     <Button
@@ -140,7 +125,6 @@ const AIChatInterface = () => {
                       </AvatarFallback>
                     </Avatar>
                   )}
-                  
                   <div className={`max-w-[85%] md:max-w-[70%] ${
                     message.type === 'user' 
                       ? 'bg-gradient-to-br from-blue-500 to-purple-600 text-white' 
@@ -157,7 +141,6 @@ const AIChatInterface = () => {
                       {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </div>
                   </div>
-
                   {message.type === 'user' && (
                     <Avatar className="w-8 h-8 md:w-10 md:h-10 border-2 border-white shadow-lg flex-shrink-0">
                       <AvatarFallback className="bg-gradient-to-br from-slate-600 to-slate-700 text-white">
@@ -188,7 +171,6 @@ const AIChatInterface = () => {
                 </div>
               </div>
             )}
-            
             <div ref={messagesEndRef} />
           </div>
         </ScrollArea>
@@ -197,8 +179,8 @@ const AIChatInterface = () => {
       {/* Input Area */}
       <div className="bg-white/80 backdrop-blur-md border-t border-slate-200 p-3 md:p-6 shadow-lg">
         <div className="max-w-4xl mx-auto">
-          <div className="flex gap-2 md:gap-3 items-end">
-            <div className="flex-1 relative">
+          <div className="flex flex-col md:flex-row md:items-end gap-2 md:gap-3">
+            <div className="flex-1 relative flex flex-col md:flex-row gap-2">
               <Input
                 ref={inputRef}
                 value={input}
@@ -208,16 +190,45 @@ const AIChatInterface = () => {
                 disabled={isLoading}
                 className="pr-16 h-10 md:h-12 lg:h-14 border-2 border-slate-200 focus:border-blue-400 focus:ring-blue-400 rounded-xl md:rounded-2xl bg-white shadow-sm text-sm md:text-base resize-none"
               />
+              <div className="flex items-center gap-1">
+                <Switch
+                  id="reasoning"
+                  checked={reasoning}
+                  onCheckedChange={setReasoning}
+                  className="mr-2"
+                />
+                <label htmlFor="reasoning" className="text-xs text-slate-600 select-none mr-3">
+                  Reasoning
+                </label>
+                <label
+                  htmlFor="file-upload"
+                  className="flex items-center cursor-pointer hover:bg-slate-100 rounded-lg p-1 transition"
+                  title="Attach File"
+                >
+                  <Upload className="w-5 h-5 text-blue-500" />
+                  <input
+                    id="file-upload"
+                    type="file"
+                    className="hidden"
+                    onChange={e => {
+                      if (e.target.files && e.target.files[0]) setFile(e.target.files[0]);
+                    }}
+                    disabled={isLoading}
+                  />
+                </label>
+                {file && (
+                  <span className="ml-1 text-xs text-slate-700">{file.name}</span>
+                )}
+              </div>
             </div>
             <Button
               onClick={handleSend}
-              disabled={!input.trim() || isLoading}
+              disabled={(!input.trim() && !file) || isLoading}
               className="h-10 md:h-12 lg:h-14 px-4 md:px-6 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-slate-400 disabled:to-slate-500 text-white shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl md:rounded-2xl"
             >
               <Send className="w-4 h-4 md:w-5 md:h-5" />
             </Button>
           </div>
-          
           <div className="mt-2 md:mt-3 text-center">
             <p className="text-xs text-slate-500">
               Press Enter to send • Your AI assistant is here to help with studies, homework, and learning
