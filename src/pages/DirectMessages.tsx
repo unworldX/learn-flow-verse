@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,7 +8,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
-import { Upload, Send, Image, Video, FileText, Search } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
+import { Upload, Send, Image, Video, FileText, Search, MoreVertical, Phone, VideoIcon } from 'lucide-react';
 import { encryptText, decryptText } from '@/lib/encryption';
 
 interface User {
@@ -338,55 +338,74 @@ const DirectMessages = () => {
 
   const renderMessage = (message: DirectMessage) => {
     const isOwn = message.sender_id === user?.id;
+    const messageTime = new Date(message.created_at);
+    const isToday = messageTime.toDateString() === new Date().toDateString();
+    const timeDisplay = isToday 
+      ? messageTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : messageTime.toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     
     return (
-      <div key={message.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-4`}>
-        <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-          isOwn ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-900'
-        }`}>
-          {message.message_type === 'text' ? (
-            <p>{message.decrypted_content || message.encrypted_content}</p>
-          ) : message.message_type === 'image' ? (
-            <div>
-              <img src={message.file_url} alt={message.file_name} className="max-w-full rounded" />
-              <p className="text-xs mt-1 opacity-75">{message.file_name}</p>
-            </div>
-          ) : message.message_type === 'video' ? (
-            <div>
-              <video controls className="max-w-full rounded">
-                <source src={message.file_url} />
-              </video>
-              <p className="text-xs mt-1 opacity-75">{message.file_name}</p>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4" />
-              <a href={message.file_url} download={message.file_name} className="underline">
-                {message.file_name}
-              </a>
-            </div>
-          )}
-          <p className="text-xs mt-1 opacity-75">
-            {new Date(message.created_at).toLocaleTimeString()}
-          </p>
+      <div key={message.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-3 group`}>
+        {!isOwn && (
+          <Avatar className="w-8 h-8 mr-2 mt-1">
+            <AvatarFallback className="text-xs bg-gradient-to-br from-blue-400 to-purple-500 text-white">
+              {selectedChat?.full_name?.[0] || selectedChat?.email[0].toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+        )}
+        <div className={`max-w-xs lg:max-w-md ${isOwn ? 'ml-12' : 'mr-12'}`}>
+          <div className={`px-4 py-2 rounded-2xl shadow-sm ${
+            isOwn 
+              ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white ml-auto' 
+              : 'bg-white border border-gray-200 text-gray-900'
+          } ${isOwn ? 'rounded-br-md' : 'rounded-bl-md'}`}>
+            {message.message_type === 'text' ? (
+              <p className="text-sm leading-relaxed">{message.decrypted_content || message.encrypted_content}</p>
+            ) : message.message_type === 'image' ? (
+              <div className="space-y-2">
+                <img src={message.file_url} alt={message.file_name} className="max-w-full rounded-lg" />
+                <p className="text-xs opacity-75">{message.file_name}</p>
+              </div>
+            ) : message.message_type === 'video' ? (
+              <div className="space-y-2">
+                <video controls className="max-w-full rounded-lg">
+                  <source src={message.file_url} />
+                </video>
+                <p className="text-xs opacity-75">{message.file_name}</p>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4" />
+                <a href={message.file_url} download={message.file_name} className="underline text-sm">
+                  {message.file_name}
+                </a>
+              </div>
+            )}
+          </div>
+          <div className={`flex items-center gap-1 mt-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
+            <span className="text-xs text-gray-500">{timeDisplay}</span>
+            {isOwn && message.is_read && (
+              <span className="text-xs text-blue-500">✓✓</span>
+            )}
+          </div>
         </div>
       </div>
     );
   };
 
   return (
-    <div className="h-full flex">
+    <div className="h-full flex bg-gray-50">
       {/* Chat List */}
-      <div className="w-1/3 border-r">
-        <div className="p-4 border-b">
-          <h2 className="text-xl font-bold mb-4">Direct Messages</h2>
+      <div className="w-1/3 bg-white border-r border-gray-200">
+        <div className="p-4 bg-white border-b border-gray-100">
+          <h2 className="text-xl font-bold mb-4 text-gray-800">Messages</h2>
           <div className="relative">
             <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
             <Input
-              placeholder="Search users..."
+              placeholder="Search conversations..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
+              className="pl-10 bg-gray-50 border-gray-200 focus:bg-white transition-colors"
             />
           </div>
         </div>
@@ -397,29 +416,36 @@ const DirectMessages = () => {
             <div
               key={chat.user.id}
               onClick={() => setSelectedChat(chat.user)}
-              className={`p-4 cursor-pointer hover:bg-gray-50 border-b ${
-                selectedChat?.id === chat.user.id ? 'bg-blue-50' : ''
+              className={`p-4 cursor-pointer hover:bg-gray-50 border-b border-gray-100 transition-all duration-200 ${
+                selectedChat?.id === chat.user.id ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
               }`}
             >
               <div className="flex items-center gap-3">
-                <Avatar>
-                  <AvatarFallback>
-                    {chat.user.full_name?.[0] || chat.user.email[0].toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="flex-1">
-                  <p className="font-medium">{chat.user.full_name || chat.user.email}</p>
+                <div className="relative">
+                  <Avatar className="w-12 h-12">
+                    <AvatarFallback className="bg-gradient-to-br from-blue-400 to-purple-500 text-white font-medium">
+                      {chat.user.full_name?.[0] || chat.user.email[0].toUpperCase()}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white rounded-full"></div>
+                </div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center justify-between mb-1">
+                    <p className="font-medium text-gray-900 truncate">
+                      {chat.user.full_name || chat.user.email}
+                    </p>
+                    {chat.unreadCount > 0 && (
+                      <Badge className="bg-blue-500 text-white text-xs px-2 py-1 rounded-full">
+                        {chat.unreadCount}
+                      </Badge>
+                    )}
+                  </div>
                   <p className="text-sm text-gray-500 truncate">
-                    {chat.lastMessage?.message_type === 'text' ? 'Text message' : 
-                     chat.lastMessage?.message_type === 'image' ? '📷 Image' :
+                    {chat.lastMessage?.message_type === 'text' ? '💬 Text message' : 
+                     chat.lastMessage?.message_type === 'image' ? '📷 Photo' :
                      chat.lastMessage?.message_type === 'video' ? '🎥 Video' : '📎 File'}
                   </p>
                 </div>
-                {chat.unreadCount > 0 && (
-                  <span className="bg-blue-500 text-white text-xs rounded-full px-2 py-1">
-                    {chat.unreadCount}
-                  </span>
-                )}
               </div>
             </div>
           ))}
@@ -429,20 +455,20 @@ const DirectMessages = () => {
             <>
               <Separator className="my-2" />
               <div className="p-2">
-                <p className="text-sm font-medium text-gray-500 mb-2">Start new chat</p>
+                <p className="text-sm font-medium text-gray-500 mb-2 px-2">Start new chat</p>
                 {filteredUsers.map((user) => (
                   <div
                     key={user.id}
                     onClick={() => startNewChat(user)}
-                    className="p-2 cursor-pointer hover:bg-gray-50 rounded flex items-center gap-3"
+                    className="p-3 cursor-pointer hover:bg-gray-50 rounded-lg flex items-center gap-3 transition-colors"
                   >
-                    <Avatar className="w-8 h-8">
-                      <AvatarFallback className="text-xs">
+                    <Avatar className="w-10 h-10">
+                      <AvatarFallback className="text-sm bg-gradient-to-br from-green-400 to-blue-500 text-white">
                         {user.full_name?.[0] || user.email[0].toUpperCase()}
                       </AvatarFallback>
                     </Avatar>
                     <div>
-                      <p className="text-sm font-medium">{user.full_name || user.email}</p>
+                      <p className="text-sm font-medium text-gray-900">{user.full_name || user.email}</p>
                       <p className="text-xs text-gray-500">{user.email}</p>
                     </div>
                   </div>
@@ -454,66 +480,93 @@ const DirectMessages = () => {
       </div>
 
       {/* Chat Area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col bg-white">
         {selectedChat ? (
           <>
             {/* Chat Header */}
-            <div className="p-4 border-b flex items-center gap-3">
-              <Avatar>
-                <AvatarFallback>
-                  {selectedChat.full_name?.[0] || selectedChat.email[0].toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              <div>
-                <h3 className="font-medium">{selectedChat.full_name || selectedChat.email}</h3>
-                <p className="text-sm text-gray-500">{selectedChat.email}</p>
+            <div className="p-4 bg-white border-b border-gray-200 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Avatar className="w-10 h-10">
+                  <AvatarFallback className="bg-gradient-to-br from-blue-400 to-purple-500 text-white font-medium">
+                    {selectedChat.full_name?.[0] || selectedChat.email[0].toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div>
+                  <h3 className="font-semibold text-gray-900">{selectedChat.full_name || selectedChat.email}</h3>
+                  <p className="text-sm text-green-500">● Online</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button variant="ghost" size="icon" className="rounded-full">
+                  <Phone className="w-4 h-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="rounded-full">
+                  <VideoIcon className="w-4 h-4" />
+                </Button>
+                <Button variant="ghost" size="icon" className="rounded-full">
+                  <MoreVertical className="w-4 h-4" />
+                </Button>
               </div>
             </div>
 
             {/* Messages */}
-            <ScrollArea className="flex-1 p-4">
-              {messages.map(renderMessage)}
+            <ScrollArea className="flex-1 p-4 bg-gradient-to-b from-gray-50 to-white">
+              <div className="space-y-1">
+                {messages.map(renderMessage)}
+              </div>
               <div ref={messagesEndRef} />
             </ScrollArea>
 
             {/* Message Input */}
-            <div className="p-4 border-t">
-              <div className="flex gap-2">
-                <Input
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Type a message..."
-                  onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendTextMessage()}
-                  className="flex-1"
-                />
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleFileUpload(file);
-                  }}
-                />
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={loading}
+            <div className="p-4 bg-white border-t border-gray-200">
+              <div className="flex gap-3 items-end">
+                <div className="flex-1 relative">
+                  <Input
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Type a message..."
+                    onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendTextMessage()}
+                    className="pr-12 py-3 rounded-full border-gray-300 focus:border-blue-500 transition-colors"
+                  />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleFileUpload(file);
+                    }}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={loading}
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 rounded-full"
+                  >
+                    <Upload className="w-4 h-4" />
+                  </Button>
+                </div>
+                <Button 
+                  onClick={sendTextMessage} 
+                  disabled={loading || !newMessage.trim()}
+                  className="rounded-full px-6 bg-blue-500 hover:bg-blue-600"
                 >
-                  <Upload className="w-4 h-4" />
-                </Button>
-                <Button onClick={sendTextMessage} disabled={loading || !newMessage.trim()}>
                   <Send className="w-4 h-4" />
                 </Button>
               </div>
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-gray-500">
-            <div className="text-center">
-              <h3 className="text-lg font-medium mb-2">Select a chat to start messaging</h3>
-              <p>Choose from existing chats or search for users to start a new conversation</p>
+          <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50">
+            <div className="text-center max-w-md mx-auto p-8">
+              <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Send className="w-10 h-10 text-white" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">Select a conversation</h3>
+              <p className="text-gray-500 leading-relaxed">
+                Choose from your existing conversations or search for someone new to start messaging
+              </p>
             </div>
           </div>
         )}

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -17,7 +16,7 @@ import { Label } from '@/components/ui/label';
 import { Separator } from '@/components/ui/separator';
 import { 
   Plus, Send, Upload, Users, Settings, Crown, Shield, 
-  User, Search, MessageCircle, Image, Video, FileText, Lock 
+  User, Search, MessageCircle, Image, Video, FileText, Lock, MoreVertical 
 } from 'lucide-react';
 import { encryptText, decryptText } from '@/lib/encryption';
 
@@ -421,64 +420,78 @@ const StudyGroups = () => {
 
   const renderMessage = (message: GroupMessage) => {
     const isOwn = message.sender_id === user?.id;
+    const messageTime = new Date(message.created_at);
+    const isToday = messageTime.toDateString() === new Date().toDateString();
+    const timeDisplay = isToday 
+      ? messageTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+      : messageTime.toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     
     return (
-      <div key={message.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-4`}>
-        <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-          isOwn ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-900'
-        }`}>
+      <div key={message.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-4 group`}>
+        {!isOwn && (
+          <Avatar className="w-8 h-8 mr-3 mt-1">
+            <AvatarFallback className="text-xs bg-gradient-to-br from-green-400 to-blue-500 text-white">
+              {message.sender?.full_name?.[0] || message.sender?.email[0].toUpperCase()}
+            </AvatarFallback>
+          </Avatar>
+        )}
+        <div className={`max-w-xs lg:max-w-md ${isOwn ? 'ml-12' : 'mr-12'}`}>
           {!isOwn && (
-            <p className="text-xs font-medium mb-1 opacity-75">
+            <p className="text-xs font-medium text-gray-600 mb-1 ml-2">
               {message.sender?.full_name || message.sender?.email}
             </p>
           )}
-          
-          {message.message_type === 'text' ? (
-            <p>{message.decrypted_content || message.encrypted_content}</p>
-          ) : message.message_type === 'image' ? (
-            <div>
-              <img src={message.file_url} alt={message.file_name} className="max-w-full rounded" />
-              <p className="text-xs mt-1 opacity-75">{message.file_name}</p>
-            </div>
-          ) : message.message_type === 'video' ? (
-            <div>
-              <video controls className="max-w-full rounded">
-                <source src={message.file_url} />
-              </video>
-              <p className="text-xs mt-1 opacity-75">{message.file_name}</p>
-            </div>
-          ) : (
-            <div className="flex items-center gap-2">
-              <FileText className="w-4 h-4" />
-              <a href={message.file_url} download={message.file_name} className="underline">
-                {message.file_name}
-              </a>
-            </div>
-          )}
-          
-          <p className="text-xs mt-1 opacity-75">
-            {new Date(message.created_at).toLocaleTimeString()}
-          </p>
+          <div className={`px-4 py-3 rounded-2xl shadow-sm ${
+            isOwn 
+              ? 'bg-gradient-to-r from-green-500 to-green-600 text-white ml-auto' 
+              : 'bg-white border border-gray-200 text-gray-900'
+          } ${isOwn ? 'rounded-br-md' : 'rounded-bl-md'}`}>
+            {message.message_type === 'text' ? (
+              <p className="text-sm leading-relaxed">{message.decrypted_content || message.encrypted_content}</p>
+            ) : message.message_type === 'image' ? (
+              <div className="space-y-2">
+                <img src={message.file_url} alt={message.file_name} className="max-w-full rounded-lg" />
+                <p className="text-xs opacity-75">{message.file_name}</p>
+              </div>
+            ) : message.message_type === 'video' ? (
+              <div className="space-y-2">
+                <video controls className="max-w-full rounded-lg">
+                  <source src={message.file_url} />
+                </video>
+                <p className="text-xs opacity-75">{message.file_name}</p>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2">
+                <FileText className="w-4 h-4" />
+                <a href={message.file_url} download={message.file_name} className="underline text-sm">
+                  {message.file_name}
+                </a>
+              </div>
+            )}
+          </div>
+          <div className={`flex items-center gap-1 mt-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
+            <span className="text-xs text-gray-500">{timeDisplay}</span>
+          </div>
         </div>
       </div>
     );
   };
 
   return (
-    <div className="h-full flex">
+    <div className="h-full flex bg-gray-50">
       {/* Groups List */}
-      <div className="w-1/3 border-r">
-        <div className="p-4 border-b">
+      <div className="w-1/3 bg-white border-r border-gray-200">
+        <div className="p-4 bg-white border-b border-gray-100">
           <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold">Study Groups</h2>
+            <h2 className="text-xl font-bold text-gray-800">Study Groups</h2>
             <Dialog open={showCreateDialog} onOpenChange={setShowCreateDialog}>
               <DialogTrigger asChild>
-                <Button size="sm">
+                <Button size="sm" className="bg-green-500 hover:bg-green-600">
                   <Plus className="w-4 h-4 mr-2" />
                   Create
                 </Button>
               </DialogTrigger>
-              <DialogContent>
+              <DialogContent className="sm:max-w-md">
                 <DialogHeader>
                   <DialogTitle>Create Study Group</DialogTitle>
                 </DialogHeader>
@@ -490,6 +503,7 @@ const StudyGroups = () => {
                       value={newGroup.name}
                       onChange={(e) => setNewGroup(prev => ({ ...prev, name: e.target.value }))}
                       placeholder="Enter group name"
+                      className="mt-1"
                     />
                   </div>
                   <div>
@@ -499,6 +513,7 @@ const StudyGroups = () => {
                       value={newGroup.description}
                       onChange={(e) => setNewGroup(prev => ({ ...prev, description: e.target.value }))}
                       placeholder="Describe your study group"
+                      className="mt-1"
                     />
                   </div>
                   <div className="flex items-center space-x-2">
@@ -518,9 +533,10 @@ const StudyGroups = () => {
                       max="100"
                       value={newGroup.max_members}
                       onChange={(e) => setNewGroup(prev => ({ ...prev, max_members: parseInt(e.target.value) }))}
+                      className="mt-1"
                     />
                   </div>
-                  <Button onClick={createGroup} disabled={loading || !newGroup.name.trim()}>
+                  <Button onClick={createGroup} disabled={loading || !newGroup.name.trim()} className="w-full">
                     Create Group
                   </Button>
                 </div>
@@ -534,25 +550,35 @@ const StudyGroups = () => {
             <div
               key={group.id}
               onClick={() => setSelectedGroup(group)}
-              className={`p-4 cursor-pointer hover:bg-gray-50 border-b ${
-                selectedGroup?.id === group.id ? 'bg-blue-50' : ''
+              className={`p-4 cursor-pointer hover:bg-gray-50 border-b border-gray-100 transition-all duration-200 ${
+                selectedGroup?.id === group.id ? 'bg-green-50 border-l-4 border-l-green-500' : ''
               }`}
             >
-              <div className="flex items-start justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  <h3 className="font-medium">{group.name}</h3>
-                  {group.is_private && <Lock className="w-4 h-4 text-gray-400" />}
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-blue-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
+                    {group.name[0].toUpperCase()}
+                  </div>
+                  <div>
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className="font-semibold text-gray-900">{group.name}</h3>
+                      {group.is_private && <Lock className="w-4 h-4 text-gray-400" />}
+                    </div>
+                    <Badge variant="outline" className="text-xs">
+                      {getRoleIcon(group.user_role || 'member')}
+                      <span className="ml-1 capitalize">{group.user_role}</span>
+                    </Badge>
+                  </div>
                 </div>
-                <Badge variant="outline" className="text-xs">
-                  {getRoleIcon(group.user_role || 'member')}
-                  <span className="ml-1">{group.user_role}</span>
-                </Badge>
               </div>
               {group.description && (
-                <p className="text-sm text-gray-500 mb-2 line-clamp-2">{group.description}</p>
+                <p className="text-sm text-gray-600 mb-3 line-clamp-2 leading-relaxed">{group.description}</p>
               )}
-              <div className="flex items-center justify-between text-xs text-gray-400">
-                <span>{group.member_count} members</span>
+              <div className="flex items-center justify-between text-xs text-gray-500">
+                <div className="flex items-center gap-1">
+                  <Users className="w-3 h-3" />
+                  <span>{group.member_count} members</span>
+                </div>
                 <span>{new Date(group.created_at).toLocaleDateString()}</span>
               </div>
             </div>
@@ -561,106 +587,126 @@ const StudyGroups = () => {
       </div>
 
       {/* Chat Area */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col bg-white">
         {selectedGroup ? (
           <>
             {/* Group Header */}
-            <div className="p-4 border-b flex items-center justify-between">
+            <div className="p-4 bg-white border-b border-gray-200 flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-r from-green-400 to-blue-500 rounded-full flex items-center justify-center text-white font-bold">
+                <div className="w-12 h-12 bg-gradient-to-br from-green-400 to-blue-500 rounded-full flex items-center justify-center text-white font-bold text-lg">
                   {selectedGroup.name[0].toUpperCase()}
                 </div>
                 <div>
-                  <h3 className="font-medium flex items-center gap-2">
+                  <h3 className="font-semibold text-gray-900 flex items-center gap-2">
                     {selectedGroup.name}
                     {selectedGroup.is_private && <Lock className="w-4 h-4 text-gray-400" />}
                   </h3>
-                  <p className="text-sm text-gray-500">{members.length} members</p>
+                  <p className="text-sm text-gray-500">{members.length} members active</p>
                 </div>
               </div>
-              <Dialog open={showMembersDialog} onOpenChange={setShowMembersDialog}>
-                <DialogTrigger asChild>
-                  <Button variant="outline" size="sm">
-                    <Users className="w-4 h-4 mr-2" />
-                    Members
-                  </Button>
-                </DialogTrigger>
-                <DialogContent>
-                  <DialogHeader>
-                    <DialogTitle>Group Members</DialogTitle>
-                  </DialogHeader>
-                  <ScrollArea className="max-h-96">
-                    {members.map((member) => (
-                      <div key={member.id} className="flex items-center justify-between p-2">
-                        <div className="flex items-center gap-3">
-                          <Avatar className="w-8 h-8">
-                            <AvatarFallback className="text-xs">
-                              {member.user?.full_name?.[0] || member.user?.email[0].toUpperCase()}
-                            </AvatarFallback>
-                          </Avatar>
-                          <div>
-                            <p className="text-sm font-medium">
-                              {member.user?.full_name || member.user?.email}
-                            </p>
-                            <p className="text-xs text-gray-500">{member.user?.email}</p>
+              <div className="flex items-center gap-2">
+                <Dialog open={showMembersDialog} onOpenChange={setShowMembersDialog}>
+                  <DialogTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <Users className="w-4 h-4 mr-2" />
+                      Members
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Group Members ({members.length})</DialogTitle>
+                    </DialogHeader>
+                    <ScrollArea className="max-h-96">
+                      <div className="space-y-3">
+                        {members.map((member) => (
+                          <div key={member.id} className="flex items-center justify-between p-3 rounded-lg hover:bg-gray-50">
+                            <div className="flex items-center gap-3">
+                              <Avatar className="w-10 h-10">
+                                <AvatarFallback className="bg-gradient-to-br from-green-400 to-blue-500 text-white">
+                                  {member.user?.full_name?.[0] || member.user?.email[0].toUpperCase()}
+                                </AvatarFallback>
+                              </Avatar>
+                              <div>
+                                <p className="text-sm font-medium text-gray-900">
+                                  {member.user?.full_name || member.user?.email}
+                                </p>
+                                <p className="text-xs text-gray-500">{member.user?.email}</p>
+                              </div>
+                            </div>
+                            <Badge variant="outline" className="text-xs">
+                              {getRoleIcon(member.role)}
+                              <span className="ml-1 capitalize">{member.role}</span>
+                            </Badge>
                           </div>
-                        </div>
-                        <Badge variant="outline" className="text-xs">
-                          {getRoleIcon(member.role)}
-                          <span className="ml-1">{member.role}</span>
-                        </Badge>
+                        ))}
                       </div>
-                    ))}
-                  </ScrollArea>
-                </DialogContent>
-              </Dialog>
+                    </ScrollArea>
+                  </DialogContent>
+                </Dialog>
+                <Button variant="ghost" size="icon" className="rounded-full">
+                  <MoreVertical className="w-4 h-4" />
+                </Button>
+              </div>
             </div>
 
             {/* Messages */}
-            <ScrollArea className="flex-1 p-4">
-              {messages.map(renderMessage)}
+            <ScrollArea className="flex-1 p-4 bg-gradient-to-b from-gray-50 to-white">
+              <div className="space-y-1">
+                {messages.map(renderMessage)}
+              </div>
               <div ref={messagesEndRef} />
             </ScrollArea>
 
             {/* Message Input */}
-            <div className="p-4 border-t">
-              <div className="flex gap-2">
-                <Input
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Type a message..."
-                  onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendTextMessage()}
-                  className="flex-1"
-                />
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  className="hidden"
-                  onChange={(e) => {
-                    const file = e.target.files?.[0];
-                    if (file) handleFileUpload(file);
-                  }}
-                />
-                <Button
-                  variant="outline"
-                  size="icon"
-                  onClick={() => fileInputRef.current?.click()}
-                  disabled={loading}
+            <div className="p-4 bg-white border-t border-gray-200">
+              <div className="flex gap-3 items-end">
+                <div className="flex-1 relative">
+                  <Input
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    placeholder="Type a message..."
+                    onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendTextMessage()}
+                    className="pr-12 py-3 rounded-full border-gray-300 focus:border-green-500 transition-colors"
+                  />
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    onChange={(e) => {
+                      const file = e.target.files?.[0];
+                      if (file) handleFileUpload(file);
+                    }}
+                  />
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={loading}
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 rounded-full"
+                  >
+                    <Upload className="w-4 h-4" />
+                  </Button>
+                </div>
+                <Button 
+                  onClick={sendTextMessage} 
+                  disabled={loading || !newMessage.trim()}
+                  className="rounded-full px-6 bg-green-500 hover:bg-green-600"
                 >
-                  <Upload className="w-4 h-4" />
-                </Button>
-                <Button onClick={sendTextMessage} disabled={loading || !newMessage.trim()}>
                   <Send className="w-4 h-4" />
                 </Button>
               </div>
             </div>
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-gray-500">
-            <div className="text-center">
-              <Users className="w-16 h-16 mx-auto mb-4 text-gray-300" />
-              <h3 className="text-lg font-medium mb-2">Select a study group</h3>
-              <p>Choose a group to view messages and participate in discussions</p>
+          <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-green-50 to-blue-50">
+            <div className="text-center max-w-md mx-auto p-8">
+              <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-blue-600 rounded-full flex items-center justify-center mx-auto mb-6">
+                <Users className="w-10 h-10 text-white" />
+              </div>
+              <h3 className="text-xl font-semibold text-gray-900 mb-3">Select a study group</h3>
+              <p className="text-gray-500 leading-relaxed">
+                Choose a group to view messages and participate in collaborative discussions
+              </p>
             </div>
           </div>
         )}
