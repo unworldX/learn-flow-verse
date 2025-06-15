@@ -1,175 +1,389 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { Separator } from "@/components/ui/separator";
-import { 
-  Send, 
-  Search, 
-  MoreVertical, 
-  Phone, 
-  Video, 
-  Paperclip,
-  Smile,
-  Check,
-  CheckCheck,
-  Clock
-} from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
-import { useToast } from "@/hooks/use-toast";
-import { cn } from "@/lib/utils";
+import { useAuth } from '@/hooks/useAuth';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { Separator } from '@/components/ui/separator';
+import { Upload, Send, Image, Video, FileText, Search } from 'lucide-react';
+import { encryptText, decryptText } from '@/lib/encryption';
 
-interface Message {
+interface User {
   id: string;
-  content: string;
-  senderId: string;
-  timestamp: Date;
-  isRead: boolean;
-  type: 'text' | 'image' | 'file';
+  email: string;
+  full_name?: string;
+}
+
+interface DirectMessage {
+  id: string;
+  sender_id: string;
+  receiver_id: string;
+  encrypted_content?: string;
+  message_type: 'text' | 'image' | 'video' | 'file';
+  file_url?: string;
+  file_name?: string;
+  file_size?: number;
+  created_at: string;
+  is_read: boolean;
+  decrypted_content?: string;
 }
 
 interface Chat {
-  id: string;
-  name: string;
-  avatar?: string;
-  lastMessage: string;
-  timestamp: Date;
+  user: User;
+  lastMessage?: DirectMessage;
   unreadCount: number;
-  isOnline: boolean;
-  lastSeen?: Date;
 }
 
 const DirectMessages = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [selectedChat, setSelectedChat] = useState<string | null>(null);
+  const [chats, setChats] = useState<Chat[]>([]);
+  const [selectedChat, setSelectedChat] = useState<User | null>(null);
+  const [messages, setMessages] = useState<DirectMessage[]>([]);
   const [newMessage, setNewMessage] = useState('');
+  const [users, setUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
+  const [loading, setLoading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // Mock data - replace with real data from your backend
-  const [chats] = useState<Chat[]>([
-    {
-      id: '1',
-      name: 'Sarah Johnson',
-      avatar: '',
-      lastMessage: 'Hey! Did you finish the chemistry assignment?',
-      timestamp: new Date(Date.now() - 5 * 60 * 1000),
-      unreadCount: 2,
-      isOnline: true
-    },
-    {
-      id: '2',
-      name: 'Mike Chen',
-      avatar: '',
-      lastMessage: 'Thanks for sharing those notes!',
-      timestamp: new Date(Date.now() - 30 * 60 * 1000),
-      unreadCount: 0,
-      isOnline: false,
-      lastSeen: new Date(Date.now() - 15 * 60 * 1000)
-    },
-    {
-      id: '3',
-      name: 'Study Group - Physics',
-      avatar: '',
-      lastMessage: 'Meeting tomorrow at 3 PM',
-      timestamp: new Date(Date.now() - 2 * 60 * 60 * 1000),
-      unreadCount: 5,
-      isOnline: true
+  useEffect(() => {
+    if (user) {
+      fetchUsers();
+      fetchChats();
     }
-  ]);
+  }, [user]);
 
-  const [messages] = useState<Message[]>([
-    {
-      id: '1',
-      content: 'Hey! Did you finish the chemistry assignment?',
-      senderId: '1',
-      timestamp: new Date(Date.now() - 10 * 60 * 1000),
-      isRead: true,
-      type: 'text'
-    },
-    {
-      id: '2',
-      content: 'Yes, just submitted it. It was quite challenging!',
-      senderId: user?.id || 'current-user',
-      timestamp: new Date(Date.now() - 8 * 60 * 1000),
-      isRead: true,
-      type: 'text'
-    },
-    {
-      id: '3',
-      content: 'Could you share your approach to problem 3?',
-      senderId: '1',
-      timestamp: new Date(Date.now() - 5 * 60 * 1000),
-      isRead: false,
-      type: 'text'
+  useEffect(() => {
+    if (selectedChat && user) {
+      fetchMessages();
+      markMessagesAsRead();
     }
-  ]);
-
-  const filteredChats = chats.filter(chat =>
-    chat.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
-
-  const selectedChatData = chats.find(chat => chat.id === selectedChat);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  };
+  }, [selectedChat, user]);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages]);
 
-  const handleSendMessage = () => {
-    if (!newMessage.trim() || !selectedChat) return;
+  useEffect(() => {
+    if (!user) return;
 
-    // Here you would typically send the message to your backend
-    toast({
-      title: "Message sent",
-      description: "Your message has been delivered.",
-    });
+    // Subscribe to new messages
+    const channel = supabase
+      .channel('direct-messages')
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'direct_messages',
+          filter: `receiver_id=eq.${user.id}`
+        },
+        (payload) => {
+          const newMessage = payload.new as DirectMessage;
+          if (selectedChat && newMessage.sender_id === selectedChat.id) {
+            setMessages(prev => [...prev, newMessage]);
+            markMessagesAsRead();
+          }
+          fetchChats(); // Update chat list
+        }
+      )
+      .subscribe();
 
-    setNewMessage('');
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user, selectedChat]);
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
+  const fetchUsers = async () => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('id, email, full_name')
+        .neq('id', user?.id);
+
+      if (error) throw error;
+      setUsers(data || []);
+    } catch (error) {
+      console.error('Error fetching users:', error);
     }
   };
 
-  const formatTime = (date: Date) => {
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const minutes = Math.floor(diff / 60000);
-    const hours = Math.floor(diff / 3600000);
-    const days = Math.floor(diff / 86400000);
+  const fetchChats = async () => {
+    if (!user) return;
 
-    if (minutes < 1) return 'now';
-    if (minutes < 60) return `${minutes}m`;
-    if (hours < 24) return `${hours}h`;
-    return `${days}d`;
+    try {
+      // Fetch messages with sender and receiver information
+      const { data: messagesData, error } = await supabase
+        .from('direct_messages')
+        .select(`
+          id,
+          sender_id,
+          receiver_id,
+          encrypted_content,
+          message_type,
+          file_url,
+          file_name,
+          file_size,
+          created_at,
+          is_read,
+          deleted_by_sender,
+          deleted_by_receiver
+        `)
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+        .order('created_at', { ascending: false });
+
+      if (error) throw error;
+
+      // Get unique user IDs to fetch user details
+      const userIds = new Set<string>();
+      messagesData?.forEach(message => {
+        userIds.add(message.sender_id);
+        userIds.add(message.receiver_id);
+      });
+
+      // Fetch user details
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('id, email, full_name')
+        .in('id', Array.from(userIds));
+
+      if (usersError) throw usersError;
+
+      const usersMap = new Map(usersData?.map(u => [u.id, u]) || []);
+
+      // Group messages by chat partner
+      const chatMap = new Map<string, Chat>();
+      
+      for (const message of messagesData || []) {
+        const partnerId = message.sender_id === user.id ? message.receiver_id : message.sender_id;
+        const partner = usersMap.get(partnerId);
+        
+        if (partner && !chatMap.has(partnerId)) {
+          chatMap.set(partnerId, {
+            user: partner,
+            lastMessage: {
+              ...message,
+              message_type: message.message_type as 'text' | 'image' | 'video' | 'file'
+            },
+            unreadCount: 0
+          });
+        }
+
+        // Count unread messages
+        if (message.receiver_id === user.id && !message.is_read) {
+          const chat = chatMap.get(partnerId);
+          if (chat) {
+            chat.unreadCount++;
+          }
+        }
+      }
+
+      setChats(Array.from(chatMap.values()));
+    } catch (error) {
+      console.error('Error fetching chats:', error);
+    }
   };
 
-  const getInitials = (name: string) => {
-    return name.split(' ').map(n => n[0]).join('').toUpperCase();
+  const fetchMessages = async () => {
+    if (!selectedChat || !user) return;
+
+    try {
+      const { data, error } = await supabase
+        .from('direct_messages')
+        .select('*')
+        .or(`and(sender_id.eq.${user.id},receiver_id.eq.${selectedChat.id}),and(sender_id.eq.${selectedChat.id},receiver_id.eq.${user.id})`)
+        .order('created_at', { ascending: true });
+
+      if (error) throw error;
+
+      // Decrypt text messages and fix types
+      const decryptedMessages = await Promise.all(
+        (data || []).map(async (message) => {
+          const typedMessage: DirectMessage = {
+            ...message,
+            message_type: message.message_type as 'text' | 'image' | 'video' | 'file'
+          };
+
+          if (message.message_type === 'text' && message.encrypted_content) {
+            return {
+              ...typedMessage,
+              decrypted_content: await decryptText(message.encrypted_content)
+            };
+          }
+          return typedMessage;
+        })
+      );
+
+      setMessages(decryptedMessages);
+    } catch (error) {
+      console.error('Error fetching messages:', error);
+    }
+  };
+
+  const markMessagesAsRead = async () => {
+    if (!selectedChat || !user) return;
+
+    try {
+      await supabase
+        .from('direct_messages')
+        .update({ is_read: true })
+        .eq('sender_id', selectedChat.id)
+        .eq('receiver_id', user.id)
+        .eq('is_read', false);
+    } catch (error) {
+      console.error('Error marking messages as read:', error);
+    }
+  };
+
+  const sendTextMessage = async () => {
+    if (!newMessage.trim() || !selectedChat || !user) return;
+
+    setLoading(true);
+    try {
+      const encryptedContent = await encryptText(newMessage);
+      
+      const { error } = await supabase
+        .from('direct_messages')
+        .insert({
+          sender_id: user.id,
+          receiver_id: selectedChat.id,
+          encrypted_content: encryptedContent,
+          message_type: 'text'
+        });
+
+      if (error) throw error;
+
+      setNewMessage('');
+      await fetchMessages();
+      await fetchChats();
+    } catch (error) {
+      console.error('Error sending message:', error);
+      toast({
+        title: "Error",
+        description: "Failed to send message",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleFileUpload = async (file: File) => {
+    if (!selectedChat || !user) return;
+
+    setLoading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('chat-media')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      const { data: urlData } = supabase.storage
+        .from('chat-media')
+        .getPublicUrl(fileName);
+
+      let messageType: 'image' | 'video' | 'file' = 'file';
+      if (file.type.startsWith('image/')) messageType = 'image';
+      else if (file.type.startsWith('video/')) messageType = 'video';
+
+      const { error } = await supabase
+        .from('direct_messages')
+        .insert({
+          sender_id: user.id,
+          receiver_id: selectedChat.id,
+          message_type: messageType,
+          file_url: urlData.publicUrl,
+          file_name: file.name,
+          file_size: file.size
+        });
+
+      if (error) throw error;
+
+      await fetchMessages();
+      await fetchChats();
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      toast({
+        title: "Error",
+        description: "Failed to upload file",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const startNewChat = (selectedUser: User) => {
+    setSelectedChat(selectedUser);
+    setMessages([]);
+  };
+
+  const filteredUsers = users.filter(u => 
+    u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    u.full_name?.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const renderMessage = (message: DirectMessage) => {
+    const isOwn = message.sender_id === user?.id;
+    
+    return (
+      <div key={message.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-4`}>
+        <div className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+          isOwn ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-900'
+        }`}>
+          {message.message_type === 'text' ? (
+            <p>{message.decrypted_content || message.encrypted_content}</p>
+          ) : message.message_type === 'image' ? (
+            <div>
+              <img src={message.file_url} alt={message.file_name} className="max-w-full rounded" />
+              <p className="text-xs mt-1 opacity-75">{message.file_name}</p>
+            </div>
+          ) : message.message_type === 'video' ? (
+            <div>
+              <video controls className="max-w-full rounded">
+                <source src={message.file_url} />
+              </video>
+              <p className="text-xs mt-1 opacity-75">{message.file_name}</p>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2">
+              <FileText className="w-4 h-4" />
+              <a href={message.file_url} download={message.file_name} className="underline">
+                {message.file_name}
+              </a>
+            </div>
+          )}
+          <p className="text-xs mt-1 opacity-75">
+            {new Date(message.created_at).toLocaleTimeString()}
+          </p>
+        </div>
+      </div>
+    );
   };
 
   return (
-    <div className="h-full flex bg-background">
-      {/* Chat List Sidebar */}
-      <div className="w-80 border-r bg-card">
+    <div className="h-full flex">
+      {/* Chat List */}
+      <div className="w-1/3 border-r">
         <div className="p-4 border-b">
-          <h1 className="text-xl font-semibold mb-4">Messages</h1>
+          <h2 className="text-xl font-bold mb-4">Direct Messages</h2>
           <div className="relative">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
             <Input
-              placeholder="Search conversations..."
+              placeholder="Search users..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               className="pl-10"
@@ -177,49 +391,65 @@ const DirectMessages = () => {
           </div>
         </div>
 
-        <ScrollArea className="flex-1">
-          <div className="p-2">
-            {filteredChats.map((chat) => (
-              <div
-                key={chat.id}
-                onClick={() => setSelectedChat(chat.id)}
-                className={cn(
-                  "flex items-center space-x-3 p-3 rounded-lg cursor-pointer transition-all duration-200 hover:bg-accent/50",
-                  selectedChat === chat.id && "bg-accent"
-                )}
-              >
-                <div className="relative">
-                  <Avatar className="w-12 h-12">
-                    <AvatarImage src={chat.avatar} />
-                    <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white">
-                      {getInitials(chat.name)}
-                    </AvatarFallback>
-                  </Avatar>
-                  {chat.isOnline && (
-                    <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-background rounded-full"></div>
-                  )}
-                </div>
-
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between">
-                    <h3 className="font-medium text-sm truncate">{chat.name}</h3>
-                    <span className="text-xs text-muted-foreground">
-                      {formatTime(chat.timestamp)}
-                    </span>
-                  </div>
-                  <p className="text-sm text-muted-foreground truncate mt-1">
-                    {chat.lastMessage}
+        <ScrollArea className="h-[calc(100vh-200px)]">
+          {/* Existing Chats */}
+          {chats.map((chat) => (
+            <div
+              key={chat.user.id}
+              onClick={() => setSelectedChat(chat.user)}
+              className={`p-4 cursor-pointer hover:bg-gray-50 border-b ${
+                selectedChat?.id === chat.user.id ? 'bg-blue-50' : ''
+              }`}
+            >
+              <div className="flex items-center gap-3">
+                <Avatar>
+                  <AvatarFallback>
+                    {chat.user.full_name?.[0] || chat.user.email[0].toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+                <div className="flex-1">
+                  <p className="font-medium">{chat.user.full_name || chat.user.email}</p>
+                  <p className="text-sm text-gray-500 truncate">
+                    {chat.lastMessage?.message_type === 'text' ? 'Text message' : 
+                     chat.lastMessage?.message_type === 'image' ? '📷 Image' :
+                     chat.lastMessage?.message_type === 'video' ? '🎥 Video' : '📎 File'}
                   </p>
                 </div>
-
                 {chat.unreadCount > 0 && (
-                  <Badge className="bg-blue-500 text-white ml-2 min-w-[1.25rem] h-5 text-xs flex items-center justify-center">
+                  <span className="bg-blue-500 text-white text-xs rounded-full px-2 py-1">
                     {chat.unreadCount}
-                  </Badge>
+                  </span>
                 )}
               </div>
-            ))}
-          </div>
+            </div>
+          ))}
+
+          {/* New Chat Options */}
+          {searchQuery && (
+            <>
+              <Separator className="my-2" />
+              <div className="p-2">
+                <p className="text-sm font-medium text-gray-500 mb-2">Start new chat</p>
+                {filteredUsers.map((user) => (
+                  <div
+                    key={user.id}
+                    onClick={() => startNewChat(user)}
+                    className="p-2 cursor-pointer hover:bg-gray-50 rounded flex items-center gap-3"
+                  >
+                    <Avatar className="w-8 h-8">
+                      <AvatarFallback className="text-xs">
+                        {user.full_name?.[0] || user.email[0].toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="text-sm font-medium">{user.full_name || user.email}</p>
+                      <p className="text-xs text-gray-500">{user.email}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
         </ScrollArea>
       </div>
 
@@ -228,153 +458,62 @@ const DirectMessages = () => {
         {selectedChat ? (
           <>
             {/* Chat Header */}
-            <div className="p-4 border-b bg-card">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center space-x-3">
-                  <div className="relative">
-                    <Avatar className="w-10 h-10">
-                      <AvatarImage src={selectedChatData?.avatar} />
-                      <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white">
-                        {selectedChatData ? getInitials(selectedChatData.name) : ''}
-                      </AvatarFallback>
-                    </Avatar>
-                    {selectedChatData?.isOnline && (
-                      <div className="absolute -bottom-1 -right-1 w-3 h-3 bg-green-500 border-2 border-background rounded-full"></div>
-                    )}
-                  </div>
-                  <div>
-                    <h2 className="font-semibold">{selectedChatData?.name}</h2>
-                    <p className="text-sm text-muted-foreground">
-                      {selectedChatData?.isOnline ? 
-                        'Online' : 
-                        selectedChatData?.lastSeen ? 
-                          `Last seen ${formatTime(selectedChatData.lastSeen)} ago` : 
-                          'Offline'
-                      }
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-center space-x-2">
-                  <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
-                    <Phone className="w-4 h-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
-                    <Video className="w-4 h-4" />
-                  </Button>
-                  <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
-                    <MoreVertical className="w-4 h-4" />
-                  </Button>
-                </div>
+            <div className="p-4 border-b flex items-center gap-3">
+              <Avatar>
+                <AvatarFallback>
+                  {selectedChat.full_name?.[0] || selectedChat.email[0].toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
+              <div>
+                <h3 className="font-medium">{selectedChat.full_name || selectedChat.email}</h3>
+                <p className="text-sm text-gray-500">{selectedChat.email}</p>
               </div>
             </div>
 
-            {/* Messages Area */}
+            {/* Messages */}
             <ScrollArea className="flex-1 p-4">
-              <div className="space-y-4">
-                {messages.map((message) => {
-                  const isOwn = message.senderId === user?.id || message.senderId === 'current-user';
-                  return (
-                    <div
-                      key={message.id}
-                      className={cn(
-                        "flex items-end space-x-2 animate-fade-in",
-                        isOwn ? "justify-end" : "justify-start"
-                      )}
-                    >
-                      {!isOwn && (
-                        <Avatar className="w-8 h-8">
-                          <AvatarImage src={selectedChatData?.avatar} />
-                          <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white text-xs">
-                            {selectedChatData ? getInitials(selectedChatData.name) : ''}
-                          </AvatarFallback>
-                        </Avatar>
-                      )}
-
-                      <div className={cn(
-                        "max-w-[70%] rounded-2xl px-4 py-2 shadow-sm transition-all duration-200 hover:shadow-md",
-                        isOwn 
-                          ? "bg-blue-500 text-white rounded-br-md" 
-                          : "bg-muted rounded-bl-md"
-                      )}>
-                        <p className="text-sm whitespace-pre-wrap break-words">
-                          {message.content}
-                        </p>
-                        <div className={cn(
-                          "flex items-center justify-end space-x-1 mt-1 text-xs",
-                          isOwn ? "text-blue-100" : "text-muted-foreground"
-                        )}>
-                          <span>{formatTime(message.timestamp)}</span>
-                          {isOwn && (
-                            message.isRead ? (
-                              <CheckCheck className="w-3 h-3" />
-                            ) : (
-                              <Check className="w-3 h-3" />
-                            )
-                          )}
-                        </div>
-                      </div>
-
-                      {isOwn && (
-                        <Avatar className="w-8 h-8">
-                          <AvatarImage src={user?.user_metadata?.avatar_url} />
-                          <AvatarFallback className="bg-gradient-to-r from-green-500 to-blue-500 text-white text-xs">
-                            {user?.email ? getInitials(user.email) : 'ME'}
-                          </AvatarFallback>
-                        </Avatar>
-                      )}
-                    </div>
-                  );
-                })}
-                <div ref={messagesEndRef} />
-              </div>
+              {messages.map(renderMessage)}
+              <div ref={messagesEndRef} />
             </ScrollArea>
 
             {/* Message Input */}
-            <div className="p-4 border-t bg-card">
-              <div className="flex items-end space-x-2">
-                <Button variant="ghost" size="icon" className="text-muted-foreground hover:text-foreground">
-                  <Paperclip className="w-4 h-4" />
-                </Button>
-                
-                <div className="flex-1 relative">
-                  <Input
-                    placeholder="Type a message..."
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    className="pr-12 rounded-full border-2 focus:border-blue-500 transition-colors"
-                  />
-                  <Button 
-                    variant="ghost" 
-                    size="icon" 
-                    className="absolute right-1 top-1/2 transform -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                  >
-                    <Smile className="w-4 h-4" />
-                  </Button>
-                </div>
-
-                <Button 
-                  onClick={handleSendMessage}
-                  disabled={!newMessage.trim()}
-                  className="rounded-full bg-blue-500 hover:bg-blue-600 text-white p-3 transition-all duration-200 hover:scale-105 disabled:opacity-50 disabled:hover:scale-100"
+            <div className="p-4 border-t">
+              <div className="flex gap-2">
+                <Input
+                  value={newMessage}
+                  onChange={(e) => setNewMessage(e.target.value)}
+                  placeholder="Type a message..."
+                  onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendTextMessage()}
+                  className="flex-1"
+                />
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) handleFileUpload(file);
+                  }}
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => fileInputRef.current?.click()}
+                  disabled={loading}
                 >
+                  <Upload className="w-4 h-4" />
+                </Button>
+                <Button onClick={sendTextMessage} disabled={loading || !newMessage.trim()}>
                   <Send className="w-4 h-4" />
                 </Button>
               </div>
             </div>
           </>
         ) : (
-          /* No Chat Selected */
-          <div className="flex-1 flex items-center justify-center bg-muted/10">
+          <div className="flex-1 flex items-center justify-center text-gray-500">
             <div className="text-center">
-              <div className="w-20 h-20 mx-auto mb-4 bg-muted rounded-full flex items-center justify-center">
-                <Send className="w-8 h-8 text-muted-foreground" />
-              </div>
-              <h3 className="text-xl font-semibold mb-2">Start a conversation</h3>
-              <p className="text-muted-foreground max-w-sm">
-                Select a chat from the sidebar to start messaging with your study partners
-              </p>
+              <h3 className="text-lg font-medium mb-2">Select a chat to start messaging</h3>
+              <p>Choose from existing chats or search for users to start a new conversation</p>
             </div>
           </div>
         )}
