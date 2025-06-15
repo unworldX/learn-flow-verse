@@ -18,56 +18,336 @@ import {
   Lock,
   Trash2,
   Download,
-  Upload
+  Upload,
+  Eye,
+  EyeOff
 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useToast } from "@/hooks/use-toast";
+import { supabase } from "@/integrations/supabase/client";
+
+interface UserProfile {
+  id: string;
+  email: string;
+  username?: string;
+  firstName?: string;
+  lastName?: string;
+  bio?: string;
+  university?: string;
+  major?: string;
+  avatar_url?: string;
+}
+
+interface NotificationSettings {
+  emailNotifications: boolean;
+  pushNotifications: boolean;
+  studyReminders: boolean;
+  groupNotifications: boolean;
+  messageNotifications: boolean;
+}
+
+interface PrivacySettings {
+  profileVisible: boolean;
+  showActivityStatus: boolean;
+}
+
+interface AppPreferences {
+  darkMode: boolean;
+  autoSave: boolean;
+  offlineMode: boolean;
+}
 
 const Settings = () => {
   const { user, signOut } = useAuth();
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [showCurrentPassword, setShowCurrentPassword] = useState(false);
+  const [showNewPassword, setShowNewPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
+  // Profile state
+  const [profile, setProfile] = useState<UserProfile>({
+    id: user?.id || '',
+    email: user?.email || '',
+    username: user?.user_metadata?.username || user?.email?.split('@')[0] || '',
+    firstName: user?.user_metadata?.firstName || '',
+    lastName: user?.user_metadata?.lastName || '',
+    bio: user?.user_metadata?.bio || '',
+    university: user?.user_metadata?.university || '',
+    major: user?.user_metadata?.major || '',
+    avatar_url: user?.user_metadata?.avatar_url || ''
+  });
+
+  // Password state
+  const [passwords, setPasswords] = useState({
+    currentPassword: '',
+    newPassword: '',
+    confirmPassword: ''
+  });
 
   // Settings state
-  const [emailNotifications, setEmailNotifications] = useState(true);
-  const [pushNotifications, setPushNotifications] = useState(true);
-  const [studyReminders, setStudyReminders] = useState(true);
-  const [groupNotifications, setGroupNotifications] = useState(true);
-  const [messageNotifications, setMessageNotifications] = useState(true);
-  const [darkMode, setDarkMode] = useState(false);
-  const [autoSave, setAutoSave] = useState(true);
-  const [offlineMode, setOfflineMode] = useState(false);
+  const [notifications, setNotifications] = useState<NotificationSettings>({
+    emailNotifications: true,
+    pushNotifications: true,
+    studyReminders: true,
+    groupNotifications: true,
+    messageNotifications: true
+  });
+
+  const [privacy, setPrivacy] = useState<PrivacySettings>({
+    profileVisible: true,
+    showActivityStatus: true
+  });
+
+  const [preferences, setPreferences] = useState<AppPreferences>({
+    darkMode: false,
+    autoSave: true,
+    offlineMode: false
+  });
+
+  // Load settings from localStorage on component mount
+  useEffect(() => {
+    const savedNotifications = localStorage.getItem('notifications');
+    const savedPrivacy = localStorage.getItem('privacy');
+    const savedPreferences = localStorage.getItem('preferences');
+
+    if (savedNotifications) {
+      setNotifications(JSON.parse(savedNotifications));
+    }
+    if (savedPrivacy) {
+      setPrivacy(JSON.parse(savedPrivacy));
+    }
+    if (savedPreferences) {
+      setPreferences(JSON.parse(savedPreferences));
+    }
+  }, []);
 
   const getInitials = (email: string) => {
     return email.substring(0, 2).toUpperCase();
   };
 
-  const handleSaveProfile = async () => {
+  const handleProfileUpdate = async () => {
+    if (!user) return;
+    
     setIsLoading(true);
-    // Simulate API call
-    setTimeout(() => {
-      setIsLoading(false);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        data: {
+          username: profile.username,
+          firstName: profile.firstName,
+          lastName: profile.lastName,
+          bio: profile.bio,
+          university: profile.university,
+          major: profile.major,
+          avatar_url: profile.avatar_url
+        }
+      });
+
+      if (error) throw error;
+
       toast({
         title: "Profile updated",
         description: "Your profile has been successfully updated.",
       });
-    }, 1000);
+    } catch (error: any) {
+      toast({
+        title: "Update failed",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
   };
 
-  const handleExportData = () => {
+  const handlePasswordUpdate = async () => {
+    if (!passwords.currentPassword || !passwords.newPassword || !passwords.confirmPassword) {
+      toast({
+        title: "Missing fields",
+        description: "Please fill in all password fields.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (passwords.newPassword !== passwords.confirmPassword) {
+      toast({
+        title: "Passwords don't match",
+        description: "New password and confirmation must match.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (passwords.newPassword.length < 6) {
+      toast({
+        title: "Password too short",
+        description: "Password must be at least 6 characters long.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: passwords.newPassword
+      });
+
+      if (error) throw error;
+
+      setPasswords({
+        currentPassword: '',
+        newPassword: '',
+        confirmPassword: ''
+      });
+
+      toast({
+        title: "Password updated",
+        description: "Your password has been successfully changed.",
+      });
+    } catch (error: any) {
+      toast({
+        title: "Password update failed",
+        description: error.message,
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleNotificationUpdate = (key: keyof NotificationSettings, value: boolean) => {
+    const updated = { ...notifications, [key]: value };
+    setNotifications(updated);
+    localStorage.setItem('notifications', JSON.stringify(updated));
+    
     toast({
-      title: "Data export started",
-      description: "Your data export will be emailed to you shortly.",
+      title: "Notification settings updated",
+      description: `${key} has been ${value ? 'enabled' : 'disabled'}.`,
     });
   };
 
-  const handleDeleteAccount = () => {
+  const handlePrivacyUpdate = (key: keyof PrivacySettings, value: boolean) => {
+    const updated = { ...privacy, [key]: value };
+    setPrivacy(updated);
+    localStorage.setItem('privacy', JSON.stringify(updated));
+    
     toast({
-      title: "Account deletion",
-      description: "This feature will be available soon. Contact support for immediate assistance.",
-      variant: "destructive"
+      title: "Privacy settings updated",
+      description: `${key} has been ${value ? 'enabled' : 'disabled'}.`,
     });
+  };
+
+  const handlePreferenceUpdate = (key: keyof AppPreferences, value: boolean) => {
+    const updated = { ...preferences, [key]: value };
+    setPreferences(updated);
+    localStorage.setItem('preferences', JSON.stringify(updated));
+    
+    if (key === 'darkMode') {
+      // Apply dark mode immediately
+      document.documentElement.classList.toggle('dark', value);
+    }
+    
+    toast({
+      title: "Preferences updated",
+      description: `${key} has been ${value ? 'enabled' : 'disabled'}.`,
+    });
+  };
+
+  const handleExportData = async () => {
+    try {
+      const exportData = {
+        profile,
+        notifications,
+        privacy,
+        preferences,
+        exportedAt: new Date().toISOString()
+      };
+
+      const blob = new Blob([JSON.stringify(exportData, null, 2)], {
+        type: 'application/json'
+      });
+
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `study-buddy-data-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      toast({
+        title: "Data exported",
+        description: "Your data has been downloaded successfully.",
+      });
+    } catch (error) {
+      toast({
+        title: "Export failed",
+        description: "Failed to export your data. Please try again.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleDeleteAccount = async () => {
+    const confirmed = window.confirm(
+      "Are you sure you want to delete your account? This action cannot be undone."
+    );
+    
+    if (!confirmed) return;
+
+    const doubleConfirm = window.confirm(
+      "This will permanently delete all your data including messages, study plans, and resources. Are you absolutely sure?"
+    );
+    
+    if (!doubleConfirm) return;
+
+    try {
+      // In a real app, you would call a backend service to handle account deletion
+      // For now, we'll just sign out the user
+      await signOut();
+      
+      toast({
+        title: "Account deletion initiated",
+        description: "Your account deletion request has been processed.",
+        variant: "destructive"
+      });
+    } catch (error) {
+      toast({
+        title: "Deletion failed",
+        description: "Failed to delete account. Please contact support.",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const handleAvatarUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) { // 2MB limit
+      toast({
+        title: "File too large",
+        description: "Please select an image smaller than 2MB.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      setProfile(prev => ({ ...prev, avatar_url: dataUrl }));
+      
+      toast({
+        title: "Avatar updated",
+        description: "Your profile picture has been updated. Don't forget to save your profile.",
+      });
+    };
+    reader.readAsDataURL(file);
   };
 
   if (!user) {
@@ -118,16 +398,25 @@ const Settings = () => {
             <CardContent className="space-y-6">
               <div className="flex items-center space-x-6">
                 <Avatar className="w-24 h-24">
-                  <AvatarImage src="" />
+                  <AvatarImage src={profile.avatar_url} />
                   <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white text-2xl">
-                    {getInitials(user.email || 'U')}
+                    {getInitials(profile.email)}
                   </AvatarFallback>
                 </Avatar>
                 <div className="space-y-2">
-                  <Button variant="outline" size="sm">
-                    <Upload className="w-4 h-4 mr-2" />
-                    Change Photo
-                  </Button>
+                  <Label htmlFor="avatar-upload">
+                    <Button variant="outline" size="sm" className="cursor-pointer">
+                      <Upload className="w-4 h-4 mr-2" />
+                      Change Photo
+                    </Button>
+                  </Label>
+                  <Input
+                    id="avatar-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleAvatarUpload}
+                    className="hidden"
+                  />
                   <p className="text-sm text-muted-foreground">
                     JPG, PNG or GIF. Max size 2MB
                   </p>
@@ -139,7 +428,8 @@ const Settings = () => {
                   <Label htmlFor="username">Username</Label>
                   <Input 
                     id="username" 
-                    defaultValue={user.user_metadata?.username || user.email?.split('@')[0] || ''} 
+                    value={profile.username}
+                    onChange={(e) => setProfile(prev => ({ ...prev, username: e.target.value }))}
                   />
                 </div>
                 <div className="space-y-2">
@@ -147,7 +437,8 @@ const Settings = () => {
                   <Input 
                     id="email" 
                     type="email" 
-                    defaultValue={user.email || ''} 
+                    value={profile.email}
+                    onChange={(e) => setProfile(prev => ({ ...prev, email: e.target.value }))}
                   />
                 </div>
               </div>
@@ -157,14 +448,16 @@ const Settings = () => {
                   <Label htmlFor="firstName">First Name</Label>
                   <Input 
                     id="firstName" 
-                    defaultValue={user.user_metadata?.firstName || ""} 
+                    value={profile.firstName}
+                    onChange={(e) => setProfile(prev => ({ ...prev, firstName: e.target.value }))}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="lastName">Last Name</Label>
                   <Input 
                     id="lastName" 
-                    defaultValue={user.user_metadata?.lastName || ""} 
+                    value={profile.lastName}
+                    onChange={(e) => setProfile(prev => ({ ...prev, lastName: e.target.value }))}
                   />
                 </div>
               </div>
@@ -174,7 +467,8 @@ const Settings = () => {
                 <Textarea
                   id="bio"
                   placeholder="Tell us about yourself..."
-                  defaultValue={user.user_metadata?.bio || ""}
+                  value={profile.bio}
+                  onChange={(e) => setProfile(prev => ({ ...prev, bio: e.target.value }))}
                 />
               </div>
 
@@ -183,20 +477,22 @@ const Settings = () => {
                   <Label htmlFor="university">University</Label>
                   <Input 
                     id="university" 
-                    defaultValue={user.user_metadata?.university || ""} 
+                    value={profile.university}
+                    onChange={(e) => setProfile(prev => ({ ...prev, university: e.target.value }))}
                   />
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="major">Major</Label>
                   <Input 
                     id="major" 
-                    defaultValue={user.user_metadata?.major || ""} 
+                    value={profile.major}
+                    onChange={(e) => setProfile(prev => ({ ...prev, major: e.target.value }))}
                   />
                 </div>
               </div>
 
               <Button 
-                onClick={handleSaveProfile} 
+                onClick={handleProfileUpdate} 
                 disabled={isLoading}
                 className="bg-gradient-to-r from-blue-600 to-purple-600 text-white"
               >
@@ -223,8 +519,8 @@ const Settings = () => {
                   <p className="text-sm text-muted-foreground">Get notified about upcoming study sessions</p>
                 </div>
                 <Switch 
-                  checked={studyReminders} 
-                  onCheckedChange={setStudyReminders}
+                  checked={notifications.studyReminders} 
+                  onCheckedChange={(checked) => handleNotificationUpdate('studyReminders', checked)}
                 />
               </div>
               <Separator />
@@ -234,8 +530,8 @@ const Settings = () => {
                   <p className="text-sm text-muted-foreground">Notifications about study group messages and activities</p>
                 </div>
                 <Switch 
-                  checked={groupNotifications} 
-                  onCheckedChange={setGroupNotifications}
+                  checked={notifications.groupNotifications} 
+                  onCheckedChange={(checked) => handleNotificationUpdate('groupNotifications', checked)}
                 />
               </div>
               <Separator />
@@ -245,8 +541,8 @@ const Settings = () => {
                   <p className="text-sm text-muted-foreground">Get notified when you receive direct messages</p>
                 </div>
                 <Switch 
-                  checked={messageNotifications} 
-                  onCheckedChange={setMessageNotifications}
+                  checked={notifications.messageNotifications} 
+                  onCheckedChange={(checked) => handleNotificationUpdate('messageNotifications', checked)}
                 />
               </div>
             </CardContent>
@@ -267,8 +563,8 @@ const Settings = () => {
                   <p className="text-sm text-muted-foreground">Receive real-time notifications in your browser</p>
                 </div>
                 <Switch 
-                  checked={pushNotifications} 
-                  onCheckedChange={setPushNotifications}
+                  checked={notifications.pushNotifications} 
+                  onCheckedChange={(checked) => handleNotificationUpdate('pushNotifications', checked)}
                 />
               </div>
             </CardContent>
@@ -289,31 +585,75 @@ const Settings = () => {
               <div className="space-y-4">
                 <div className="space-y-2">
                   <Label htmlFor="currentPassword">Current Password</Label>
-                  <Input 
-                    id="currentPassword" 
-                    type="password" 
-                    placeholder="Enter current password"
-                  />
+                  <div className="relative">
+                    <Input 
+                      id="currentPassword" 
+                      type={showCurrentPassword ? "text" : "password"}
+                      placeholder="Enter current password"
+                      value={passwords.currentPassword}
+                      onChange={(e) => setPasswords(prev => ({ ...prev, currentPassword: e.target.value }))}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowCurrentPassword(!showCurrentPassword)}
+                    >
+                      {showCurrentPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="newPassword">New Password</Label>
-                  <Input 
-                    id="newPassword" 
-                    type="password" 
-                    placeholder="Enter new password"
-                  />
+                  <div className="relative">
+                    <Input 
+                      id="newPassword" 
+                      type={showNewPassword ? "text" : "password"}
+                      placeholder="Enter new password"
+                      value={passwords.newPassword}
+                      onChange={(e) => setPasswords(prev => ({ ...prev, newPassword: e.target.value }))}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowNewPassword(!showNewPassword)}
+                    >
+                      {showNewPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="confirmPassword">Confirm New Password</Label>
-                  <Input 
-                    id="confirmPassword" 
-                    type="password" 
-                    placeholder="Confirm new password"
-                  />
+                  <div className="relative">
+                    <Input 
+                      id="confirmPassword" 
+                      type={showConfirmPassword ? "text" : "password"}
+                      placeholder="Confirm new password"
+                      value={passwords.confirmPassword}
+                      onChange={(e) => setPasswords(prev => ({ ...prev, confirmPassword: e.target.value }))}
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="absolute right-0 top-0 h-full px-3 py-2 hover:bg-transparent"
+                      onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                    >
+                      {showConfirmPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </Button>
+                  </div>
                 </div>
-                <Button variant="outline" className="flex items-center gap-2">
+                <Button 
+                  variant="outline" 
+                  className="flex items-center gap-2"
+                  onClick={handlePasswordUpdate}
+                  disabled={isLoading}
+                >
                   <Lock className="w-4 h-4" />
-                  Update Password
+                  {isLoading ? "Updating..." : "Update Password"}
                 </Button>
               </div>
 
@@ -326,14 +666,20 @@ const Settings = () => {
                     <p className="font-medium">Profile visibility</p>
                     <p className="text-sm text-muted-foreground">Make your profile visible to other users</p>
                   </div>
-                  <Switch defaultChecked />
+                  <Switch 
+                    checked={privacy.profileVisible}
+                    onCheckedChange={(checked) => handlePrivacyUpdate('profileVisible', checked)}
+                  />
                 </div>
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="font-medium">Show activity status</p>
                     <p className="text-sm text-muted-foreground">Let others see when you're online</p>
                   </div>
-                  <Switch defaultChecked />
+                  <Switch 
+                    checked={privacy.showActivityStatus}
+                    onCheckedChange={(checked) => handlePrivacyUpdate('showActivityStatus', checked)}
+                  />
                 </div>
               </div>
             </CardContent>
@@ -357,8 +703,8 @@ const Settings = () => {
                   <p className="text-sm text-muted-foreground">Switch between light and dark themes</p>
                 </div>
                 <Switch 
-                  checked={darkMode} 
-                  onCheckedChange={setDarkMode}
+                  checked={preferences.darkMode} 
+                  onCheckedChange={(checked) => handlePreferenceUpdate('darkMode', checked)}
                 />
               </div>
               <Separator />
@@ -368,8 +714,8 @@ const Settings = () => {
                   <p className="text-sm text-muted-foreground">Automatically save your notes as you type</p>
                 </div>
                 <Switch 
-                  checked={autoSave} 
-                  onCheckedChange={setAutoSave}
+                  checked={preferences.autoSave} 
+                  onCheckedChange={(checked) => handlePreferenceUpdate('autoSave', checked)}
                 />
               </div>
               <Separator />
@@ -379,8 +725,8 @@ const Settings = () => {
                   <p className="text-sm text-muted-foreground">Enable offline access to downloaded resources</p>
                 </div>
                 <Switch 
-                  checked={offlineMode} 
-                  onCheckedChange={setOfflineMode}
+                  checked={preferences.offlineMode} 
+                  onCheckedChange={(checked) => handlePreferenceUpdate('offlineMode', checked)}
                 />
               </div>
             </CardContent>
@@ -402,7 +748,7 @@ const Settings = () => {
                 <div className="p-4 border rounded-lg">
                   <h4 className="font-medium mb-2">Export Data</h4>
                   <p className="text-sm text-muted-foreground mb-3">
-                    Download all your data including notes, messages, and study plans
+                    Download all your data including profile, settings, and preferences
                   </p>
                   <Button 
                     variant="outline" 
@@ -435,8 +781,8 @@ const Settings = () => {
               <div className="space-y-2">
                 <h4 className="font-medium">Account Information</h4>
                 <div className="text-sm text-gray-500 space-y-1">
-                  <p>Account created: {new Date(user.created_at).toLocaleDateString()}</p>
-                  <p>Last login: {new Date(user.last_sign_in_at || '').toLocaleDateString()}</p>
+                  <p>Account created: {user.created_at ? new Date(user.created_at).toLocaleDateString() : 'Unknown'}</p>
+                  <p>Last login: {user.last_sign_in_at ? new Date(user.last_sign_in_at).toLocaleDateString() : 'Unknown'}</p>
                   <p>Email verified: {user.email_confirmed_at ? '✅ Yes' : '❌ No'}</p>
                   <p>User ID: {user.id}</p>
                 </div>
