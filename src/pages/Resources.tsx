@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -8,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Search, BookOpen, Video, FileText, Upload, Plus, Download, Loader2 } from "lucide-react";
+import { Search, BookOpen, Video, FileText, Upload, Plus, Download, Loader2, Filter } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -22,6 +23,7 @@ const Resources = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSubject, setSelectedSubject] = useState("all");
   const [selectedType, setSelectedType] = useState("all");
+  const [readFilter, setReadFilter] = useState("all");
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -38,7 +40,7 @@ const Resources = () => {
   const { data: resources, isLoading } = useQuery({
     queryKey: ['resources'],
     queryFn: async () => {
-      const { data, error } = await supabase.from('resources').select('*').order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('resources').select('*').order('upload_date', { ascending: false });
       if (error) throw error;
       return data;
     }
@@ -132,7 +134,6 @@ const Resources = () => {
       
       queryClient.invalidateQueries({ queryKey: ['resources'] });
 
-      // Reset form and close dialog
       setUploadData({
         title: "",
         author: "",
@@ -175,219 +176,260 @@ const Resources = () => {
   }) || [];
 
   return (
-    <div className="space-y-6 p-4 md:p-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Study Resources</h1>
-          <p className="text-muted-foreground">Upload and discover learning materials</p>
-        </div>
-        <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
-              <Upload className="w-4 h-4 mr-2" />
-              Upload Resource
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Upload New Resource</DialogTitle>
-              <DialogDescription>
-                Share your study materials with the community
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="title">Title *</Label>
-                <Input
-                  id="title"
-                  value={uploadData.title}
-                  onChange={(e) => setUploadData(prev => ({ ...prev, title: e.target.value }))}
-                  placeholder="Resource title"
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="author">Author</Label>
-                <Input
-                  id="author"
-                  value={uploadData.author}
-                  onChange={(e) => setUploadData(prev => ({ ...prev, author: e.target.value }))}
-                  placeholder="Author name"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-2">
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-4 md:p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="text-center md:text-left">
+            <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              Study Resources
+            </h1>
+            <p className="text-slate-600 mt-2">Upload and discover learning materials</p>
+          </div>
+          
+          <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl h-12">
+                <Upload className="w-5 h-5 mr-2" />
+                Upload Resource
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-lg mx-4 rounded-2xl border-0 shadow-2xl">
+              <DialogHeader>
+                <DialogTitle className="text-xl font-semibold text-slate-800">Upload New Resource</DialogTitle>
+                <DialogDescription className="text-slate-600">Share your study materials with the community</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 mt-4">
                 <div>
-                  <Label htmlFor="subject">Subject</Label>
-                  <Select onValueChange={(value) => setUploadData(prev => ({ ...prev, subject: value }))}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select subject" />
+                  <Label htmlFor="title" className="text-sm font-medium text-slate-700">Resource Title *</Label>
+                  <Input
+                    id="title"
+                    value={uploadData.title}
+                    onChange={(e) => setUploadData(prev => ({ ...prev, title: e.target.value }))}
+                    placeholder="Enter resource title"
+                    className="mt-1 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl h-12"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="author" className="text-sm font-medium text-slate-700">Author Name</Label>
+                  <Input
+                    id="author"
+                    value={uploadData.author}
+                    onChange={(e) => setUploadData(prev => ({ ...prev, author: e.target.value }))}
+                    placeholder="Enter author name"
+                    className="mt-1 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl h-12"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="subject" className="text-sm font-medium text-slate-700">Subject</Label>
+                    <Select onValueChange={(value) => setUploadData(prev => ({ ...prev, subject: value }))} value={uploadData.subject}>
+                      <SelectTrigger className="mt-1 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl h-12">
+                        <SelectValue placeholder="Select subject" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl border-0 shadow-2xl">
+                        {subjects.map(subject => (
+                          <SelectItem key={subject} value={subject} className="rounded-lg">{subject}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="class" className="text-sm font-medium text-slate-700">Class</Label>
+                    <Input
+                      id="class"
+                      value={uploadData.class}
+                      onChange={(e) => setUploadData(prev => ({ ...prev, class: e.target.value }))}
+                      placeholder="e.g. Grade 12"
+                      className="mt-1 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl h-12"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="resourceType" className="text-sm font-medium text-slate-700">Resource Type *</Label>
+                  <Select
+                    onValueChange={(value) => setUploadData(prev => ({ ...prev, resourceType: value }))}
+                    value={uploadData.resourceType}
+                  >
+                    <SelectTrigger className="mt-1 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl h-12">
+                      <SelectValue placeholder="Select resource type" />
                     </SelectTrigger>
-                    <SelectContent>
-                      {subjects.map(subject => (
-                        <SelectItem key={subject} value={subject}>{subject}</SelectItem>
+                    <SelectContent className="rounded-xl border-0 shadow-2xl">
+                      {resourceTypes.map(type => (
+                        <SelectItem key={type.value} value={type.value} className="rounded-lg">
+                          {type.label}
+                        </SelectItem>
                       ))}
                     </SelectContent>
                   </Select>
                 </div>
-                
+
                 <div>
-                  <Label htmlFor="class">Class</Label>
-                  <Input
-                    id="class"
-                    value={uploadData.class}
-                    onChange={(e) => setUploadData(prev => ({ ...prev, class: e.target.value }))}
-                    placeholder="e.g. Grade 12"
+                  <Label htmlFor="description" className="text-sm font-medium text-slate-700">Description</Label>
+                  <Textarea
+                    id="description"
+                    value={uploadData.description}
+                    onChange={(e) => setUploadData(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="Brief description of the resource"
+                    rows={3}
+                    className="mt-1 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl"
                   />
                 </div>
-              </div>
 
-              <div>
-                <Label htmlFor="resourceType">Resource Type *</Label>
-                <Select
-                  onValueChange={(value) => setUploadData(prev => ({ ...prev, resourceType: value }))}
-                  value={uploadData.resourceType}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {resourceTypes.map(type => (
-                      <SelectItem key={type.value} value={type.value}>
-                        {type.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
+                <div>
+                  <Label htmlFor="file" className="text-sm font-medium text-slate-700">File *</Label>
+                  <Input
+                    id="file"
+                    type="file"
+                    onChange={handleFileUpload}
+                    accept=".pdf,.mp4,.avi,.mov,.epub,.doc,.docx"
+                    disabled={isUploading}
+                    className="mt-1 border-2 border-dashed border-slate-300 hover:border-blue-400 focus:border-blue-500 rounded-xl h-20 file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-gradient-to-r file:from-blue-600 file:to-purple-600 file:text-white file:font-medium hover:file:from-blue-700 hover:file:to-purple-700 transition-all duration-300"
+                  />
+                  {!uploadData.file && (
+                    <p className="text-sm text-slate-500 mt-1">No file chosen</p>
+                  )}
+                </div>
 
-              <div>
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={uploadData.description}
-                  onChange={(e) => setUploadData(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Brief description of the resource"
-                  rows={3}
-                />
+                <div className="flex gap-3 pt-4">
+                  <Button onClick={() => setIsUploadOpen(false)} variant="outline" className="flex-1 rounded-xl border-slate-200">
+                    Cancel
+                  </Button>
+                  <Button onClick={handleUpload} className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-xl" disabled={isUploading}>
+                    {isUploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
+                    {isUploading ? 'Uploading...' : 'Upload Resource'}
+                  </Button>
+                </div>
               </div>
+            </DialogContent>
+          </Dialog>
+        </div>
 
-              <div>
-                <Label htmlFor="file">File *</Label>
+        {/* Filters */}
+        <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm rounded-2xl">
+          <CardContent className="p-6 space-y-4">
+            <div className="flex flex-col md:flex-row gap-4">
+              <div className="flex-1 relative">
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
                 <Input
-                  id="file"
-                  type="file"
-                  onChange={handleFileUpload}
-                  accept=".pdf,.mp4,.avi,.mov,.epub,.doc,.docx"
-                  disabled={isUploading}
+                  placeholder="Search resources, authors, subjects..."
+                  className="pl-10 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl h-12"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
                 />
               </div>
-
-              <Button onClick={handleUpload} className="w-full" disabled={isUploading}>
-                {isUploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
-                {isUploading ? 'Uploading...' : 'Upload Resource'}
-              </Button>
+              
+              <Select value={selectedSubject} onValueChange={setSelectedSubject}>
+                <SelectTrigger className="w-full md:w-48 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl h-12">
+                  <SelectValue placeholder="Subject" />
+                </SelectTrigger>
+                <SelectContent className="rounded-xl border-0 shadow-2xl">
+                  <SelectItem value="all" className="rounded-lg">All Subjects</SelectItem>
+                  {subjects.map(subject => (
+                    <SelectItem key={subject} value={subject} className="rounded-lg">{subject}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      {/* Search and Filters */}
-      <Card>
-        <CardContent className="p-4 space-y-4">
-          <div className="flex flex-col md:flex-row gap-4">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-              <Input
-                placeholder="Search resources, authors, subjects..."
-                className="pl-10"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-            </div>
-            <Select value={selectedSubject} onValueChange={setSelectedSubject}>
-              <SelectTrigger className="w-full md:w-40">
-                <SelectValue placeholder="Subject" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Subjects</SelectItem>
-                {subjects.map(subject => (
-                  <SelectItem key={subject} value={subject}>{subject}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div>
-            <Label className="text-sm font-medium mb-2 block">Resource Type</Label>
-             <ToggleGroup
-              type="single"
-              value={selectedType}
-              onValueChange={(value) => { if (value) setSelectedType(value) }}
-              className="justify-start flex-wrap"
-            >
-              <ToggleGroupItem value="all" aria-label="All types">All</ToggleGroupItem>
-              {resourceTypes.map(type => (
-                 <ToggleGroupItem key={type.value} value={type.value} aria-label={type.label}>{type.label}</ToggleGroupItem>
-              ))}
-            </ToggleGroup>
-          </div>
-        </CardContent>
-      </Card>
-      
-      {/* Resources Grid */}
-      {isLoading ? (
-        <div className="text-center p-12">
-          <Loader2 className="w-8 h-8 mx-auto animate-spin text-primary" />
-          <p className="mt-4 text-muted-foreground">Loading resources...</p>
-        </div>
-      ) : filteredResources.length > 0 ? (
-        <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filteredResources.map(resource => (
-            <Card key={resource.id} className="flex flex-col">
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <CardTitle className="text-lg leading-tight">{resource.title}</CardTitle>
-                  <Badge variant="secondary">{resource.resource_type}</Badge>
-                </div>
-                {resource.author && <CardDescription>by {resource.author}</CardDescription>}
-              </CardHeader>
-              <CardContent className="flex-grow space-y-2">
-                <p className="text-sm text-muted-foreground line-clamp-3">{resource.description}</p>
-                <div className="flex gap-2">
-                  {resource.subject && <Badge variant="outline">{resource.subject}</Badge>}
-                  {resource.class && <Badge variant="outline">{resource.class}</Badge>}
-                </div>
-              </CardContent>
-              <div className="p-4 pt-0">
-                <Button 
-                  className="w-full" 
-                  onClick={() => handleDownload(resource.file_url, resource.title)}
-                >
-                  <Download className="w-4 h-4 mr-2" />
-                  Download
-                </Button>
+            
+            <div className="space-y-3">
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-slate-600" />
+                <Label className="text-sm font-medium text-slate-700">Resource Type</Label>
               </div>
-            </Card>
-          ))}
-        </div>
-      ) : (
-        <Card>
-          <CardContent className="p-12 text-center">
-            <BookOpen className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-            <h3 className="text-xl font-semibold mb-2">No resources found</h3>
-            <p className="text-gray-500 mb-6">
-              Try adjusting your search or filters, or be the first to share study materials.
-            </p>
-            <Button 
-              onClick={() => setIsUploadOpen(true)}
-              className="bg-blue-600 hover:bg-blue-700"
-            >
-              <Upload className="w-4 h-4 mr-2" />
-              Upload a Resource
-            </Button>
+              <ToggleGroup
+                type="single"
+                value={selectedType}
+                onValueChange={(value) => { if (value) setSelectedType(value) }}
+                className="justify-start flex-wrap"
+              >
+                <ToggleGroupItem value="all" aria-label="All types" className="rounded-xl">All</ToggleGroupItem>
+                {resourceTypes.map(type => (
+                  <ToggleGroupItem key={type.value} value={type.value} aria-label={type.label} className="rounded-xl">{type.label}</ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+            </div>
+
+            <div className="space-y-3">
+              <Label className="text-sm font-medium text-slate-700">Read Status</Label>
+              <ToggleGroup
+                type="single"
+                value={readFilter}
+                onValueChange={(value) => { if (value) setReadFilter(value) }}
+                className="justify-start flex-wrap"
+              >
+                <ToggleGroupItem value="all" aria-label="All" className="rounded-xl">All</ToggleGroupItem>
+                <ToggleGroupItem value="read" aria-label="Read" className="rounded-xl">Read</ToggleGroupItem>
+                <ToggleGroupItem value="unread" aria-label="Unread" className="rounded-xl">Unread</ToggleGroupItem>
+              </ToggleGroup>
+            </div>
           </CardContent>
         </Card>
-      )}
+        
+        {/* Resources Grid */}
+        {isLoading ? (
+          <div className="text-center p-12">
+            <Loader2 className="w-8 h-8 mx-auto animate-spin text-primary" />
+            <p className="mt-4 text-muted-foreground">Loading resources...</p>
+          </div>
+        ) : filteredResources.length > 0 ? (
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {filteredResources.map(resource => (
+              <Card key={resource.id} className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80 backdrop-blur-sm rounded-2xl group">
+                <CardHeader className="pb-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+                        {getResourceTypeIcon(resource.resource_type)}
+                      </div>
+                      <div className="flex-1">
+                        <CardTitle className="text-lg leading-tight text-slate-800">{resource.title}</CardTitle>
+                        {resource.author && <CardDescription className="text-slate-600">by {resource.author}</CardDescription>}
+                      </div>
+                    </div>
+                    <Badge variant="secondary" className="rounded-lg">{resource.resource_type}</Badge>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <p className="text-sm text-slate-600 line-clamp-3">{resource.description}</p>
+                  <div className="flex gap-2 flex-wrap">
+                    {resource.subject && <Badge variant="outline" className="rounded-lg">{resource.subject}</Badge>}
+                    {resource.class && <Badge variant="outline" className="rounded-lg">{resource.class}</Badge>}
+                  </div>
+                  <Button 
+                    className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-xl group-hover:shadow-lg transition-all duration-300" 
+                    onClick={() => handleDownload(resource.file_url, resource.title)}
+                  >
+                    <Download className="w-4 h-4 mr-2" />
+                    Download
+                  </Button>
+                </CardContent>
+              </Card>
+            ))}
+          </div>
+        ) : (
+          <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm rounded-2xl">
+            <CardContent className="p-12 text-center">
+              <BookOpen className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+              <h3 className="text-xl font-semibold mb-2 text-slate-800">No resources found</h3>
+              <p className="text-slate-600 mb-6">
+                Try adjusting your search or filters, or be the first to share study materials.
+              </p>
+              <Button 
+                onClick={() => setIsUploadOpen(true)}
+                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-xl"
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                Upload a Resource
+              </Button>
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   );
 };

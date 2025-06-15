@@ -11,12 +11,14 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, Di
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Switch } from "@/components/ui/switch";
 import { Calendar } from "@/components/ui/calendar";
-import { Plus, Bell, Clock, Calendar as CalendarIcon, AlertCircle, CheckCircle, Trash2, Edit } from "lucide-react";
+import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
+import { Plus, Bell, Clock, Calendar as CalendarIcon, AlertCircle, CheckCircle, Trash2, Edit, Filter } from "lucide-react";
 
 const Reminders = () => {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [activeTab, setActiveTab] = useState("upcoming");
+  const [readFilter, setReadFilter] = useState("all");
 
   const mockReminders = [
     {
@@ -26,6 +28,7 @@ const Reminders = () => {
       dueDate: "2024-12-16T10:00:00",
       priority: "high",
       isCompleted: false,
+      isRead: true,
       type: "exam",
       notificationEnabled: true
     },
@@ -36,6 +39,7 @@ const Reminders = () => {
       dueDate: "2024-12-17T23:59:00",
       priority: "medium",
       isCompleted: false,
+      isRead: false,
       type: "assignment",
       notificationEnabled: true
     },
@@ -46,6 +50,7 @@ const Reminders = () => {
       dueDate: "2024-12-18T15:00:00",
       priority: "low",
       isCompleted: true,
+      isRead: true,
       type: "study",
       notificationEnabled: false
     }
@@ -69,12 +74,21 @@ const Reminders = () => {
     }
   };
 
-  const upcomingReminders = mockReminders.filter(r => !r.isCompleted);
-  const completedReminders = mockReminders.filter(r => r.isCompleted);
+  const filteredReminders = (reminders) => {
+    return reminders.filter(reminder => {
+      if (readFilter === "all") return true;
+      if (readFilter === "read") return reminder.isRead;
+      if (readFilter === "unread") return !reminder.isRead;
+      return true;
+    });
+  };
+
+  const upcomingReminders = filteredReminders(mockReminders.filter(r => !r.isCompleted));
+  const completedReminders = filteredReminders(mockReminders.filter(r => r.isCompleted));
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-4 md:p-6">
-      <div className="max-w-6xl mx-auto space-y-6">
+      <div className="max-w-7xl mx-auto space-y-6">
         {/* Header */}
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
           <div className="text-center md:text-left">
@@ -209,6 +223,28 @@ const Reminders = () => {
           </Card>
         </div>
 
+        {/* Read Status Filter */}
+        <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm rounded-2xl">
+          <CardContent className="p-6">
+            <div className="flex items-center gap-4">
+              <div className="flex items-center gap-2">
+                <Filter className="w-4 h-4 text-slate-600" />
+                <Label className="text-sm font-medium text-slate-700">Read Status</Label>
+              </div>
+              <ToggleGroup
+                type="single"
+                value={readFilter}
+                onValueChange={(value) => { if (value) setReadFilter(value) }}
+                className="justify-start flex-wrap"
+              >
+                <ToggleGroupItem value="all" aria-label="All" className="rounded-xl">All</ToggleGroupItem>
+                <ToggleGroupItem value="read" aria-label="Read" className="rounded-xl">Read</ToggleGroupItem>
+                <ToggleGroupItem value="unread" aria-label="Unread" className="rounded-xl">Unread</ToggleGroupItem>
+              </ToggleGroup>
+            </div>
+          </CardContent>
+        </Card>
+
         <div className="grid lg:grid-cols-3 gap-6">
           {/* Calendar */}
           <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm rounded-2xl">
@@ -257,7 +293,7 @@ const Reminders = () => {
                     const isOverdue = new Date(reminder.dueDate) < new Date();
                     
                     return (
-                      <Card key={reminder.id} className={`border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80 backdrop-blur-sm rounded-2xl ${isOverdue ? 'ring-2 ring-red-200' : ''}`}>
+                      <Card key={reminder.id} className={`border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80 backdrop-blur-sm rounded-2xl ${isOverdue ? 'ring-2 ring-red-200' : ''} ${!reminder.isRead ? 'border-l-4 border-l-blue-500' : ''}`}>
                         <CardContent className="p-6">
                           <div className="flex items-start gap-4">
                             <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${getPriorityColor(reminder.priority)}`}>
@@ -266,7 +302,12 @@ const Reminders = () => {
                             
                             <div className="flex-1 space-y-2">
                               <div className="flex items-start justify-between">
-                                <h3 className="font-semibold text-slate-800">{reminder.title}</h3>
+                                <div className="flex items-center gap-2">
+                                  <h3 className="font-semibold text-slate-800">{reminder.title}</h3>
+                                  {!reminder.isRead && (
+                                    <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
+                                  )}
+                                </div>
                                 <div className="flex items-center gap-2">
                                   <Badge className={`${getPriorityColor(reminder.priority)} text-white hover:${getPriorityColor(reminder.priority)} rounded-lg`}>
                                     {reminder.priority}
