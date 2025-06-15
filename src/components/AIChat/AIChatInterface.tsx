@@ -17,7 +17,9 @@ import {
   Loader2,
   X,
   Minimize2,
-  Maximize2
+  Maximize2,
+  Trash2,
+  History
 } from 'lucide-react';
 
 interface Message {
@@ -30,6 +32,14 @@ interface Message {
     type: string;
     size: number;
   };
+}
+
+interface ChatSession {
+  id: string;
+  title: string;
+  messages: Message[];
+  createdAt: Date;
+  updatedAt: Date;
 }
 
 interface AIChatInterfaceProps {
@@ -54,21 +64,93 @@ const AIChatInterface = ({
   onMaximize,
   isMinimized = false 
 }: AIChatInterfaceProps) => {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [selectedModel, setSelectedModel] = useState(AI_MODELS[0].id);
   const [isLoading, setIsLoading] = useState(false);
   const [apiKey, setApiKey] = useState(localStorage.getItem('openrouter_api_key') || '');
+  const [showHistory, setShowHistory] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
+  // Load chat sessions from localStorage on component mount
+  useEffect(() => {
+    const savedSessions = localStorage.getItem('ai_chat_sessions');
+    if (savedSessions) {
+      const sessions = JSON.parse(savedSessions).map((session: any) => ({
+        ...session,
+        createdAt: new Date(session.createdAt),
+        updatedAt: new Date(session.updatedAt),
+        messages: session.messages.map((msg: any) => ({
+          ...msg,
+          timestamp: new Date(msg.timestamp)
+        }))
+      }));
+      setChatSessions(sessions);
+      
+      // Load the most recent session if available
+      if (sessions.length > 0) {
+        setCurrentSessionId(sessions[0].id);
+      }
+    }
+  }, []);
+
+  // Save chat sessions to localStorage whenever they change
+  useEffect(() => {
+    if (chatSessions.length > 0) {
+      localStorage.setItem('ai_chat_sessions', JSON.stringify(chatSessions));
+    }
+  }, [chatSessions]);
+
   useEffect(() => {
     scrollToBottom();
-  }, [messages]);
+  }, [currentSessionId]);
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
+  const getCurrentSession = (): ChatSession | undefined => {
+    return chatSessions.find(session => session.id === currentSessionId);
+  };
+
+  const createNewSession = () => {
+    const newSession: ChatSession = {
+      id: Date.now().toString(),
+      title: 'New Chat',
+      messages: [],
+      createdAt: new Date(),
+      updatedAt: new Date()
+    };
+    
+    setChatSessions(prev => [newSession, ...prev]);
+    setCurrentSessionId(newSession.id);
+    setShowHistory(false);
+  };
+
+  const updateSessionTitle = (sessionId: string, firstMessage: string) => {
+    setChatSessions(prev => prev.map(session => 
+      session.id === sessionId 
+        ? { ...session, title: firstMessage.slice(0, 50) + (firstMessage.length > 50 ? '...' : '') }
+        : session
+    ));
+  };
+
+  const deleteSession = (sessionId: string) => {
+    setChatSessions(prev => prev.filter(session => session.id !== sessionId));
+    if (currentSessionId === sessionId) {
+      const remaining = chatSessions.filter(session => session.id !== sessionId);
+      setCurrentSessionId(remaining.length > 0 ? remaining[0].id : null);
+    }
+  };
+
+  const clearAllHistory = () => {
+    setChatSessions([]);
+    setCurrentSessionId(null);
+    localStorage.removeItem('ai_chat_sessions');
+    setShowHistory(false);
   };
 
   const handleApiKeyChange = (key: string) => {
@@ -88,6 +170,22 @@ const AIChatInterface = ({
       return;
     }
 
+    let sessionId = currentSessionId;
+    
+    // Create new session if none exists
+    if (!sessionId) {
+      const newSession: ChatSession = {
+        id: Date.now().toString(),
+        title: newMessage.slice(0, 50) + (newMessage.length > 50 ? '...' : ''),
+        messages: [],
+        createdAt: new Date(),
+        updatedAt: new Date()
+      };
+      setChatSessions(prev => [newSession, ...prev]);
+      sessionId = newSession.id;
+      setCurrentSessionId(sessionId);
+    }
+
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -95,11 +193,30 @@ const AIChatInterface = ({
       timestamp: new Date()
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    // Add user message to current session
+    setChatSessions(prev => prev.map(session => 
+      session.id === sessionId 
+        ? { 
+            ...session, 
+            messages: [...session.messages, userMessage],
+            updatedAt: new Date()
+          }
+        : session
+    ));
+
+    // Update session title if it's the first message
+    const currentSession = chatSessions.find(s => s.id === sessionId);
+    if (!currentSession || currentSession.messages.length === 0) {
+      updateSessionTitle(sessionId, newMessage);
+    }
+
     setNewMessage('');
     setIsLoading(true);
 
     try {
+      const session = chatSessions.find(s => s.id === sessionId);
+      const conversationHistory = session ? session.messages : [];
+
       const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -113,9 +230,9 @@ const AIChatInterface = ({
           messages: [
             {
               role: 'system',
-              content: 'You are a helpful AI assistant for learning and education. Help users with their questions, provide explanations, and assist with study materials.'
+              content: 'You are a helpful AI assistant for learning and education. Help users with their questions, provide explanations, and assist with study materials. Maintain context from previous messages in this conversation.'
             },
-            ...messages.map(msg => ({
+            ...conversationHistory.map(msg => ({
               role: msg.role,
               content: msg.content
             })),
@@ -141,7 +258,16 @@ const AIChatInterface = ({
         timestamp: new Date()
       };
 
-      setMessages(prev => [...prev, assistantMessage]);
+      // Add assistant message to current session
+      setChatSessions(prev => prev.map(session => 
+        session.id === sessionId 
+          ? { 
+              ...session, 
+              messages: [...session.messages, assistantMessage],
+              updatedAt: new Date()
+            }
+          : session
+      ));
     } catch (error) {
       console.error('Error sending message:', error);
       toast({
@@ -156,7 +282,6 @@ const AIChatInterface = ({
 
   const handleFileUpload = async (file: File) => {
     if (file.type === 'application/pdf') {
-      // Handle PDF upload and summary
       const userMessage: Message = {
         id: Date.now().toString(),
         role: 'user',
@@ -169,9 +294,22 @@ const AIChatInterface = ({
         }
       };
 
-      setMessages(prev => [...prev, userMessage]);
+      let sessionId = currentSessionId;
+      if (!sessionId) {
+        createNewSession();
+        sessionId = chatSessions[0]?.id;
+      }
+
+      setChatSessions(prev => prev.map(session => 
+        session.id === sessionId 
+          ? { 
+              ...session, 
+              messages: [...session.messages, userMessage],
+              updatedAt: new Date()
+            }
+          : session
+      ));
       
-      // TODO: Implement PDF processing
       toast({
         title: "PDF Upload",
         description: "PDF processing will be implemented soon",
@@ -243,6 +381,80 @@ const AIChatInterface = ({
     );
   }
 
+  const currentSession = getCurrentSession();
+  const messages = currentSession?.messages || [];
+
+  if (showHistory) {
+    return (
+      <div className={isFloating ? "fixed bottom-4 right-4 w-96 h-[600px] z-50 shadow-2xl" : "h-full flex flex-col bg-gray-50"}>
+        <Card className="h-full flex flex-col">
+          <CardHeader className="pb-4">
+            <div className="flex items-center justify-between">
+              <CardTitle className="flex items-center gap-2">
+                <History className="w-5 h-5 text-purple-500" />
+                Chat History
+              </CardTitle>
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" size="icon" onClick={() => setShowHistory(false)}>
+                  <X className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="flex-1 p-0">
+            <ScrollArea className="h-full p-4">
+              <div className="space-y-2">
+                <Button onClick={createNewSession} className="w-full justify-start bg-purple-500 hover:bg-purple-600 text-white mb-4">
+                  + New Chat
+                </Button>
+                
+                {chatSessions.length > 0 && (
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium text-gray-600">Recent Chats</span>
+                    <Button variant="ghost" size="sm" onClick={clearAllHistory} className="text-red-500 hover:text-red-700">
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                )}
+
+                {chatSessions.map((session) => (
+                  <div key={session.id} className="group relative">
+                    <Button
+                      variant={currentSessionId === session.id ? "secondary" : "ghost"}
+                      onClick={() => {
+                        setCurrentSessionId(session.id);
+                        setShowHistory(false);
+                      }}
+                      className="w-full justify-start text-left h-auto p-3"
+                    >
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm truncate">{session.title}</div>
+                        <div className="text-xs text-gray-500">
+                          {session.updatedAt.toLocaleDateString()}
+                        </div>
+                      </div>
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteSession(session.id);
+                      }}
+                      className="absolute right-1 top-1 opacity-0 group-hover:opacity-100 transition-opacity w-6 h-6"
+                    >
+                      <X className="w-3 h-3" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
   const chatContent = (
     <>
       {/* Header */}
@@ -252,16 +464,21 @@ const AIChatInterface = ({
             <Bot className="w-5 h-5 text-purple-500" />
             AI Assistant
           </CardTitle>
-          {isFloating && (
-            <div className="flex items-center gap-1">
-              <Button variant="ghost" size="icon" onClick={onMinimize}>
-                <Minimize2 className="w-4 h-4" />
-              </Button>
-              <Button variant="ghost" size="icon" onClick={onClose}>
-                <X className="w-4 h-4" />
-              </Button>
-            </div>
-          )}
+          <div className="flex items-center gap-1">
+            <Button variant="ghost" size="icon" onClick={() => setShowHistory(true)}>
+              <History className="w-4 h-4" />
+            </Button>
+            {isFloating && (
+              <>
+                <Button variant="ghost" size="icon" onClick={onMinimize}>
+                  <Minimize2 className="w-4 h-4" />
+                </Button>
+                <Button variant="ghost" size="icon" onClick={onClose}>
+                  <X className="w-4 h-4" />
+                </Button>
+              </>
+            )}
+          </div>
         </div>
         
         {/* API Key Input */}
@@ -299,6 +516,13 @@ const AIChatInterface = ({
             ))}
           </SelectContent>
         </Select>
+
+        {/* New Chat Button */}
+        {messages.length > 0 && (
+          <Button onClick={createNewSession} variant="outline" className="w-full">
+            + New Chat
+          </Button>
+        )}
       </CardHeader>
 
       {/* Messages */}
