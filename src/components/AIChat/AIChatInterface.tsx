@@ -1,415 +1,540 @@
 
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue, SelectLabel, SelectGroup } from "@/components/ui/select";
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
-import { Badge } from "@/components/ui/badge";
-import { Separator } from "@/components/ui/separator";
-import { ScrollArea } from "@/components/ui/scroll-area";
-import { 
-  Send, 
-  Settings, 
-  User, 
-  Bot, 
-  Copy, 
-  RotateCcw, 
-  Trash2, 
-  MessageSquare,
-  Sparkles,
-  Zap,
-  Brain,
-  Cpu
-} from "lucide-react";
-import AISettings from './AISettings';
+import { Send, Loader2, Paperclip, Brain, Bot, Trash2, RotateCcw, Plus, Settings } from "lucide-react";
+import { useToast } from "@/components/ui/use-toast";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+  SelectGroup,
+  SelectLabel,
+} from "@/components/ui/select"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { createChatCompletion, deleteChatSession, getChatMessages, getChatSessions, uploadPdf, createChatSession } from "@/lib/api";
+import { ChatMessage, ChatSession } from "@/types";
 
-// AI Provider configurations
-const AI_PROVIDERS = {
-  'OpenRouter': {
+// AI Models configuration organized by provider - matching AISettings.tsx
+const API_PROVIDERS = {
+  openrouter: {
     name: 'OpenRouter',
-    icon: Zap,
+    keyName: 'openrouter_api_key',
     models: [
-      { id: 'openrouter/auto', name: 'Auto (Best Available)', free: false },
-      { id: 'anthropic/claude-3.5-sonnet', name: 'Claude 3.5 Sonnet', free: false },
-      { id: 'openai/gpt-4o', name: 'GPT-4o', free: false },
-      { id: 'google/gemini-pro-1.5', name: 'Gemini Pro 1.5', free: false },
-      { id: 'meta-llama/llama-3.1-405b-instruct', name: 'Llama 3.1 405B', free: false }
+      { id: 'microsoft/phi-4-reasoning-plus:free', name: 'Microsoft Phi-4 Reasoning Plus', free: true },
+      { id: 'deepseek/deepseek-r1-0528:free', name: 'DeepSeek R1 (0528)', free: true },
+      { id: 'deepseek/deepseek-r1-0528-qwen3-8b:free', name: 'DeepSeek R1 Qwen3 8B', free: true },
+      { id: 'google/gemma-3-27b-it:free', name: 'Google Gemma 3 27B IT', free: true }
     ]
   },
-  'OpenAI': {
+  openai: {
     name: 'OpenAI',
-    icon: Brain,
+    keyName: 'openai_api_key',
     models: [
       { id: 'gpt-4o', name: 'GPT-4o', free: false },
-      { id: 'gpt-4o-mini', name: 'GPT-4o Mini', free: true },
+      { id: 'gpt-4o-mini', name: 'GPT-4o Mini', free: false },
       { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', free: false },
-      { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', free: true }
+      { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', free: false }
     ]
   },
-  'Google': {
-    name: 'Google',
-    icon: Sparkles,
+  anthropic: {
+    name: 'Anthropic',
+    keyName: 'anthropic_api_key',
+    models: [
+      { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus', free: false },
+      { id: 'claude-3-sonnet-20240229', name: 'Claude 3 Sonnet', free: false },
+      { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku', free: false }
+    ]
+  },
+  google: {
+    name: 'Google AI',
+    keyName: 'google_api_key',
     models: [
       { id: 'gemini-pro', name: 'Gemini Pro', free: false },
-      { id: 'gemini-pro-vision', name: 'Gemini Pro Vision', free: false },
-      { id: 'gemini-1.5-flash', name: 'Gemini 1.5 Flash', free: true }
+      { id: 'gemini-pro-vision', name: 'Gemini Pro Vision', free: false }
     ]
   },
-  'Other': {
-    name: 'Other Providers',
-    icon: Cpu,
+  deepseek: {
+    name: 'DeepSeek',
+    keyName: 'deepseek_api_key',
     models: [
-      { id: 'claude-3-opus', name: 'Claude 3 Opus', free: false },
-      { id: 'claude-3-sonnet', name: 'Claude 3 Sonnet', free: false },
-      { id: 'deepseek-coder', name: 'DeepSeek Coder', free: true },
-      { id: 'mistral-large', name: 'Mistral Large', free: false }
+      { id: 'deepseek-chat', name: 'DeepSeek Chat', free: false },
+      { id: 'deepseek-coder', name: 'DeepSeek Coder', free: false }
     ]
   }
 };
 
-interface Message {
-  id: string;
-  content: string;
-  role: 'user' | 'assistant';
-  timestamp: Date;
-}
-
-const AIChatInterface = () => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      content: 'Hello! I\'m your AI study assistant. How can I help you with your learning today?',
-      role: 'assistant',
-      timestamp: new Date()
+// Get current model info
+const getCurrentModelInfo = (modelId: string) => {
+  for (const [providerId, provider] of Object.entries(API_PROVIDERS)) {
+    const model = provider.models.find(m => m.id === modelId);
+    if (model) {
+      return {
+        provider: provider.name,
+        model: model
+      };
     }
-  ]);
-  const [inputMessage, setInputMessage] = useState('');
+  }
+  return { provider: 'Unknown', model: { id: modelId, name: modelId, free: false } };
+};
+
+export default function AIChatInterface() {
+  const [input, setInput] = useState('');
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [selectedProvider, setSelectedProvider] = useState('OpenRouter');
-  const [selectedModel, setSelectedModel] = useState('openrouter/auto');
-  const [showSettings, setShowSettings] = useState(false);
+  const [reasoning, setReasoning] = useState(false);
+  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
+  
+  // Read selected provider and model from localStorage
+  const [selectedProvider, setSelectedProvider] = useState(() => 
+    localStorage.getItem('ai_provider') || 'openrouter'
+  );
+  const [selectedModel, setSelectedModel] = useState(() => 
+    localStorage.getItem('ai_model') || 'microsoft/phi-4-reasoning-plus:free'
+  );
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const queryClient = useQueryClient();
+  const { toast } = useToast();
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>('session-1');
+
+  // Listen for provider changes from settings
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const newProvider = localStorage.getItem('ai_provider') || 'openrouter';
+      const newModel = localStorage.getItem('ai_model') || 'microsoft/phi-4-reasoning-plus:free';
+      setSelectedProvider(newProvider);
+      setSelectedModel(newModel);
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  // Get available models for the current provider
+  const availableModels = API_PROVIDERS[selectedProvider as keyof typeof API_PROVIDERS]?.models || [];
+  const currentProvider = API_PROVIDERS[selectedProvider as keyof typeof API_PROVIDERS];
+
+  // Fetch chat sessions
+  const { data: sessions = [], refetch: refetchSessions } = useQuery<ChatSession[]>({
+    queryKey: ['chatSessions'],
+    queryFn: getChatSessions,
+  });
+
+  // Fetch chat messages for the current session
+  const { data: initialMessages = [], refetch: refetchMessages } = useQuery<ChatMessage[]>({
+    queryKey: ['chatMessages', currentSessionId],
+    queryFn: () => getChatMessages(currentSessionId || ''),
+    enabled: !!currentSessionId,
+  });
+
+  useEffect(() => {
+    if (initialMessages) {
+      setMessages(initialMessages);
+    }
+  }, [initialMessages]);
+
+  // Mutation for creating a chat completion
+  const { mutate: createCompletion } = useMutation({
+    mutationFn: createChatCompletion,
+    onSuccess: (newMessage) => {
+      console.log('Chat completion successful:', newMessage);
+      setMessages((prev) => [...prev, newMessage]);
+      setInput('');
+      setIsLoading(false);
+      
+      // Refresh messages for the current session
+      if (currentSessionId) {
+        queryClient.invalidateQueries({ queryKey: ['chatMessages', currentSessionId] });
+      }
+    },
+    onError: (error) => {
+      console.error('Chat completion error:', error);
+      toast({
+        title: "Something went wrong!",
+        description: "There was an error sending your message. Please try again.",
+        variant: "destructive",
+      });
+      setIsLoading(false);
+    },
+  });
+
+  // Mutation for deleting a chat session
+  const { mutate: deleteSessionMutation } = useMutation({
+    mutationFn: deleteChatSession,
+    onSuccess: () => {
+      toast({
+        title: "Session deleted!",
+        description: "The chat session has been successfully deleted.",
+      });
+      setCurrentSessionId('session-1');
+      setMessages([]);
+      refetchSessions();
+      queryClient.invalidateQueries({ queryKey: ['chatMessages'] });
+    },
+    onError: () => {
+      toast({
+        title: "Something went wrong!",
+        description: "There was an error deleting the session. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Mutation for creating a new session
+  const { mutate: createNewSessionMutation } = useMutation({
+    mutationFn: (name: string) => createChatSession(name),
+    onSuccess: (newSession) => {
+      console.log('New session created:', newSession);
+      setCurrentSessionId(newSession.id);
+      setMessages([]);
+      refetchSessions();
+      toast({
+        title: "New session created!",
+        description: `Created "${newSession.name}" successfully.`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Something went wrong!",
+        description: "There was an error creating a new session. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Mutation for uploading a PDF
+  const { mutate: uploadFileMutation } = useMutation({
+    mutationFn: uploadPdf,
+    onSuccess: () => {
+      toast({
+        title: "File uploaded!",
+        description: "The PDF has been successfully uploaded.",
+      });
+      setUploadedFile(null);
+    },
+    onError: () => {
+      toast({
+        title: "Something went wrong!",
+        description: "There was an error uploading the file. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  const sendMessage = async () => {
+    if (!input.trim()) return;
+    
+    console.log('Sending message:', input, 'with model:', selectedModel);
+    setIsLoading(true);
+    const messageContent = input.trim();
+
+    // Add user message immediately
+    const userMessage: ChatMessage = {
+      id: Math.random().toString(36).substr(2, 9),
+      role: 'user',
+      content: messageContent,
+      createdAt: new Date().toISOString(),
+    };
+    setMessages(prev => [...prev, userMessage]);
+
+    // Clear input immediately
+    setInput('');
+
+    // Create AI completion with selected model
+    createCompletion({
+      sessionId: currentSessionId || undefined,
+      message: messageContent,
+      reasoning: reasoning,
+      model: selectedModel,
+    });
+  };
+
+  const handleKeyDown = (event: React.KeyboardEvent<HTMLTextAreaElement>) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      sendMessage();
+    }
+  };
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setUploadedFile(file);
+    const formData = new FormData();
+    formData.append('file', file);
+
+    uploadFileMutation(formData);
+  };
+
+  const clearChat = () => {
+    setMessages([]);
+    if (currentSessionId) {
+      queryClient.invalidateQueries({ queryKey: ['chatMessages', currentSessionId] });
+    }
+  };
 
   const scrollToBottom = useCallback(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
   }, []);
 
   useEffect(() => {
     scrollToBottom();
   }, [messages, scrollToBottom]);
 
-  const handleSendMessage = async () => {
-    if (!inputMessage.trim() || isLoading) return;
-
-    const userMessage: Message = {
-      id: Date.now().toString(),
-      content: inputMessage.trim(),
-      role: 'user',
-      timestamp: new Date()
-    };
-
-    setMessages(prev => [...prev, userMessage]);
-    setInputMessage('');
-    setIsLoading(true);
-
-    // Simulate AI response
-    setTimeout(() => {
-      const aiResponse: Message = {
-        id: (Date.now() + 1).toString(),
-        content: `I understand you're asking about: "${userMessage.content}". I'm here to help with your studies! This is a simulated response using ${selectedModel} from ${selectedProvider}.`,
-        role: 'assistant',
-        timestamp: new Date()
-      };
-      setMessages(prev => [...prev, aiResponse]);
-      setIsLoading(false);
-    }, 1500);
+  const switchSession = (sessionId: string) => {
+    console.log('Switching to session:', sessionId);
+    setCurrentSessionId(sessionId);
+    queryClient.invalidateQueries({ queryKey: ['chatMessages', sessionId] });
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
+  const createNewSession = () => {
+    const newSessionName = `Chat Session ${(sessions?.length || 0) + 1}`;
+    createNewSessionMutation(newSessionName);
+  };
+
+  const deleteSession = (sessionId: string) => {
+    if (sessionId === 'session-1') {
+      toast({
+        title: "Cannot delete default session",
+        description: "The default session cannot be deleted.",
+        variant: "destructive",
+      });
+      return;
     }
+    deleteSessionMutation(sessionId);
   };
 
-  const clearChat = () => {
-    setMessages([{
-      id: '1',
-      content: 'Hello! I\'m your AI study assistant. How can I help you with your learning today?',
-      role: 'assistant',
-      timestamp: new Date()
-    }]);
+  const handleModelChange = (modelId: string) => {
+    setSelectedModel(modelId);
+    localStorage.setItem('ai_model', modelId);
   };
 
-  const copyMessage = (content: string) => {
-    navigator.clipboard.writeText(content);
-  };
-
-  // Get available models based on selected provider
-  const currentProvider = AI_PROVIDERS[selectedProvider as keyof typeof AI_PROVIDERS];
-  const availableModels = currentProvider?.models || [];
-
-  // Update selected model when provider changes
-  useEffect(() => {
-    if (currentProvider && availableModels.length > 0) {
-      setSelectedModel(availableModels[0].id);
-    }
-  }, [selectedProvider, currentProvider, availableModels]);
-
-  const ProviderIcon = currentProvider?.icon || Brain;
+  const currentModelInfo = getCurrentModelInfo(selectedModel);
 
   return (
-    <div className="h-full flex flex-col bg-gradient-to-br from-gray-50 to-white">
-      <ResizablePanelGroup direction="horizontal" className="h-full">
-        {/* Main Chat Panel */}
-        <ResizablePanel defaultSize={75} minSize={60}>
-          <div className="h-full flex flex-col">
-            {/* Enhanced Header */}
-            <div className="bg-white border-b border-gray-200 shadow-sm">
-              <div className="px-6 py-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-10 h-10 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
-                        <Brain className="w-5 h-5 text-white" />
-                      </div>
-                      <div>
-                        <h1 className="text-xl font-semibold text-gray-900">AI Assistant</h1>
-                        <p className="text-sm text-gray-500">Powered by {currentProvider?.name}</p>
-                      </div>
+    <div className="flex flex-col h-full bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
+      {/* Session Management Bar */}
+      <div className="border-b bg-white/90 backdrop-blur-sm px-6 py-4 shadow-sm">
+        <div className="flex items-center justify-between max-w-7xl mx-auto">
+          <div className="flex items-center gap-4">
+            <Select value={currentSessionId || ""} onValueChange={switchSession}>
+              <SelectTrigger className="w-64 h-10 bg-white shadow-sm border-gray-200 hover:border-gray-300 transition-colors">
+                <SelectValue placeholder="Select or create a session..." />
+              </SelectTrigger>
+              <SelectContent>
+                {sessions?.map((session) => (
+                  <SelectItem key={session.id} value={session.id}>
+                    <div className="flex items-center justify-between w-full">
+                      <span className="truncate max-w-40 font-medium">{session.name}</span>
+                      <span className="text-xs text-gray-500 ml-3">
+                        {new Date(session.createdAt).toLocaleDateString()}
+                      </span>
                     </div>
-                    <Badge variant="secondary" className="bg-blue-50 text-blue-700 border-blue-200">
-                      <ProviderIcon className="w-3 h-3 mr-1" />
-                      {selectedModel.split('/').pop()?.replace(/-/g, ' ')}
-                    </Badge>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            {/* Model Selection for Current Provider */}
+            <Select value={selectedModel} onValueChange={handleModelChange}>
+              <SelectTrigger className="w-56 h-10 bg-white shadow-sm border-gray-200 hover:border-gray-300 transition-colors">
+                <SelectValue placeholder="Select model...">
+                  <div className="flex flex-col items-start">
+                    <span className="font-medium text-sm">{currentModelInfo.model.name}</span>
+                    <span className="text-xs text-gray-500">{currentProvider?.name || selectedProvider}</span>
                   </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={clearChat}
-                      className="text-gray-600 hover:text-gray-900"
-                    >
-                      <RotateCcw className="w-4 h-4 mr-2" />
-                      Clear
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => setShowSettings(!showSettings)}
-                      className="text-gray-600 hover:text-gray-900"
-                    >
-                      <Settings className="w-4 h-4 mr-2" />
-                      Settings
-                    </Button>
-                  </div>
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent>
+                <SelectGroup>
+                  <SelectLabel className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-2 py-1">
+                    {currentProvider?.name || selectedProvider} Models
+                  </SelectLabel>
+                  {availableModels.map((model) => (
+                    <SelectItem key={model.id} value={model.id}>
+                      <div className="flex items-center gap-2">
+                        <div className="flex flex-col">
+                          <span className="font-medium">{model.name}</span>
+                          {model.free && <span className="text-xs text-green-600">Free</span>}
+                        </div>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </SelectGroup>
+              </SelectContent>
+            </Select>
+            
+            <Button onClick={createNewSession} variant="outline" size="sm" className="gap-2 h-10 px-4 bg-white hover:bg-gray-50 border-gray-200">
+              <Plus className="w-4 h-4" />
+              New Chat
+            </Button>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {currentSessionId && currentSessionId !== 'session-1' && (
+              <Button
+                onClick={() => deleteSession(currentSessionId)}
+                variant="outline"
+                size="sm"
+                className="text-red-600 hover:text-red-700 hover:bg-red-50 h-10 px-4 border-red-200 hover:border-red-300"
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            )}
+            
+            <Button onClick={clearChat} variant="outline" size="sm" className="gap-2 h-10 px-4 bg-white hover:bg-gray-50 border-gray-200">
+              <RotateCcw className="w-4 h-4" />
+              Clear
+            </Button>
+          </div>
+        </div>
+      </div>
+
+      {/* Main Chat Area */}
+      <div className="flex-1 flex flex-col overflow-hidden">
+        {/* Messages Container */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-4xl mx-auto px-6 py-8">
+            {messages.length === 0 ? (
+              <div className="text-center py-16">
+                <div className="w-20 h-20 bg-gradient-to-br from-blue-500 via-purple-500 to-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+                  <Bot className="w-10 h-10 text-white" />
                 </div>
-
-                {/* Model Selection Bar */}
-                <div className="mt-4 flex items-center gap-4">
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-gray-700">Provider:</label>
-                    <Select value={selectedProvider} onValueChange={setSelectedProvider}>
-                      <SelectTrigger className="w-40 h-9 bg-white border-gray-300">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {Object.entries(AI_PROVIDERS).map(([key, provider]) => (
-                          <SelectItem key={key} value={key}>
-                            <div className="flex items-center gap-2">
-                              <provider.icon className="w-4 h-4" />
-                              {provider.name}
-                            </div>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-
-                  <div className="flex items-center gap-2">
-                    <label className="text-sm font-medium text-gray-700">Model:</label>
-                    <Select value={selectedModel} onValueChange={setSelectedModel}>
-                      <SelectTrigger className="w-56 h-9 bg-white border-gray-300">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectGroup>
-                          <SelectLabel className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-2 py-1">
-                            {currentProvider?.name || selectedProvider} Models
-                          </SelectLabel>
-                          {availableModels.map((model) => (
-                            <SelectItem key={model.id} value={model.id}>
-                              <div className="flex items-center gap-2">
-                                <div className="flex flex-col">
-                                  <span className="font-medium">{model.name}</span>
-                                  {model.free && <span className="text-xs text-green-600">Free</span>}
-                                </div>
-                              </div>
-                            </SelectItem>
-                          ))}
-                        </SelectGroup>
-                      </SelectContent>
-                    </Select>
-                  </div>
+                <h3 className="text-2xl font-bold text-gray-900 mb-3">Welcome to AI Assistant</h3>
+                <p className="text-gray-600 max-w-lg mx-auto text-lg leading-relaxed">
+                  Start a conversation with our AI assistant. Ask questions, get help with your studies, or explore new topics together.
+                </p>
+                <div className="mt-6 text-sm text-gray-500">
+                  Current model: <span className="font-medium text-gray-700">{currentModelInfo.model.name}</span>
+                  <span className="text-gray-400 mx-2">•</span>
+                  <span className="text-gray-500">{currentProvider?.name || selectedProvider}</span>
                 </div>
               </div>
-            </div>
-
-            {/* Enhanced Messages Area */}
-            <ScrollArea className="flex-1 px-6 py-4">
-              <div className="space-y-6 max-w-4xl mx-auto">
-                {messages.map((message) => (
-                  <div
-                    key={message.id}
-                    className={`flex gap-4 ${
-                      message.role === 'user' ? 'justify-end' : 'justify-start'
-                    }`}
-                  >
-                    {message.role === 'assistant' && (
-                      <div className="flex-shrink-0">
-                        <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                          <Bot className="w-4 h-4 text-white" />
-                        </div>
+            ) : (
+              <div className="space-y-8">
+                {messages.map((message, index) => (
+                  <div key={index} className={`flex items-start gap-4 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                    {message.role !== 'user' && (
+                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 via-purple-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-md flex-shrink-0">
+                        <Bot className="w-5 h-5 text-white" />
                       </div>
                     )}
-                    
-                    <div
-                      className={`group max-w-[80%] ${
-                        message.role === 'user'
-                          ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white rounded-2xl rounded-tr-md'
-                          : 'bg-white border border-gray-200 text-gray-900 rounded-2xl rounded-tl-md shadow-sm'
-                      } px-4 py-3`}
-                    >
-                      <div className="prose prose-sm max-w-none">
-                        <p className="mb-0 leading-relaxed">{message.content}</p>
-                      </div>
-                      
-                      <div className={`flex items-center justify-between mt-2 pt-2 border-t ${
-                        message.role === 'user' 
-                          ? 'border-white/20' 
-                          : 'border-gray-100'
-                      }`}>
-                        <span className={`text-xs ${
+                    <div className={`flex flex-col gap-2 max-w-[75%] ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
+                      <div 
+                        className={`px-6 py-4 rounded-3xl shadow-sm border text-[15px] leading-relaxed whitespace-pre-wrap ${
                           message.role === 'user' 
-                            ? 'text-white/70' 
-                            : 'text-gray-500'
-                        }`}>
-                          {message.timestamp.toLocaleTimeString()}
-                        </span>
-                        
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => copyMessage(message.content)}
-                          className={`opacity-0 group-hover:opacity-100 transition-opacity h-6 px-2 ${
-                            message.role === 'user'
-                              ? 'text-white/70 hover:text-white hover:bg-white/10'
-                              : 'text-gray-500 hover:text-gray-700 hover:bg-gray-100'
-                          }`}
-                        >
-                          <Copy className="w-3 h-3" />
-                        </Button>
+                            ? 'bg-blue-600 text-white border-blue-600' 
+                            : 'bg-white text-gray-800 border-gray-100 shadow-md'
+                        }`}
+                      >
+                        {message.content}
                       </div>
+                      <span className="text-xs text-gray-500 px-2">
+                        {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
                     </div>
-
-                    {message.role === 'user' && (
-                      <div className="flex-shrink-0">
-                        <div className="w-8 h-8 bg-gradient-to-r from-green-500 to-blue-500 rounded-lg flex items-center justify-center">
-                          <User className="w-4 h-4 text-white" />
-                        </div>
-                      </div>
-                    )}
                   </div>
                 ))}
-                
-                {isLoading && (
-                  <div className="flex gap-4 justify-start">
-                    <div className="flex-shrink-0">
-                      <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
-                        <Bot className="w-4 h-4 text-white" />
-                      </div>
-                    </div>
-                    <div className="bg-white border border-gray-200 rounded-2xl rounded-tl-md shadow-sm px-4 py-3">
-                      <div className="flex items-center gap-2">
-                        <div className="flex space-x-1">
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"></div>
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
-                          <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
-                        </div>
-                        <span className="text-sm text-gray-500">AI is thinking...</span>
-                      </div>
-                    </div>
-                  </div>
-                )}
-                <div ref={messagesEndRef} />
               </div>
-            </ScrollArea>
+            )}
+            
+            {isLoading && (
+              <div className="flex items-start gap-4 mt-8">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 via-purple-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-md">
+                  <Bot className="w-5 h-5 text-white animate-pulse" />
+                </div>
+                <div className="px-6 py-4 rounded-3xl bg-gray-100 text-gray-600 shadow-sm border border-gray-100">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Thinking with {currentModelInfo.model.name}...
+                  </div>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
+        </div>
 
-            {/* Enhanced Input Area */}
-            <div className="bg-white border-t border-gray-200 p-6">
-              <div className="max-w-4xl mx-auto">
+        {/* Input Section */}
+        <div className="border-t bg-white/90 backdrop-blur-sm shadow-lg">
+          <div className="max-w-4xl mx-auto p-6">
+            {/* PDF Upload Section */}
+            {uploadedFile && (
+              <div className="mb-4 p-4 bg-blue-50 rounded-2xl border border-blue-200">
+                <p className="text-sm text-blue-700 font-medium">
+                  Uploaded File: {uploadedFile.name} ({Math.round(uploadedFile.size / 1024)} KB)
+                </p>
+              </div>
+            )}
+            
+            {/* Message Input */}
+            <div className="flex gap-3 items-end">
+              <div className="flex-1">
                 <div className="relative">
                   <Textarea
-                    ref={textareaRef}
-                    value={inputMessage}
-                    onChange={(e) => setInputMessage(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    placeholder="Ask me anything about your studies..."
-                    className="min-h-[60px] max-h-32 resize-none pr-16 bg-gray-50 border-gray-200 focus:bg-white focus:border-blue-300 focus:ring-2 focus:ring-blue-100 rounded-xl"
+                    value={input}
+                    onChange={(e) => setInput(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    placeholder={reasoning ? "Ask with detailed reasoning..." : "Type your message..."}
+                    className="min-h-[56px] max-h-32 resize-none pr-32 text-base bg-white border-gray-200 focus:border-blue-400 focus:ring-blue-400/20 rounded-2xl shadow-sm"
                     disabled={isLoading}
                   />
-                  <Button
-                    onClick={handleSendMessage}
-                    disabled={!inputMessage.trim() || isLoading}
-                    className="absolute bottom-2 right-2 h-10 w-10 rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    <Send className="w-4 h-4" />
-                  </Button>
+                  
+                  {/* Reasoning Toggle */}
+                  <div className="absolute right-3 top-3">
+                    <Button
+                      onClick={() => setReasoning(!reasoning)}
+                      variant={reasoning ? "default" : "outline"}
+                      size="sm"
+                      className={`gap-2 text-xs h-8 px-3 rounded-xl transition-all ${
+                        reasoning 
+                          ? "bg-purple-600 hover:bg-purple-700 text-white shadow-md" 
+                          : "bg-white hover:bg-gray-50 border-gray-200 text-gray-700"
+                      }`}
+                      type="button"
+                    >
+                      <Brain className="w-3 h-3" />
+                      {reasoning ? "ON" : "OFF"}
+                    </Button>
+                  </div>
                 </div>
+              </div>
+              
+              <div className="flex gap-2">
+                <input
+                  type="file"
+                  accept=".pdf"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                  id="pdf-upload"
+                  disabled={isLoading}
+                />
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => document.getElementById('pdf-upload')?.click()}
+                  disabled={isLoading}
+                  className="shrink-0 h-14 w-14 rounded-2xl bg-white hover:bg-gray-50 border-gray-200 shadow-sm"
+                >
+                  <Paperclip className="w-5 h-5 text-gray-600" />
+                </Button>
                 
-                <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-                  <div className="flex items-center gap-4">
-                    <span>Press Enter to send, Shift+Enter for new line</span>
-                    <Badge variant="outline" className="text-xs">
-                      {messages.length - 1} messages
-                    </Badge>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-                    <span>Connected</span>
-                  </div>
-                </div>
+                <Button
+                  onClick={sendMessage}
+                  disabled={isLoading || !input.trim()}
+                  className="shrink-0 h-14 w-14 rounded-2xl bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 hover:from-blue-700 hover:via-purple-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all"
+                >
+                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
+                </Button>
               </div>
             </div>
           </div>
-        </ResizablePanel>
-
-        {showSettings && (
-          <>
-            <ResizableHandle withHandle />
-            <ResizablePanel defaultSize={25} minSize={20} maxSize={40}>
-              <Card className="h-full rounded-none border-l border-gray-200 shadow-none">
-                <CardHeader className="bg-gray-50 border-b border-gray-200">
-                  <CardTitle className="flex items-center gap-2 text-lg">
-                    <Settings className="w-5 h-5" />
-                    Settings
-                  </CardTitle>
-                </CardHeader>
-                <CardContent className="p-6">
-                  <AISettings />
-                </CardContent>
-              </Card>
-            </ResizablePanel>
-          </>
-        )}
-      </ResizablePanelGroup>
+        </div>
+      </div>
     </div>
   );
-};
-
-export default AIChatInterface;
-
+}
