@@ -84,6 +84,12 @@ const StudyGroups = () => {
     max_members: 50
   });
 
+  // Filter groups based on search query
+  const filteredGroups = groups.filter(group =>
+    group.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+    (group.description && group.description.toLowerCase().includes(searchQuery.toLowerCase()))
+  );
+
   useEffect(() => {
     if (user) {
       fetchGroups();
@@ -501,7 +507,7 @@ const StudyGroups = () => {
 
             {/* Groups List */}
             <ScrollArea className="flex-1">
-              {(searchQuery ? filteredGroups : groups).map((group) => (
+              {filteredGroups.map((group) => (
                 <div
                   key={group.id}
                   onClick={() => setSelectedGroup(group)}
@@ -713,7 +719,7 @@ const StudyGroups = () => {
     );
   }
 
-  // Desktop Layout (existing code)
+  // Desktop Layout
   return (
     <div className="h-full flex bg-gray-50">
       {/* Groups List */}
