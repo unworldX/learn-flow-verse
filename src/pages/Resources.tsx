@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Search, BookOpen, Video, FileText, Download, Loader2, Filter } from "lucide-react";
+import { Search, BookOpen, Video, FileText, Download, Loader2, Filter, BookOpen as BookIcon } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 
@@ -15,6 +15,8 @@ const Resources = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSubject, setSelectedSubject] = useState("all");
   const [selectedType, setSelectedType] = useState("all");
+
+  const [resourceTypeToggle, setResourceTypeToggle] = useState("all"); // New state for the horizontal toggle
 
   const { data: resources, isLoading } = useQuery({
     queryKey: ['resources'],
@@ -36,8 +38,21 @@ const Resources = () => {
     { value: "Book", label: "E-Book", icon: BookOpen },
     { value: "Other", label: "Other", icon: FileText }
   ];
-  
+
+  // For toggle group display (must match actual resource_type values)
+  const toggleTypes = [
+    { value: "all", label: "All" },
+    { value: "PDF", label: "PDF Document" },
+    { value: "Video", label: "Video" },
+    { value: "Book", label: "E-Book" },
+    { value: "Other", label: "Other" },
+    { value: "downloaded", label: "Downloaded" },
+  ];
+
   const getResourceTypeIcon = (type: string) => {
+    if (type === "Book") {
+      return <BookIcon className="w-5 h-5" />;
+    }
     const resourceType = resourceTypes.find(rt => rt.value === type);
     if (resourceType) {
       const Icon = resourceType.icon;
@@ -55,12 +70,26 @@ const Resources = () => {
     document.body.removeChild(link);
   }
 
+  // Filtering logic for resources
   const filteredResources = resources?.filter(resource => {
     const searchMatch = resource.title.toLowerCase().includes(searchQuery.toLowerCase()) || 
                         (resource.author && resource.author.toLowerCase().includes(searchQuery.toLowerCase())) ||
                         (resource.subject && resource.subject.toLowerCase().includes(searchQuery.toLowerCase()));
-    const subjectMatch = selectedSubject === 'all' || !selectedSubject || resource.subject === selectedSubject;
-    const typeMatch = selectedType === 'all' || !selectedType || resource.resource_type === selectedType;
+
+    const subjectMatch = selectedSubject === "all" || !selectedSubject || resource.subject === selectedSubject;
+
+    let typeMatch = true;
+    // Use horizontal toggle for filtering resource type
+    if (resourceTypeToggle === "all") {
+      typeMatch = true;
+    } else if (resourceTypeToggle === "downloaded") {
+      // Placeholder: show all for now (no download-tracking)
+      typeMatch = true;
+      // Optionally: implement download tracking here and filter only downloaded resources
+    } else {
+      typeMatch = resource.resource_type === resourceTypeToggle;
+    }
+
     return searchMatch && subjectMatch && typeMatch;
   }) || [];
 
@@ -95,7 +124,7 @@ const Resources = () => {
                     onChange={(e) => setSearchQuery(e.target.value)}
                   />
                 </div>
-                
+
                 <div>
                   <Label className="text-sm font-medium text-slate-700">Subject</Label>
                   <Select value={selectedSubject} onValueChange={setSelectedSubject}>
@@ -112,50 +141,39 @@ const Resources = () => {
                 </div>
               </CardContent>
             </Card>
-
-            {/* Download Panel */}
-            <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm rounded-2xl">
-              <CardHeader>
-                <CardTitle className="flex items-center gap-2 text-lg text-slate-800">
-                  <Download className="w-5 h-5" />
-                  Download Panel
-                </CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <Label className="text-sm font-medium text-slate-700 mb-3 block">Resource Type</Label>
-                  <ToggleGroup
-                    type="single"
-                    value={selectedType}
-                    onValueChange={(value) => { if (value) setSelectedType(value) }}
-                    className="flex flex-col items-stretch gap-2"
-                  >
-                    <ToggleGroupItem value="all" aria-label="All types" className="rounded-xl justify-start">
-                      <Filter className="w-4 h-4 mr-2" />
-                      All
-                    </ToggleGroupItem>
-                    {resourceTypes.map(type => {
-                      const Icon = type.icon;
-                      return (
-                        <ToggleGroupItem key={type.value} value={type.value} aria-label={type.label} className="rounded-xl justify-start">
-                          <Icon className="w-4 h-4 mr-2" />
-                          {type.label}
-                        </ToggleGroupItem>
-                      );
-                    })}
-                  </ToggleGroup>
-                </div>
-                <div className="pt-2 border-t border-slate-200">
-                  <p className="text-xs text-slate-500">
-                    {filteredResources.length} resource{filteredResources.length !== 1 ? 's' : ''} found
-                  </p>
-                </div>
-              </CardContent>
-            </Card>
           </div>
-          
-          {/* Resources Grid */}
-          <div className="lg:col-span-3">
+          {/* End of Sidebar */}
+
+          {/* Resources Section - spans 3 columns */}
+          <div className="lg:col-span-3 flex flex-col gap-4">
+            {/* New horizontal toggle for resource types */}
+            <div className="w-full flex justify-center mb-2">
+              <ToggleGroup
+                type="single"
+                value={resourceTypeToggle}
+                onValueChange={(value) => {
+                  if (value) setResourceTypeToggle(value)
+                }}
+                className="flex flex-wrap gap-2 bg-white/90 rounded-xl shadow px-2 py-2"
+              >
+                {toggleTypes.map(type => (
+                  <ToggleGroupItem
+                    key={type.value}
+                    value={type.value}
+                    aria-label={type.label}
+                    className={`rounded-lg px-3 py-1 font-medium text-sm transition ${
+                      resourceTypeToggle === type.value
+                        ? "bg-gradient-to-r from-blue-600 to-purple-600 text-white shadow"
+                        : "bg-white text-blue-700 hover:bg-slate-100"
+                    }`}
+                  >
+                    {type.label}
+                  </ToggleGroupItem>
+                ))}
+              </ToggleGroup>
+            </div>
+            {/* End toggle */}
+
             {isLoading ? (
               <div className="text-center p-12">
                 <Loader2 className="w-8 h-8 mx-auto animate-spin text-primary" />
