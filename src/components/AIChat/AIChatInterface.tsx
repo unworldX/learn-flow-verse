@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -21,6 +20,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createChatCompletion, deleteChatSession, getChatMessages, getChatSessions, createChatSession } from "@/lib/api";
 import { ChatMessage, ChatSession } from "@/types";
 import { Badge } from "@/components/ui/badge";
+import { useIsMobile } from '@/hooks/use-mobile';
 
 const AI_PROVIDERS = {
   openai: {
@@ -258,28 +258,38 @@ export default function AIChatInterface() {
   const currentProviderData = AI_PROVIDERS[selectedProvider as keyof typeof AI_PROVIDERS];
   const currentModelData = currentProviderData?.models.find(m => m.id === selectedModel);
 
+  const isMobile = useIsMobile();
+
   return (
-    <div className="flex flex-col h-full bg-gradient-to-br from-slate-50 via-white to-blue-50/30 overflow-hidden">
-      {/* Enhanced Professional Header */}
-      <div className="border-b bg-white/95 backdrop-blur-sm shadow-sm relative overflow-hidden">
-        <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 via-purple-600/5 to-indigo-600/5"></div>
-        <div className="relative px-6 py-4">
-          <div className="flex items-center justify-between max-w-7xl mx-auto">
-            <div className="flex items-center gap-6">
+    <div className={
+      `flex flex-col h-full bg-gradient-to-br from-slate-50 via-white to-blue-50/30 overflow-hidden
+      ${isMobile ? 'rounded-none shadow-none min-h-screen' : ''}`
+    }>
+      {/* Header */}
+      <div className={
+        `border-b bg-white/95 backdrop-blur-sm shadow-sm relative overflow-hidden
+        ${isMobile ? 'py-2' : ''}`
+      }>
+        {/* Enhanced Professional Header */}
+        <div className={`relative px-4 ${isMobile ? 'py-2' : 'py-4'}`}>
+          <div className={
+            `flex items-center ${isMobile ? 'gap-3 flex-wrap' : 'justify-between'} max-w-7xl mx-auto`
+          }>
+            <div className="flex items-center gap-3">
               {/* AI Assistant Brand */}
               <div className="flex items-center gap-3">
-                <div className={`w-12 h-12 bg-gradient-to-br ${currentProviderData?.color || 'from-blue-600 via-purple-600 to-indigo-600'} rounded-2xl flex items-center justify-center shadow-lg`}>
-                  <Bot className="w-6 h-6 text-white" />
+                <div className={`w-10 h-10 ${isMobile ? 'rounded-xl' : 'rounded-2xl'} bg-gradient-to-br ${currentProviderData?.color || 'from-blue-600 via-purple-600 to-indigo-600'} flex items-center justify-center shadow-lg`}>
+                  <Bot className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-xl font-bold text-gray-900">AI Assistant</h1>
-                  <div className="flex items-center gap-3">
-                    <Badge variant={isOnline ? "default" : "destructive"} className="text-xs px-2 py-0.5">
+                  <h1 className={`text-lg font-bold text-gray-900 ${isMobile ? 'tracking-tight' : 'text-xl'}`}>AI Assistant</h1>
+                  <div className="flex items-center gap-2">
+                    <Badge variant={isOnline ? "default" : "destructive"} className="text-xs px-1.5 py-0.5">
                       {isOnline ? "Online" : "Offline"}
                     </Badge>
-                    <span className="text-xs text-gray-500">Ready to help</span>
+                    <span className="text-xs text-gray-500">{isMobile ? "" : "Ready to help"}</span>
                     {currentModelData && (
-                      <Badge variant="outline" className="text-xs px-2 py-0.5 bg-gradient-to-r from-gray-50 to-gray-100">
+                      <Badge variant="outline" className="text-2xs px-1.5 py-0.5 bg-gradient-to-r from-gray-50 to-gray-100">
                         {currentProviderData.name} · {currentModelData.name}
                       </Badge>
                     )}
@@ -413,180 +423,226 @@ export default function AIChatInterface() {
             </div>
           </div>
         </div>
+        {isMobile && (
+          <div className="flex items-center gap-2 px-4 pb-2 overflow-x-auto scrollbar-hide">
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="outline" size="sm" className="gap-1 px-3 h-8 bg-white border-gray-200 text-xs">
+                  <div className={`w-2 h-2 rounded-full bg-gradient-to-br ${currentProviderData?.color}`} />
+                  {currentProviderData?.name}
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="start" className="w-40 z-[60]">
+                {Object.entries(AI_PROVIDERS).map(([key, provider]) => (
+                  <DropdownMenuItem
+                    key={key}
+                    onClick={() => {
+                      setSelectedProvider(key);
+                      setSelectedModel(provider.models[0].id);
+                    }}
+                    className="flex items-center gap-2 text-xs"
+                  >
+                    <div className={`w-2 h-2 rounded-full bg-gradient-to-br ${provider.color}`} />
+                    <span>{provider.name}</span>
+                  </DropdownMenuItem>
+                ))}
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <Select value={selectedModel} onValueChange={setSelectedModel}>
+              <SelectTrigger className="w-32 h-8 text-xs bg-white shadow border-gray-200">
+                <SelectValue>
+                  <span className="font-medium truncate">{currentModelData?.name || 'Model...'}</span>
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent className="w-32 z-[60]">
+                {currentProviderData?.models.map((model) => (
+                  <SelectItem key={model.id} value={model.id}>
+                    <span className="font-medium text-xs">{model.name}</span>
+                    <span className="block text-2xs text-gray-500">{model.description}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={currentSessionId || ""} onValueChange={switchSession}>
+              <SelectTrigger className="w-32 h-8 text-xs bg-white shadow border-gray-200">
+                <SelectValue placeholder="Session...">
+                  <span className="font-medium truncate">
+                    {currentSession?.name || "Session..."}
+                  </span>
+                </SelectValue>
+              </SelectTrigger>
+              <SelectContent className="w-32 z-[60]">
+                {sessions?.map((session) => (
+                  <SelectItem key={session.id} value={session.id}>
+                    <span className="truncate max-w-20 font-medium text-xs">{session.name}</span>
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Button onClick={createNewSession} variant="outline" size="sm" className="px-2 h-8 text-xs">New</Button>
+            {currentSessionId && currentSessionId !== 'session-1' && (
+              <Button onClick={() => deleteSession(currentSessionId)} variant="outline" size="icon" className="text-red-600 h-8 w-8 px-0">
+                <Trash2 className="w-3 h-3" />
+              </Button>
+            )}
+            <Button onClick={clearChat} variant="outline" size="icon" className="h-8 w-8 px-0">
+              <RotateCcw className="w-3 h-3" />
+            </Button>
+          </div>
+        )}
       </div>
 
-      {/* Main Chat Area */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        {/* Messages Container */}
-        <div className="flex-1 overflow-y-auto">
-          <div className="max-w-4xl mx-auto px-6 py-8">
-            {messages.length === 0 ? (
-              <div className="text-center py-16">
-                <div className="relative mb-8">
-                  <div className={`w-24 h-24 bg-gradient-to-br ${currentProviderData?.color || 'from-blue-500 via-purple-500 to-indigo-600'} rounded-3xl flex items-center justify-center mx-auto shadow-2xl`}>
-                    <Bot className="w-12 h-12 text-white" />
-                  </div>
-                  <div className="absolute -top-2 -right-2 w-6 h-6 bg-green-500 rounded-full border-4 border-white shadow-lg animate-pulse"></div>
+      {/* Chat messages area */}
+      <div className={`flex-1 flex flex-col overflow-hidden ${isMobile ? 'pb-24' : ''}`}>
+        {/* Messages */}
+        <div className={`flex-1 overflow-y-auto transition-all ${isMobile ? 'px-2 py-2' : 'max-w-4xl mx-auto px-6 py-8'}`}>
+          {messages.length === 0 ? (
+            <div className={`text-center ${isMobile ? 'py-6' : 'py-16'}`}>
+              {/* Welcome and features for empty chat */}
+              <div className={`relative mb-6 ${isMobile ? 'mb-3' : 'mb-8'}`}>
+                <div className={`w-16 h-16 md:w-24 md:h-24 bg-gradient-to-br ${currentProviderData?.color || 'from-blue-500 via-purple-500 to-indigo-600'} rounded-2xl md:rounded-3xl flex items-center justify-center mx-auto shadow-xl`}>
+                  <Bot className="w-8 h-8 md:w-12 md:h-12 text-white" />
                 </div>
-                <h3 className="text-3xl font-bold text-gray-900 mb-4">Welcome to AI Assistant</h3>
-                <p className="text-gray-600 max-w-2xl mx-auto text-lg leading-relaxed mb-8">
-                  Your intelligent companion powered by {currentProviderData?.name} {currentModelData?.name}. Ask questions, explore ideas, 
-                  or get help with any task you're working on.
-                </p>
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto">
-                  <div className="p-4 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200">
-                    <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center mb-3">
-                      <MessageSquare className="w-4 h-4 text-blue-600" />
-                    </div>
-                    <h4 className="font-semibold text-gray-900 mb-2">Smart Conversations</h4>
-                    <p className="text-sm text-gray-600">Engage in natural, context-aware discussions</p>
+                <div className="absolute -top-1 -right-1 w-4 h-4 md:w-6 md:h-6 bg-green-500 rounded-full border-2 border-white shadow-lg animate-pulse" />
+              </div>
+              <h3 className="text-xl md:text-3xl font-bold text-gray-900 mb-2 md:mb-4">Welcome to AI Assistant</h3>
+              <p className="text-gray-600 max-w-md mx-auto text-base md:text-lg leading-relaxed mb-4">
+                Your AI companion powered by {currentProviderData?.name} {currentModelData?.name}.
+              </p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 md:gap-4 max-w-lg mx-auto">
+                <div className="p-3 md:p-4 bg-white rounded-xl md:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md">
+                  <div className="w-7 h-7 md:w-8 md:h-8 bg-blue-100 rounded-lg flex items-center justify-center mb-2">
+                    <MessageSquare className="w-4 h-4 text-blue-600" />
                   </div>
-                  <div className="p-4 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200">
-                    <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center mb-3">
-                      <Brain className="w-4 h-4 text-purple-600" />
-                    </div>
-                    <h4 className="font-semibold text-gray-900 mb-2">Deep Reasoning</h4>
-                    <p className="text-sm text-gray-600">Get detailed analysis and step-by-step thinking</p>
+                  <h4 className="font-semibold text-gray-900 mb-1 text-xs md:text-base">Smart Chat</h4>
+                  <p className="text-xs md:text-sm text-gray-600">Natural discussion.</p>
+                </div>
+                <div className="p-3 md:p-4 bg-white rounded-xl md:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md">
+                  <div className="w-7 h-7 md:w-8 md:h-8 bg-purple-100 rounded-lg flex items-center justify-center mb-2">
+                    <Brain className="w-4 h-4 text-purple-600" />
                   </div>
-                  <div className="p-4 bg-white rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all duration-200">
-                    <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center mb-3">
-                      <Settings className="w-4 h-4 text-indigo-600" />
-                    </div>
-                    <h4 className="font-semibold text-gray-900 mb-2">Multiple Models</h4>
-                    <p className="text-sm text-gray-600">Choose from various AI providers and models</p>
+                  <h4 className="font-semibold text-gray-900 mb-1 text-xs md:text-base">Reasoning</h4>
+                  <p className="text-xs md:text-sm text-gray-600">Detailed explanations.</p>
+                </div>
+                <div className="p-3 md:p-4 bg-white rounded-xl md:rounded-2xl border border-gray-100 shadow-sm hover:shadow-md">
+                  <div className="w-7 h-7 md:w-8 md:h-8 bg-indigo-100 rounded-lg flex items-center justify-center mb-2">
+                    <Settings className="w-4 h-4 text-indigo-600" />
                   </div>
+                  <h4 className="font-semibold text-gray-900 mb-1 text-xs md:text-base">Models</h4>
+                  <p className="text-xs md:text-sm text-gray-600">Choose your AI.</p>
                 </div>
               </div>
-            ) : (
-              <div className="space-y-8">
-                {messages.map((message, index) => (
-                  <div key={index} className={`flex items-start gap-4 group ${message.role === 'user' ? 'flex-row-reverse' : ''} transition-all duration-300 hover:scale-[1.01]`}>
-                    {message.role !== 'user' && (
-                      <div className={`w-10 h-10 bg-gradient-to-br ${currentProviderData?.color || 'from-blue-500 via-purple-500 to-indigo-600'} rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0 group-hover:shadow-xl transition-all duration-300`}>
-                        <Bot className="w-5 h-5 text-white" />
-                      </div>
-                    )}
-                    {message.role === 'user' && (
-                      <div className="w-10 h-10 bg-gradient-to-br from-gray-600 to-gray-800 rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0 group-hover:shadow-xl transition-all duration-300">
-                        <span className="text-white font-semibold text-sm">You</span>
-                      </div>
-                    )}
-                    <div className={`flex flex-col gap-2 max-w-[80%] ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
-                      <div 
-                        className={`px-6 py-4 rounded-3xl shadow-sm border text-[15px] leading-relaxed whitespace-pre-wrap transition-all duration-300 group-hover:shadow-lg ${
-                          message.role === 'user' 
-                            ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white border-blue-600 shadow-blue-200/50' 
-                            : 'bg-white text-gray-800 border-gray-100 shadow-gray-200/50 hover:border-gray-200'
-                        }`}
-                      >
-                        {message.content}
-                      </div>
-                      <div className={`flex items-center gap-2 px-2 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}>
-                        <span className="text-xs text-gray-500">
-                          {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                        {message.role !== 'user' && (
-                          <Badge variant="secondary" className="text-xs px-2 py-0.5">
-                            {currentProviderData?.name} Response
-                          </Badge>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-            
-            {isLoading && (
-              <div className="flex items-start gap-4 mt-8 animate-fade-in">
-                <div className={`w-10 h-10 bg-gradient-to-br ${currentProviderData?.color || 'from-blue-500 via-purple-500 to-indigo-600'} rounded-2xl flex items-center justify-center shadow-lg`}>
-                  <Bot className="w-5 h-5 text-white animate-pulse" />
-                </div>
-                <div className="px-6 py-4 rounded-3xl bg-gradient-to-r from-gray-100 to-gray-50 text-gray-700 shadow-sm border border-gray-100">
-                  <div className="flex items-center gap-3">
-                    <div className="flex gap-1">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                      <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                    </div>
-                    <span className="font-medium">{currentProviderData?.name} is thinking...</span>
-                    {reasoning && (
-                      <Badge variant="outline" className="text-xs border-purple-200 text-purple-700 bg-purple-50">
-                        Deep reasoning mode
-                      </Badge>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
-            <div ref={messagesEndRef} />
-          </div>
-        </div>
-
-        {/* Enhanced Input Section */}
-        <div className="border-t bg-white/95 backdrop-blur-sm shadow-2xl relative">
-          <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 via-purple-600/5 to-indigo-600/5"></div>
-          <div className="relative max-w-4xl mx-auto p-6">
-            {/* Message Input */}
-            <div className="flex gap-4 items-end">
-              <div className="flex-1">
-                <div className="relative group">
-                  <Textarea
-                    value={input}
-                    onChange={(e) => setInput(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    placeholder={reasoning ? "Ask with detailed reasoning and analysis..." : `Type your message for ${currentProviderData?.name} ${currentModelData?.name}...`}
-                    className="min-h-[64px] max-h-32 resize-none pr-20 text-base bg-white border-gray-200 focus:border-blue-400 focus:ring-blue-400/20 rounded-2xl shadow-sm transition-all duration-300 group-hover:shadow-md focus:shadow-lg"
-                    disabled={isLoading}
-                  />
-                  
-                  {/* Reasoning Toggle */}
-                  <div className="absolute right-3 top-3">
-                    <Button
-                      onClick={() => setReasoning(!reasoning)}
-                      variant={reasoning ? "default" : "outline"}
-                      size="sm"
-                      className={`gap-2 text-xs h-8 px-3 rounded-xl transition-all duration-300 ${
-                        reasoning 
-                          ? "bg-gradient-to-r from-purple-600 to-purple-700 hover:from-purple-700 hover:to-purple-800 text-white shadow-lg hover:shadow-xl" 
-                          : "bg-white hover:bg-purple-50 border-gray-200 hover:border-purple-300 text-gray-700 hover:text-purple-700"
-                      }`}
-                      type="button"
-                    >
-                      <Brain className="w-3 h-3" />
-                      <span className="font-medium">{reasoning ? "Deep Mode" : "Standard"}</span>
-                    </Button>
-                  </div>
-                </div>
-                
-                {/* Input Helper Text */}
-                <div className="flex items-center justify-between mt-2 px-1">
-                  <div className="flex items-center gap-2 text-xs text-gray-500">
-                    <span>Press Enter to send, Shift+Enter for new line</span>
-                    {reasoning && (
-                      <Badge variant="outline" className="text-xs border-purple-200 text-purple-600 bg-purple-50">
-                        Reasoning enabled
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="text-xs text-gray-400">
-                    {input.length}/2000
-                  </div>
-                </div>
-              </div>
-              
-              <Button
-                onClick={sendMessage}
-                disabled={isLoading || !input.trim() || !isOnline}
-                className={`shrink-0 h-16 w-16 rounded-2xl bg-gradient-to-r ${currentProviderData?.color || 'from-blue-600 via-purple-600 to-indigo-600'} hover:opacity-90 text-white shadow-xl hover:shadow-2xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed group`}
-              >
-                {isLoading ? (
-                  <Loader2 className="w-6 h-6 animate-spin" />
-                ) : (
-                  <Send className="w-6 h-6 group-hover:scale-110 transition-transform duration-200" />
-                )}
-              </Button>
             </div>
+          ) : (
+            <div className="space-y-5 md:space-y-8">
+              {messages.map((message, index) => (
+                <div key={index} className={`flex items-start gap-2 md:gap-4 group ${message.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                  {message.role !== 'user' ? (
+                    <div className={`w-7 h-7 md:w-10 md:h-10 bg-gradient-to-br ${currentProviderData?.color || 'from-blue-500 via-purple-500 to-indigo-600'} rounded-xl md:rounded-2xl flex items-center justify-center shadow-lg`}>
+                      <Bot className="w-4 h-4 md:w-5 md:h-5 text-white" />
+                    </div>
+                  ) : (
+                    <div className="w-7 h-7 md:w-10 md:h-10 bg-gradient-to-br from-gray-600 to-gray-800 rounded-xl md:rounded-2xl flex items-center justify-center shadow-lg">
+                      <span className="text-white font-semibold text-xs md:text-sm">You</span>
+                    </div>
+                  )}
+                  <div className={`flex flex-col gap-1 md:gap-2 max-w-[88vw] md:max-w-[80%] ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
+                    <div
+                      className={`px-4 py-3 md:px-6 md:py-4 rounded-2xl md:rounded-3xl shadow-sm border text-sm md:text-[15px] leading-relaxed whitespace-pre-wrap transition-all duration-300 
+                      ${message.role === 'user'
+                        ? 'bg-gradient-to-br from-blue-600 to-blue-700 text-white border-blue-600 shadow-blue-200/50'
+                        : 'bg-white text-gray-800 border-gray-100 shadow-gray-200/50 hover:border-gray-200'}`}
+                    >
+                      {message.content}
+                    </div>
+                    <div className={`flex items-center gap-1 md:gap-2 px-1 text-xs md:text-xs ${message.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                      <span className="text-gray-500">{new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                      {message.role !== 'user' && (
+                        <Badge variant="secondary" className="text-2xs px-1.5 py-0.5">{currentProviderData?.name} Response</Badge>
+                      )}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+          {isLoading && (
+            <div className="flex items-start gap-3 mt-4 md:mt-8 animate-fade-in">
+              <div className={`w-7 h-7 md:w-10 md:h-10 bg-gradient-to-br ${currentProviderData?.color || 'from-blue-500 via-purple-500 to-indigo-600'} rounded-xl md:rounded-2xl flex items-center justify-center shadow-lg`}>
+                <Bot className="w-4 h-4 md:w-5 md:h-5 text-white animate-pulse" />
+              </div>
+              <div className="px-4 py-3 md:px-6 md:py-4 rounded-2xl md:rounded-3xl bg-gradient-to-r from-gray-100 to-gray-50 text-gray-700 shadow-sm border border-gray-100">
+                <span className="font-medium">{currentProviderData?.name} is thinking...</span>
+                {reasoning && (
+                  <Badge variant="outline" className="text-2xs md:text-xs border-purple-200 text-purple-700 bg-purple-50 ml-2">Deep reasoning</Badge>
+                )}
+              </div>
+            </div>
+          )}
+          <div ref={messagesEndRef} />
+        </div>
+      </div>
+      {/* Input section (mobile: always docked, full width & large tap) */}
+      <div className={`border-t bg-white/95 backdrop-blur-sm shadow-2xl relative ${isMobile ? 'fixed bottom-0 left-0 right-0 z-50 p-2' : ''}`}>
+        {/* Enhanced Input Section */}
+        <div className={`relative ${isMobile ? 'max-w-full p-0' : 'max-w-4xl mx-auto p-6'}`}>
+          <div className="flex gap-2 md:gap-4 items-end">
+            <div className="flex-1">
+              <div className={`relative group`}>
+                <Textarea
+                  value={input}
+                  onChange={(e) => setInput(e.target.value)}
+                  onKeyDown={handleKeyDown}
+                  placeholder={reasoning
+                    ? "Ask with detailed reasoning and analysis..."
+                    : `Type your message for ${currentProviderData?.name} ${currentModelData?.name}...`
+                  }
+                  className={
+                    `min-h-[48px] max-h-32 resize-none pr-20 text-base bg-white border-gray-200
+                    focus:border-blue-400 focus:ring-blue-400/20 rounded-xl md:rounded-2xl shadow-sm
+                    transition-all duration-300 group-hover:shadow-md focus:shadow-lg
+                    ${isMobile ? 'py-3 px-4 h-14 text-base' : ''}`
+                  }
+                  disabled={isLoading}
+                />
+                <div className="absolute right-3 top-2">
+                  <Button
+                    onClick={() => setReasoning(!reasoning)}
+                    variant={reasoning ? "default" : "outline"}
+                    size="sm"
+                    className={`gap-2 text-xs h-8 md:h-8 px-2 md:px-3 rounded-lg md:rounded-xl transition-all duration-300
+                      ${reasoning
+                        ? "bg-gradient-to-r from-purple-600 to-purple-700 text-white shadow-lg"
+                        : "bg-white hover:bg-purple-50 border-gray-200 hover:border-purple-300 text-gray-700 hover:text-purple-700"
+                      }`}
+                    type="button"
+                  >
+                    <Brain className="w-3 h-3" />
+                    <span className={`font-medium hidden md:block`}>{reasoning ? "Deep Mode" : "Standard"}</span>
+                  </Button>
+                </div>
+              </div>
+              <div className="flex items-center justify-between mt-1 md:mt-2 px-1 text-xs text-gray-500">
+                <span>{isMobile ? "Send: " : "Press Enter to send,"} Shift+Enter for new line</span>
+                {reasoning && (
+                  <Badge variant="outline" className="text-xs border-purple-200 text-purple-600 bg-purple-50">Reasoning enabled</Badge>
+                )}
+                <span className="text-xs text-gray-400 ml-auto">{input.length}/2000</span>
+              </div>
+            </div>
+            <Button
+              onClick={sendMessage}
+              disabled={isLoading || !input.trim() || !isOnline}
+              className={`shrink-0 h-14 md:h-16 w-14 md:w-16 rounded-xl md:rounded-2xl text-white shadow-xl hover:shadow-2xl
+                transition-all duration-300 bg-gradient-to-r
+                ${currentProviderData?.color || 'from-blue-600 via-purple-600 to-indigo-600'}
+                disabled:opacity-50 disabled:cursor-not-allowed group`}
+            >
+              {isLoading
+                ? <Loader2 className="w-6 h-6 animate-spin" />
+                : <Send className="w-6 h-6 group-hover:scale-110 transition-transform duration-200" />
+              }
+            </Button>
           </div>
         </div>
       </div>

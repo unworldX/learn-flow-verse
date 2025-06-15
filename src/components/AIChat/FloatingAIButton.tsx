@@ -1,7 +1,9 @@
+
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { Bot } from 'lucide-react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { useIsMobile } from '@/hooks/use-mobile'; // Import mobile hook
 
 const FloatingAIButton = () => {
   const navigate = useNavigate();
@@ -10,6 +12,7 @@ const FloatingAIButton = () => {
   const [isDragging, setIsDragging] = useState(false);
   const [dragStart, setDragStart] = useState({ x: 0, y: 0 });
   const buttonRef = useRef<HTMLDivElement>(null);
+  const isMobile = useIsMobile();
 
   // Only show on home, resources, and forums pages
   const allowedPaths = ['/', '/resources', '/forums'];
@@ -70,7 +73,8 @@ const FloatingAIButton = () => {
     }
   };
 
-  if (!shouldShow) return null;
+  // Hide on mobile
+  if (!shouldShow || isMobile) return null;
 
   return (
     <div
