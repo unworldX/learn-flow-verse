@@ -15,6 +15,8 @@ import StudyPlans from "./pages/StudyPlans";
 import Forums from "./pages/Forums";
 import Reminders from "./pages/Reminders";
 import Upload from "./pages/Upload";
+import DirectMessages from "./pages/DirectMessages";
+import StudyGroups from "./pages/StudyGroups";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -61,10 +63,10 @@ const AppRoutes = () => (
     <Route path="/forums" element={<ProtectedRoute><Forums /></ProtectedRoute>} />
     <Route path="/reminders" element={<ProtectedRoute><Reminders /></ProtectedRoute>} />
     <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
+    <Route path="/chats" element={<ProtectedRoute><DirectMessages /></ProtectedRoute>} />
+    <Route path="/groups" element={<ProtectedRoute><StudyGroups /></ProtectedRoute>} />
     
-    {/* Placeholder routes - to be implemented */}
-    <Route path="/chats" element={<ProtectedRoute><div className="p-6"><h1 className="text-2xl font-bold">Direct Messages - Coming Soon!</h1></div></ProtectedRoute>} />
-    <Route path="/groups" element={<ProtectedRoute><div className="p-6"><h1 className="text-2xl font-bold">Study Groups - Coming Soon!</h1></div></ProtectedRoute>} />
+    {/* Settings placeholder */}
     <Route path="/settings" element={<ProtectedRoute><div className="p-6"><h1 className="text-2xl font-bold">Settings - Coming Soon!</h1></div></ProtectedRoute>} />
 
     {/* Catch all */}
