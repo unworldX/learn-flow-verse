@@ -11,6 +11,7 @@ import Login from "./pages/Login";
 import Signup from "./pages/Signup";
 import Resources from "./pages/Resources";
 import Profile from "./pages/Profile";
+import StudyPlans from "./pages/StudyPlans";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
