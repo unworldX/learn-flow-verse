@@ -17,6 +17,7 @@ import Reminders from "./pages/Reminders";
 import Upload from "./pages/Upload";
 import DirectMessages from "./pages/DirectMessages";
 import StudyGroups from "./pages/StudyGroups";
+import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
