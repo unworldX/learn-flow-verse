@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,6 +8,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
 import SecureKeyManager from './SecureKeyManager';
+import { Input } from '@/components/ui/input';
 
 const AI_PROVIDERS = {
   openai: {
@@ -276,7 +276,7 @@ const AISettings = () => {
             AI Provider Settings
           </CardTitle>
           <CardDescription className="text-blue-700">
-            Configure your AI provider and model. API keys are stored securely and hidden after saving.
+            Configure your AI provider and model. API keys are always visible here and must be edited securely.
           </CardDescription>
         </CardHeader>
 
@@ -287,7 +287,7 @@ const AISettings = () => {
               <div className="space-y-1">
                 <h4 className="font-semibold text-blue-800">Security & Privacy</h4>
                 <p className="text-sm text-blue-700">
-                  Your API keys are encrypted and stored securely. Authentication is required to edit them.
+                  Your API keys are encrypted in the database. Authentication is required to edit them.
                 </p>
               </div>
             </div>
@@ -333,14 +333,19 @@ const AISettings = () => {
                     </CardHeader>
                     <CardContent className="pt-0">
                       <div className="flex items-center gap-2">
-                        {apiKeys[AI_PROVIDERS[p].keyName] ? (
-                          <>
-                            <div className="flex-1 px-3 py-2 bg-green-50 border border-green-200 rounded-lg">
-                              <div className="flex items-center gap-2">
-                                <Key className="w-4 h-4 text-green-600" />
-                                <span className="text-sm text-green-700 font-medium">API Key Configured</span>
-                              </div>
-                            </div>
+                        <div className="flex-1 px-3 py-2 bg-white border border-slate-200 rounded-lg flex flex-col gap-1">
+                          <div className="flex items-center gap-2">
+                            <Key className="w-4 h-4 text-blue-600" />
+                            <span className="text-sm text-slate-700 font-medium">API Key</span>
+                          </div>
+                          <div className="mt-2 flex items-center gap-2">
+                            <Input
+                              className="flex-1 text-mono"
+                              value={apiKeys[AI_PROVIDERS[p].keyName] || ''}
+                              readOnly
+                              type="password"
+                              placeholder={AI_PROVIDERS[p].placeholder}
+                            />
                             <Button
                               variant="outline"
                               size="sm"
@@ -350,16 +355,8 @@ const AISettings = () => {
                               <Edit className="w-4 h-4 mr-1" />
                               Edit
                             </Button>
-                          </>
-                        ) : (
-                          <Button
-                            onClick={() => openSecureKeyManager(p)}
-                            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                          >
-                            <Key className="w-4 h-4 mr-2" />
-                            Add API Key
-                          </Button>
-                        )}
+                          </div>
+                        </div>
                       </div>
                       {AI_PROVIDERS[p].fetchModels && apiKeys[AI_PROVIDERS[p].keyName] && (
                         <div className="mt-2 flex items-center gap-2">
@@ -439,7 +436,7 @@ const AISettings = () => {
             </Button>
           </div>
           <div className="text-xs text-gray-500 text-center pt-4 border-t border-gray-100">
-            API keys are encrypted and securely stored. Authentication required to edit keys.
+            API keys are visible here and require authentication to edit.
           </div>
         </CardContent>
       </Card>
