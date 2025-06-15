@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -5,6 +6,8 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AppLayout } from "./components/AppLayout";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
+import { AIChatProvider } from "./hooks/useAIChat";
+import FloatingAIButton from "./components/AIChat/FloatingAIButton";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
 import Signup from "./pages/Signup";
@@ -16,6 +19,7 @@ import Reminders from "./pages/Reminders";
 import Upload from "./pages/Upload";
 import DirectMessages from "./pages/DirectMessages";
 import StudyGroups from "./pages/StudyGroups";
+import AIChat from "./pages/AIChat";
 import Settings from "./pages/Settings";
 import NotFound from "./pages/NotFound";
 
@@ -32,7 +36,14 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
     );
   }
   
-  return user ? <AppLayout>{children}</AppLayout> : <Navigate to="/login" />;
+  return user ? (
+    <AIChatProvider>
+      <AppLayout>
+        {children}
+        <FloatingAIButton />
+      </AppLayout>
+    </AIChatProvider>
+  ) : <Navigate to="/login" />;
 };
 
 const PublicRoute = ({ children }: { children: React.ReactNode }) => {
@@ -65,6 +76,7 @@ const AppRoutes = () => (
     <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
     <Route path="/chats" element={<ProtectedRoute><DirectMessages /></ProtectedRoute>} />
     <Route path="/groups" element={<ProtectedRoute><StudyGroups /></ProtectedRoute>} />
+    <Route path="/ai-chat" element={<ProtectedRoute><AIChat /></ProtectedRoute>} />
     <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
 
     {/* Catch all */}
