@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,7 @@ import {
 } from "@/components/ui/select"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createChatCompletion, deleteChatSession, getChatMessages, getChatSessions, uploadPdf } from "@/lib/api";
-import { ChatMessage } from "@/types";
+import { ChatMessage, ChatSession } from "@/types";
 
 export default function AIChatInterface() {
   const [input, setInput] = useState('');
@@ -26,13 +27,13 @@ export default function AIChatInterface() {
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
 
   // Fetch chat sessions
-  const { data: sessions = [], refetch: refetchSessions } = useQuery({
+  const { data: sessions = [], refetch: refetchSessions } = useQuery<ChatSession[]>({
     queryKey: ['chatSessions'],
     queryFn: getChatSessions,
   });
 
   // Fetch chat messages for the current session
-  const { data: initialMessages = [], refetch: refetchMessages } = useQuery({
+  const { data: initialMessages = [], refetch: refetchMessages } = useQuery<ChatMessage[]>({
     queryKey: ['chatMessages', currentSessionId],
     queryFn: () => getChatMessages(currentSessionId || ''),
     enabled: !!currentSessionId,
@@ -107,6 +108,15 @@ export default function AIChatInterface() {
     setIsLoading(true);
     const messageContent = input.trim();
 
+    // Add user message immediately
+    const userMessage: ChatMessage = {
+      id: Math.random().toString(36).substr(2, 9),
+      role: 'user',
+      content: messageContent,
+      createdAt: new Date().toISOString(),
+    };
+    setMessages(prev => [...prev, userMessage]);
+
     createCompletion({
       sessionId: currentSessionId || undefined,
       message: messageContent,
@@ -146,7 +156,7 @@ export default function AIChatInterface() {
 
   const switchSession = (sessionId: string) => {
     setCurrentSessionId(sessionId);
-    queryClient.invalidateQueries(['chatMessages', sessionId]);
+    queryClient.invalidateQueries({ queryKey: ['chatMessages', sessionId] });
   };
 
   const createNewSession = () => {
@@ -154,9 +164,9 @@ export default function AIChatInterface() {
     const newSessionId = Math.random().toString(36).substring(7);
 
     // Optimistically update the sessions list
-    queryClient.setQueryData(['chatSessions'], (oldSessions: any) => [
-      ...oldSessions,
-      { id: newSessionId, name: newSessionName, createdAt: new Date() },
+    queryClient.setQueryData(['chatSessions'], (oldSessions: ChatSession[] | undefined) => [
+      ...(oldSessions || []),
+      { id: newSessionId, name: newSessionName, createdAt: new Date().toISOString() },
     ]);
 
     setCurrentSessionId(newSessionId);
@@ -169,21 +179,21 @@ export default function AIChatInterface() {
   };
 
   return (
-    <div className="flex flex-col h-[calc(100vh-4rem)] bg-gradient-to-br from-blue-50 via-white to-purple-50">
+    <div className="flex flex-col h-full bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
       {/* Session Management Bar */}
-      <div className="border-b bg-white/80 backdrop-blur-sm px-6 py-3">
-        <div className="flex items-center justify-between">
+      <div className="border-b bg-white/90 backdrop-blur-sm px-6 py-4 shadow-sm">
+        <div className="flex items-center justify-between max-w-7xl mx-auto">
           <div className="flex items-center gap-4">
             <Select value={currentSessionId || ""} onValueChange={switchSession}>
-              <SelectTrigger className="w-64">
+              <SelectTrigger className="w-72 h-10 bg-white shadow-sm border-gray-200 hover:border-gray-300 transition-colors">
                 <SelectValue placeholder="Select or create a session..." />
               </SelectTrigger>
               <SelectContent>
                 {sessions.map((session) => (
                   <SelectItem key={session.id} value={session.id}>
                     <div className="flex items-center justify-between w-full">
-                      <span className="truncate max-w-48">{session.name}</span>
-                      <span className="text-xs text-gray-500 ml-2">
+                      <span className="truncate max-w-48 font-medium">{session.name}</span>
+                      <span className="text-xs text-gray-500 ml-3">
                         {new Date(session.createdAt).toLocaleDateString()}
                       </span>
                     </div>
@@ -192,7 +202,7 @@ export default function AIChatInterface() {
               </SelectContent>
             </Select>
             
-            <Button onClick={createNewSession} variant="outline" size="sm" className="gap-2">
+            <Button onClick={createNewSession} variant="outline" size="sm" className="gap-2 h-10 px-4 bg-white hover:bg-gray-50 border-gray-200">
               <Plus className="w-4 h-4" />
               New Chat
             </Button>
@@ -204,13 +214,13 @@ export default function AIChatInterface() {
                 onClick={() => deleteSession(currentSessionId)}
                 variant="outline"
                 size="sm"
-                className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                className="text-red-600 hover:text-red-700 hover:bg-red-50 h-10 px-4 border-red-200 hover:border-red-300"
               >
                 <Trash2 className="w-4 h-4" />
               </Button>
             )}
             
-            <Button onClick={clearChat} variant="outline" size="sm" className="gap-2">
+            <Button onClick={clearChat} variant="outline" size="sm" className="gap-2 h-10 px-4 bg-white hover:bg-gray-50 border-gray-200">
               <RotateCcw className="w-4 h-4" />
               Clear
             </Button>
@@ -221,43 +231,56 @@ export default function AIChatInterface() {
       {/* Main Chat Area */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {/* Messages Container */}
-        <div className="flex-1 overflow-y-auto px-6 py-4">
-          <div className="max-w-4xl mx-auto space-y-6">
+        <div className="flex-1 overflow-y-auto">
+          <div className="max-w-4xl mx-auto px-6 py-8">
             {messages.length === 0 ? (
-              <div className="text-center py-12">
-                <div className="w-16 h-16 bg-gradient-to-r from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-4">
-                  <Bot className="w-8 h-8 text-white" />
+              <div className="text-center py-16">
+                <div className="w-20 h-20 bg-gradient-to-br from-blue-500 via-purple-500 to-indigo-600 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+                  <Bot className="w-10 h-10 text-white" />
                 </div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">Welcome to AI Assistant</h3>
-                <p className="text-gray-600 max-w-md mx-auto">
-                  Start a conversation with our AI assistant. Ask questions, get help with your studies, or just chat!
+                <h3 className="text-2xl font-bold text-gray-900 mb-3">Welcome to AI Assistant</h3>
+                <p className="text-gray-600 max-w-lg mx-auto text-lg leading-relaxed">
+                  Start a conversation with our AI assistant. Ask questions, get help with your studies, or explore new topics together.
                 </p>
               </div>
             ) : (
-              messages.map((message, index) => (
-                <div key={index} className={`flex items-start gap-3 ${message.role === 'user' ? 'justify-end' : ''}`}>
-                  {message.role !== 'user' && (
-                    <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
-                      <Bot className="w-4 h-4 text-white" />
+              <div className="space-y-8">
+                {messages.map((message, index) => (
+                  <div key={index} className={`flex items-start gap-4 ${message.role === 'user' ? 'flex-row-reverse' : ''}`}>
+                    {message.role !== 'user' && (
+                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 via-purple-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-md flex-shrink-0">
+                        <Bot className="w-5 h-5 text-white" />
+                      </div>
+                    )}
+                    <div className={`flex flex-col gap-2 max-w-[75%] ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
+                      <div 
+                        className={`px-6 py-4 rounded-3xl shadow-sm border text-[15px] leading-relaxed ${
+                          message.role === 'user' 
+                            ? 'bg-blue-600 text-white border-blue-600' 
+                            : 'bg-white text-gray-800 border-gray-100 shadow-md'
+                        }`}
+                      >
+                        {message.content}
+                      </div>
+                      <span className="text-xs text-gray-500 px-2">
+                        {new Date(message.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
                     </div>
-                  )}
-                  <div className="flex flex-col gap-1.5 max-w-[80%]">
-                    <div className="px-4 py-2 rounded-xl shadow-md text-sm" style={{ backgroundColor: message.role === 'user' ? '#e2e8f0' : 'white' }}>
-                      {message.content}
-                    </div>
-                    <span className="text-xs text-gray-500">{new Date(message.createdAt).toLocaleTimeString()}</span>
                   </div>
-                </div>
-              ))
+                ))}
+              </div>
             )}
             
             {isLoading && (
-              <div className="flex items-center gap-3">
-                <div className="w-8 h-8 bg-gray-200 rounded-xl flex items-center justify-center">
-                  <Bot className="w-4 h-4 text-gray-500 animate-pulse" />
+              <div className="flex items-start gap-4 mt-8">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 via-purple-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-md">
+                  <Bot className="w-5 h-5 text-white animate-pulse" />
                 </div>
-                <div className="px-4 py-2 rounded-xl bg-gray-100 text-sm">
-                  Thinking...
+                <div className="px-6 py-4 rounded-3xl bg-gray-100 text-gray-600 shadow-sm border border-gray-100">
+                  <div className="flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    Thinking...
+                  </div>
                 </div>
               </div>
             )}
@@ -266,12 +289,12 @@ export default function AIChatInterface() {
         </div>
 
         {/* Input Section */}
-        <div className="border-t bg-white/80 backdrop-blur-sm p-6">
-          <div className="max-w-4xl mx-auto">
+        <div className="border-t bg-white/90 backdrop-blur-sm shadow-lg">
+          <div className="max-w-4xl mx-auto p-6">
             {/* PDF Upload Section */}
             {uploadedFile && (
-              <div className="mb-4 p-4 bg-blue-50 rounded-md border border-blue-200">
-                <p className="text-sm text-blue-700">
+              <div className="mb-4 p-4 bg-blue-50 rounded-2xl border border-blue-200">
+                <p className="text-sm text-blue-700 font-medium">
                   Uploaded File: {uploadedFile.name} ({Math.round(uploadedFile.size / 1024)} KB)
                 </p>
               </div>
@@ -286,21 +309,25 @@ export default function AIChatInterface() {
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
                     placeholder={reasoning ? "Ask with detailed reasoning..." : "Type your message..."}
-                    className="min-h-[60px] max-h-32 resize-none pr-32 text-base"
+                    className="min-h-[56px] max-h-32 resize-none pr-32 text-base bg-white border-gray-200 focus:border-blue-400 focus:ring-blue-400/20 rounded-2xl shadow-sm"
                     disabled={isLoading}
                   />
                   
-                  {/* Reasoning Toggle */}
+                  {/* Reasoning Toggle - positioned to the right side of input */}
                   <div className="absolute right-3 top-3">
                     <Button
                       onClick={() => setReasoning(!reasoning)}
                       variant={reasoning ? "default" : "outline"}
                       size="sm"
-                      className="gap-2 text-xs"
+                      className={`gap-2 text-xs h-8 px-3 rounded-xl transition-all ${
+                        reasoning 
+                          ? "bg-purple-600 hover:bg-purple-700 text-white shadow-md" 
+                          : "bg-white hover:bg-gray-50 border-gray-200 text-gray-700"
+                      }`}
                       type="button"
                     >
                       <Brain className="w-3 h-3" />
-                      {reasoning ? "Reasoning ON" : "Reasoning OFF"}
+                      {reasoning ? "ON" : "OFF"}
                     </Button>
                   </div>
                 </div>
@@ -320,17 +347,17 @@ export default function AIChatInterface() {
                   size="icon"
                   onClick={() => document.getElementById('pdf-upload')?.click()}
                   disabled={isLoading}
-                  className="shrink-0"
+                  className="shrink-0 h-14 w-14 rounded-2xl bg-white hover:bg-gray-50 border-gray-200 shadow-sm"
                 >
-                  <Paperclip className="w-4 h-4" />
+                  <Paperclip className="w-5 h-5 text-gray-600" />
                 </Button>
                 
                 <Button
                   onClick={sendMessage}
                   disabled={isLoading || !input.trim()}
-                  className="shrink-0 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white px-6"
+                  className="shrink-0 h-14 w-14 rounded-2xl bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 hover:from-blue-700 hover:via-purple-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all"
                 >
-                  {isLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  {isLoading ? <Loader2 className="w-5 h-5 animate-spin" /> : <Send className="w-5 h-5" />}
                 </Button>
               </div>
             </div>
