@@ -12,7 +12,7 @@ import {
   SelectValue,
 } from "@/components/ui/select"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { createChatCompletion, deleteChatSession, getChatMessages, getChatSessions, uploadPdf } from "@/lib/api";
+import { createChatCompletion, deleteChatSession, getChatMessages, getChatSessions, uploadPdf, createChatSession } from "@/lib/api";
 import { ChatMessage, ChatSession } from "@/types";
 
 export default function AIChatInterface() {
@@ -24,7 +24,7 @@ export default function AIChatInterface() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
+  const [currentSessionId, setCurrentSessionId] = useState<string | null>('session-1');
 
   // Fetch chat sessions
   const { data: sessions = [], refetch: refetchSessions } = useQuery<ChatSession[]>({
@@ -49,11 +49,18 @@ export default function AIChatInterface() {
   const { mutate: createCompletion } = useMutation({
     mutationFn: createChatCompletion,
     onSuccess: (newMessage) => {
+      console.log('Chat completion successful:', newMessage);
       setMessages((prev) => [...prev, newMessage]);
       setInput('');
       setIsLoading(false);
+      
+      // Refresh messages for the current session
+      if (currentSessionId) {
+        queryClient.invalidateQueries({ queryKey: ['chatMessages', currentSessionId] });
+      }
     },
-    onError: () => {
+    onError: (error) => {
+      console.error('Chat completion error:', error);
       toast({
         title: "Something went wrong!",
         description: "There was an error sending your message. Please try again.",
@@ -71,14 +78,37 @@ export default function AIChatInterface() {
         title: "Session deleted!",
         description: "The chat session has been successfully deleted.",
       });
-      setCurrentSessionId(null);
+      setCurrentSessionId('session-1');
       setMessages([]);
       refetchSessions();
+      queryClient.invalidateQueries({ queryKey: ['chatMessages'] });
     },
     onError: () => {
       toast({
         title: "Something went wrong!",
         description: "There was an error deleting the session. Please try again.",
+        variant: "destructive",
+      });
+    },
+  });
+
+  // Mutation for creating a new session
+  const { mutate: createNewSessionMutation } = useMutation({
+    mutationFn: (name: string) => createChatSession(name),
+    onSuccess: (newSession) => {
+      console.log('New session created:', newSession);
+      setCurrentSessionId(newSession.id);
+      setMessages([]);
+      refetchSessions();
+      toast({
+        title: "New session created!",
+        description: `Created "${newSession.name}" successfully.`,
+      });
+    },
+    onError: () => {
+      toast({
+        title: "Something went wrong!",
+        description: "There was an error creating a new session. Please try again.",
         variant: "destructive",
       });
     },
@@ -105,6 +135,8 @@ export default function AIChatInterface() {
 
   const sendMessage = async () => {
     if (!input.trim()) return;
+    
+    console.log('Sending message:', input);
     setIsLoading(true);
     const messageContent = input.trim();
 
@@ -117,6 +149,10 @@ export default function AIChatInterface() {
     };
     setMessages(prev => [...prev, userMessage]);
 
+    // Clear input immediately
+    setInput('');
+
+    // Create AI completion
     createCompletion({
       sessionId: currentSessionId || undefined,
       message: messageContent,
@@ -144,6 +180,9 @@ export default function AIChatInterface() {
 
   const clearChat = () => {
     setMessages([]);
+    if (currentSessionId) {
+      queryClient.invalidateQueries({ queryKey: ['chatMessages', currentSessionId] });
+    }
   };
 
   const scrollToBottom = useCallback(() => {
@@ -155,26 +194,25 @@ export default function AIChatInterface() {
   }, [messages, scrollToBottom]);
 
   const switchSession = (sessionId: string) => {
+    console.log('Switching to session:', sessionId);
     setCurrentSessionId(sessionId);
     queryClient.invalidateQueries({ queryKey: ['chatMessages', sessionId] });
   };
 
   const createNewSession = () => {
-    const newSessionName = `Chat Session ${sessions.length + 1}`;
-    const newSessionId = Math.random().toString(36).substring(7);
-
-    // Optimistically update the sessions list
-    queryClient.setQueryData(['chatSessions'], (oldSessions: ChatSession[] | undefined) => [
-      ...(oldSessions || []),
-      { id: newSessionId, name: newSessionName, createdAt: new Date().toISOString() },
-    ]);
-
-    setCurrentSessionId(newSessionId);
-    setMessages([]);
-    refetchSessions(); // Refresh the sessions list from the server
+    const newSessionName = `Chat Session ${(sessions?.length || 0) + 1}`;
+    createNewSessionMutation(newSessionName);
   };
 
   const deleteSession = (sessionId: string) => {
+    if (sessionId === 'session-1') {
+      toast({
+        title: "Cannot delete default session",
+        description: "The default session cannot be deleted.",
+        variant: "destructive",
+      });
+      return;
+    }
     deleteSessionMutation(sessionId);
   };
 
@@ -189,7 +227,7 @@ export default function AIChatInterface() {
                 <SelectValue placeholder="Select or create a session..." />
               </SelectTrigger>
               <SelectContent>
-                {sessions.map((session) => (
+                {sessions?.map((session) => (
                   <SelectItem key={session.id} value={session.id}>
                     <div className="flex items-center justify-between w-full">
                       <span className="truncate max-w-48 font-medium">{session.name}</span>
@@ -209,7 +247,7 @@ export default function AIChatInterface() {
           </div>
 
           <div className="flex items-center gap-2">
-            {currentSessionId && (
+            {currentSessionId && currentSessionId !== 'session-1' && (
               <Button
                 onClick={() => deleteSession(currentSessionId)}
                 variant="outline"
@@ -254,7 +292,7 @@ export default function AIChatInterface() {
                     )}
                     <div className={`flex flex-col gap-2 max-w-[75%] ${message.role === 'user' ? 'items-end' : 'items-start'}`}>
                       <div 
-                        className={`px-6 py-4 rounded-3xl shadow-sm border text-[15px] leading-relaxed ${
+                        className={`px-6 py-4 rounded-3xl shadow-sm border text-[15px] leading-relaxed whitespace-pre-wrap ${
                           message.role === 'user' 
                             ? 'bg-blue-600 text-white border-blue-600' 
                             : 'bg-white text-gray-800 border-gray-100 shadow-md'
@@ -313,7 +351,7 @@ export default function AIChatInterface() {
                     disabled={isLoading}
                   />
                   
-                  {/* Reasoning Toggle - positioned to the right side of input */}
+                  {/* Reasoning Toggle */}
                   <div className="absolute right-3 top-3">
                     <Button
                       onClick={() => setReasoning(!reasoning)}
