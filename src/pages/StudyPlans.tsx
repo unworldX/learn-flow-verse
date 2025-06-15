@@ -232,7 +232,7 @@ const StudyPlans = () => {
   };
 
   const getProgressBySubject = () => {
-    const subjectProgress = {};
+    const subjectProgress: Record<string, { total: number; completed: number }> = {};
     
     planTasks.forEach(task => {
       const subject = task.resources?.subject || 'General';
@@ -536,9 +536,9 @@ const StudyPlans = () => {
           ) : (
             <div className="grid md:grid-cols-2 gap-4">
               {studyPlans.map(plan => {
-                const planTasks = planTasks.filter(task => task.plan_id === plan.id);
-                const completedTasks = planTasks.filter(task => task.is_completed).length;
-                const totalTasks = planTasks.length;
+                const currentPlanTasks = planTasks.filter(task => task.plan_id === plan.id);
+                const completedTasks = currentPlanTasks.filter(task => task.is_completed).length;
+                const totalTasks = currentPlanTasks.length;
                 const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
                 return (
