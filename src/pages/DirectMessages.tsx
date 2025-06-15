@@ -343,16 +343,27 @@ const DirectMessages = () => {
     setSearchQuery(''); // Clear search when starting new chat
   };
 
-  // Fix the filtering logic - ensure proper case-insensitive search
+  // Improved search: match on username or any part of full name, and support multi-word queries
   const filteredUsers = users.filter(u => {
     const query = searchQuery.toLowerCase().trim();
-    if (!query) return true; // Show all users if no search query
-    
+    if (!query) return true;
+    const keywords = query.split(/\s+/).filter(Boolean);
+
+    // check email/username
     const email = (u.email || '').toLowerCase();
+    // check all full name parts (split by space)
     const fullName = (u.full_name || '').toLowerCase();
-    
-    // Search by email (username) OR full name
-    return email.includes(query) || fullName.includes(query);
+    const nameParts = fullName.split(/\s+/);
+
+    // If any keyword is in email OR any name part matches any keyword
+    return (
+      email.includes(query) ||
+      keywords.some(keyword =>
+        nameParts.some(name => name.includes(keyword))
+      ) ||
+      // Also, allow matching whole full_name string
+      fullName.includes(query)
+    );
   });
 
   const renderMessage = (message: DirectMessage) => {
