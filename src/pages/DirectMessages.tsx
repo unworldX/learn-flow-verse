@@ -622,18 +622,6 @@ const DirectMessages = () => {
     );
   }
 
-  // New State: group chats and view filter
-  const [groups, setGroups] = useState<any[]>([]);
-  const [view, setView] = useState<'all'|'direct'|'group'>('all');
-  const [filters, setFilters] = useState({ showPinned: false, showUnread: false });
-
-  // Example handler and wiring for modular components:
-  const handleSelectChat = (id: string, type: "direct"|"group") => {
-    // ... logic to set selected chat or group ...
-  };
-
-  // ... fetch and wire all recent chats, group chats, and map group shape as needed ...
-
   // Desktop Layout
   return (
     <div className="h-full flex bg-gray-50">
