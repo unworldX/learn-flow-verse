@@ -3,8 +3,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Switch } from '@/components/ui/switch';
 import { useToast } from '@/hooks/use-toast';
@@ -45,25 +43,21 @@ interface AIChatInterfaceProps {
   onClose?: () => void;
 }
 
-const AI_MODELS = [
-  { id: 'microsoft/phi-4-reasoning-plus:free', name: 'Microsoft Phi-4 Reasoning Plus' },
-  { id: 'deepseek/deepseek-r1-0528:free', name: 'DeepSeek R1 (0528)' },
-  { id: 'deepseek/deepseek-r1-0528-qwen3-8b:free', name: 'DeepSeek R1 Qwen3 8B' },
-  { id: 'google/gemma-3-27b-it:free', name: 'Google Gemma 3 27B IT' }
-];
-
 const AIChatInterface = ({ onClose }: AIChatInterfaceProps) => {
   const [chatSessions, setChatSessions] = useState<ChatSession[]>([]);
   const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState('');
-  const [selectedModel, setSelectedModel] = useState(AI_MODELS[0].id);
   const [isLoading, setIsLoading] = useState(false);
-  const [apiKey, setApiKey] = useState(localStorage.getItem('openrouter_api_key') || '');
   const [showHistory, setShowHistory] = useState(false);
   const [reasoningEnabled, setReasoningEnabled] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
+
+  // Get settings from localStorage
+  const apiProvider = localStorage.getItem('ai_provider') || 'openrouter';
+  const selectedModel = localStorage.getItem('ai_model') || 'microsoft/phi-4-reasoning-plus:free';
+  const apiKey = localStorage.getItem(`${apiProvider}_api_key`) || '';
 
   useEffect(() => {
     const savedSessions = localStorage.getItem('ai_chat_sessions');
@@ -142,17 +136,12 @@ const AIChatInterface = ({ onClose }: AIChatInterfaceProps) => {
     setShowHistory(false);
   };
 
-  const handleApiKeyChange = (key: string) => {
-    setApiKey(key);
-    localStorage.setItem('openrouter_api_key', key);
-  };
-
   const sendMessage = async () => {
     if (!newMessage.trim() || !apiKey) {
       if (!apiKey) {
         toast({
           title: "API Key Required",
-          description: "Please enter your OpenRouter API key",
+          description: "Please configure your API key in Settings",
           variant: "destructive"
         });
       }
@@ -210,7 +199,26 @@ const AIChatInterface = ({ onClose }: AIChatInterfaceProps) => {
         ? 'You are a helpful AI assistant for learning and education. Think step by step and show your reasoning process. Help users with their questions, provide explanations, and assist with study materials. Maintain context from previous messages in this conversation.'
         : 'You are a helpful AI assistant for learning and education. Help users with their questions, provide explanations, and assist with study materials. Maintain context from previous messages in this conversation.';
 
-      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      let apiUrl = '';
+      let requestBody: any = {};
+
+      // Configure API based on provider
+      if (apiProvider === 'openrouter') {
+        apiUrl = 'https://openrouter.ai/api/v1/chat/completions';
+        requestBody = {
+          model: selectedModel,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            ...conversationHistory.map(msg => ({ role: msg.role, content: msg.content })),
+            { role: 'user', content: newMessage }
+          ],
+          temperature: reasoningEnabled ? 0.3 : 0.7,
+          max_tokens: 1000
+        };
+      }
+      // Add other providers as needed...
+
+      const response = await fetch(apiUrl, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${apiKey}`,
@@ -218,25 +226,7 @@ const AIChatInterface = ({ onClose }: AIChatInterfaceProps) => {
           'HTTP-Referer': window.location.origin,
           'X-Title': 'Learn Flow Verse'
         },
-        body: JSON.stringify({
-          model: selectedModel,
-          messages: [
-            {
-              role: 'system',
-              content: systemPrompt
-            },
-            ...conversationHistory.map(msg => ({
-              role: msg.role,
-              content: msg.content
-            })),
-            {
-              role: 'user',
-              content: newMessage
-            }
-          ],
-          temperature: reasoningEnabled ? 0.3 : 0.7,
-          max_tokens: 1000
-        })
+        body: JSON.stringify(requestBody)
       });
 
       if (!response.ok) {
@@ -443,6 +433,9 @@ const AIChatInterface = ({ onClose }: AIChatInterfaceProps) => {
             <CardTitle className="flex items-center gap-2">
               <Bot className="w-5 h-5 text-purple-500" />
               AI Assistant
+              <span className="text-sm text-gray-500 font-normal">
+                ({apiProvider} - {selectedModel.split('/').pop()?.split(':')[0]})
+              </span>
             </CardTitle>
             <div className="flex items-center gap-2">
               <Button variant="ghost" size="icon" onClick={() => setShowHistory(true)}>
@@ -456,56 +449,18 @@ const AIChatInterface = ({ onClose }: AIChatInterfaceProps) => {
             </div>
           </div>
           
-          {/* API Key Input */}
+          {/* API Key Warning */}
           {!apiKey && (
-            <div className="space-y-2">
-              <Input
-                placeholder="Enter OpenRouter API Key"
-                type="password"
-                value={apiKey}
-                onChange={(e) => handleApiKeyChange(e.target.value)}
-                className="text-sm"
-              />
-              <p className="text-xs text-gray-500">
-                Get your API key from{' '}
-                <a href="https://openrouter.ai/keys" target="_blank" rel="noopener noreferrer" className="text-purple-500 hover:underline">
-                  OpenRouter
-                </a>
+            <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+              <p className="text-sm text-yellow-800">
+                No API key configured. Please go to{' '}
+                <a href="/settings" className="text-purple-500 hover:underline font-medium">
+                  Settings → AI
+                </a>{' '}
+                to configure your API provider and key.
               </p>
             </div>
           )}
-
-          {/* Model Selection */}
-          <Select value={selectedModel} onValueChange={setSelectedModel}>
-            <SelectTrigger className="w-full">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              {AI_MODELS.map(model => (
-                <SelectItem key={model.id} value={model.id}>
-                  <div className="flex items-center gap-2">
-                    <span className="text-sm">{model.name}</span>
-                    <Badge variant="secondary" className="text-xs">Free</Badge>
-                  </div>
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-
-          {/* Reasoning Toggle */}
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Brain className="w-4 h-4 text-purple-500" />
-              <label htmlFor="reasoning" className="text-sm font-medium">
-                Reasoning Mode
-              </label>
-            </div>
-            <Switch
-              id="reasoning"
-              checked={reasoningEnabled}
-              onCheckedChange={setReasoningEnabled}
-            />
-          </div>
 
           {/* New Chat Button */}
           {messages.length > 0 && (
@@ -550,12 +505,25 @@ const AIChatInterface = ({ onClose }: AIChatInterfaceProps) => {
 
           {/* Input Area */}
           <div className="p-4 border-t border-gray-200">
+            {/* Reasoning Toggle */}
+            <div className="flex items-center justify-center gap-2 mb-3">
+              <Brain className="w-4 h-4 text-purple-500" />
+              <label htmlFor="reasoning" className="text-sm font-medium">
+                Reasoning Mode
+              </label>
+              <Switch
+                id="reasoning"
+                checked={reasoningEnabled}
+                onCheckedChange={setReasoningEnabled}
+              />
+            </div>
+
             <div className="flex gap-2 items-end">
               <div className="flex-1 relative">
                 <Input
                   value={newMessage}
                   onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Ask me anything..."
+                  placeholder={reasoningEnabled ? "Ask me to think through a problem..." : "Ask me anything..."}
                   onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendMessage()}
                   className="pr-12 rounded-full"
                   disabled={isLoading || !apiKey}
