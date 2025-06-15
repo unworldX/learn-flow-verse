@@ -1,57 +1,231 @@
 
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Search, Filter, BookOpen, Video, FileText } from "lucide-react";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Search, Filter, BookOpen, Video, FileText, Upload, Plus } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const Resources = () => {
-  const resources = [
-    {
-      id: 1,
-      title: "Advanced Calculus Complete Course",
-      author: "Dr. Sarah Johnson",
-      subject: "Mathematics",
-      type: "PDF",
-      description: "Comprehensive study material covering differential and integral calculus",
-      downloads: 1250,
-      rating: 4.8,
-      size: "15.2 MB"
-    },
-    {
-      id: 2,
-      title: "Physics Lab Experiments Video Series",
-      author: "Prof. Michael Chen",
-      subject: "Physics",
-      type: "Video",
-      description: "Step-by-step laboratory experiments with detailed explanations",
-      downloads: 890,
-      rating: 4.9,
-      size: "2.1 GB"
-    },
-    {
-      id: 3,
-      title: "Organic Chemistry Reaction Mechanisms",
-      author: "Dr. Emily Rodriguez",
-      subject: "Chemistry",
-      type: "PDF",
-      description: "Detailed notes on organic reaction mechanisms and synthesis",
-      downloads: 670,
-      rating: 4.7,
-      size: "8.7 MB"
-    }
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const [searchQuery, setSearchQuery] = useState("");
+  const [selectedSubject, setSelectedSubject] = useState("");
+  const [selectedType, setSelectedType] = useState("");
+  const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [uploadData, setUploadData] = useState({
+    title: "",
+    author: "",
+    subject: "",
+    class: "",
+    description: "",
+    resourceType: "",
+    file: null as File | null
+  });
+
+  const subjects = [
+    "Mathematics", "Physics", "Chemistry", "Biology", "Computer Science",
+    "Literature", "History", "Geography", "Economics", "Psychology"
   ];
+
+  const resourceTypes = [
+    { value: "PDF", label: "PDF Document", icon: FileText },
+    { value: "Video", label: "Video", icon: Video },
+    { value: "Book", label: "E-Book", icon: BookOpen }
+  ];
+
+  const handleFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setUploadData(prev => ({ ...prev, file }));
+    }
+  };
+
+  const handleUpload = async () => {
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to upload resources",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!uploadData.title || !uploadData.resourceType || !uploadData.file) {
+      toast({
+        title: "Missing required fields",
+        description: "Please fill in title, resource type, and select a file",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      // Upload file to Supabase Storage (placeholder for now)
+      const fileUrl = `placeholder-url/${uploadData.file.name}`;
+
+      // Insert resource data into database
+      const { error } = await supabase
+        .from('resources')
+        .insert({
+          title: uploadData.title,
+          author: uploadData.author || 'Unknown',
+          subject: uploadData.subject,
+          class: uploadData.class,
+          description: uploadData.description,
+          resource_type: uploadData.resourceType,
+          file_url: fileUrl,
+          uploader_id: user.id
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Resource uploaded successfully",
+        description: "Your resource has been added to the library"
+      });
+
+      // Reset form and close dialog
+      setUploadData({
+        title: "",
+        author: "",
+        subject: "",
+        class: "",
+        description: "",
+        resourceType: "",
+        file: null
+      });
+      setIsUploadOpen(false);
+
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast({
+        title: "Upload failed",
+        description: "There was an error uploading your resource",
+        variant: "destructive"
+      });
+    }
+  };
 
   return (
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold">Study Resources</h1>
-          <p className="text-muted-foreground">Discover and access shared study materials</p>
+          <p className="text-muted-foreground">Upload and discover learning materials</p>
         </div>
-        <Button className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
-          Upload Resource
-        </Button>
+        <Dialog open={isUploadOpen} onOpenChange={setIsUploadOpen}>
+          <DialogTrigger asChild>
+            <Button className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
+              <Upload className="w-4 h-4 mr-2" />
+              Upload Resource
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="max-w-md">
+            <DialogHeader>
+              <DialogTitle>Upload New Resource</DialogTitle>
+              <DialogDescription>
+                Share your study materials with the community
+              </DialogDescription>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div>
+                <Label htmlFor="title">Title *</Label>
+                <Input
+                  id="title"
+                  value={uploadData.title}
+                  onChange={(e) => setUploadData(prev => ({ ...prev, title: e.target.value }))}
+                  placeholder="Resource title"
+                />
+              </div>
+              
+              <div>
+                <Label htmlFor="author">Author</Label>
+                <Input
+                  id="author"
+                  value={uploadData.author}
+                  onChange={(e) => setUploadData(prev => ({ ...prev, author: e.target.value }))}
+                  placeholder="Author name"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label htmlFor="subject">Subject</Label>
+                  <Select onValueChange={(value) => setUploadData(prev => ({ ...prev, subject: value }))}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select subject" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {subjects.map(subject => (
+                        <SelectItem key={subject} value={subject}>{subject}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                
+                <div>
+                  <Label htmlFor="class">Class</Label>
+                  <Input
+                    id="class"
+                    value={uploadData.class}
+                    onChange={(e) => setUploadData(prev => ({ ...prev, class: e.target.value }))}
+                    placeholder="e.g. Grade 12"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <Label htmlFor="resourceType">Resource Type *</Label>
+                <Select onValueChange={(value) => setUploadData(prev => ({ ...prev, resourceType: value }))}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select type" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {resourceTypes.map(type => (
+                      <SelectItem key={type.value} value={type.value}>
+                        {type.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="description">Description</Label>
+                <Textarea
+                  id="description"
+                  value={uploadData.description}
+                  onChange={(e) => setUploadData(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Brief description of the resource"
+                  rows={3}
+                />
+              </div>
+
+              <div>
+                <Label htmlFor="file">File *</Label>
+                <Input
+                  id="file"
+                  type="file"
+                  onChange={handleFileUpload}
+                  accept=".pdf,.mp4,.avi,.mov,.epub,.doc,.docx"
+                />
+              </div>
+
+              <Button onClick={handleUpload} className="w-full">
+                <Plus className="w-4 h-4 mr-2" />
+                Upload Resource
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
       {/* Search and Filters */}
@@ -63,70 +237,56 @@ const Resources = () => {
               <Input
                 placeholder="Search resources, authors, subjects..."
                 className="pl-10"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            <Button variant="outline" className="flex items-center gap-2">
-              <Filter className="w-4 h-4" />
-              Filters
-            </Button>
+            <div className="flex gap-2">
+              <Select value={selectedSubject} onValueChange={setSelectedSubject}>
+                <SelectTrigger className="w-40">
+                  <SelectValue placeholder="Subject" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Subjects</SelectItem>
+                  {subjects.map(subject => (
+                    <SelectItem key={subject} value={subject}>{subject}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              
+              <Select value={selectedType} onValueChange={setSelectedType}>
+                <SelectTrigger className="w-32">
+                  <SelectValue placeholder="Type" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="">All Types</SelectItem>
+                  {resourceTypes.map(type => (
+                    <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* Resource Grid */}
-      <div className="grid gap-6">
-        {resources.map((resource) => (
-          <Card key={resource.id} className="hover:shadow-lg transition-shadow">
-            <CardContent className="p-6">
-              <div className="flex items-start space-x-4">
-                <div className="flex-shrink-0">
-                  {resource.type === "Video" ? (
-                    <Video className="w-12 h-12 text-red-500" />
-                  ) : (
-                    <FileText className="w-12 h-12 text-blue-500" />
-                  )}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <h3 className="text-lg font-semibold mb-1">{resource.title}</h3>
-                      <p className="text-sm text-muted-foreground mb-2">by {resource.author}</p>
-                      <p className="text-sm text-gray-600 mb-3">{resource.description}</p>
-                      
-                      <div className="flex items-center space-x-4 text-sm text-muted-foreground">
-                        <span className="flex items-center">
-                          <BookOpen className="w-4 h-4 mr-1" />
-                          {resource.downloads} downloads
-                        </span>
-                        <span>⭐ {resource.rating}</span>
-                        <span>{resource.size}</span>
-                      </div>
-                    </div>
-                    <div className="flex flex-col items-end space-y-2">
-                      <Badge variant="secondary">{resource.subject}</Badge>
-                      <Badge variant="outline">{resource.type}</Badge>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-between mt-4">
-                    <div className="flex space-x-2">
-                      <Button variant="outline" size="sm">
-                        Preview
-                      </Button>
-                      <Button size="sm" className="bg-blue-600 hover:bg-blue-700">
-                        Download
-                      </Button>
-                    </div>
-                    <Button variant="ghost" size="sm">
-                      ❤️ Save
-                    </Button>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        ))}
-      </div>
+      {/* Empty State */}
+      <Card>
+        <CardContent className="p-12 text-center">
+          <BookOpen className="w-16 h-16 text-gray-300 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold mb-2">No resources found</h3>
+          <p className="text-gray-500 mb-6">
+            Be the first to share study materials with the community
+          </p>
+          <Button 
+            onClick={() => setIsUploadOpen(true)}
+            className="bg-blue-600 hover:bg-blue-700"
+          >
+            <Upload className="w-4 h-4 mr-2" />
+            Upload First Resource
+          </Button>
+        </CardContent>
+      </Card>
     </div>
   );
 };
