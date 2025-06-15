@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
-import { Send, Loader2, Bot, Trash2, RotateCcw, Plus, Brain, Settings, MessageSquare, Users, Clock } from "lucide-react";
+import { Send, Loader2, Bot, Trash2, RotateCcw, Plus, Brain, Settings, MessageSquare, Users, Clock, ChevronDown } from "lucide-react";
 import { useToast } from "@/components/ui/use-toast";
 import {
   Select,
@@ -11,10 +11,57 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createChatCompletion, deleteChatSession, getChatMessages, getChatSessions, createChatSession } from "@/lib/api";
 import { ChatMessage, ChatSession } from "@/types";
 import { Badge } from "@/components/ui/badge";
+
+const AI_PROVIDERS = {
+  openai: {
+    name: 'OpenAI',
+    models: [
+      { id: 'gpt-4o', name: 'GPT-4o', description: 'Most capable model' },
+      { id: 'gpt-4o-mini', name: 'GPT-4o Mini', description: 'Fast and efficient' },
+    ],
+    color: 'from-green-500 to-emerald-600'
+  },
+  anthropic: {
+    name: 'Anthropic',
+    models: [
+      { id: 'claude-3-sonnet', name: 'Claude 3 Sonnet', description: 'Balanced performance' },
+      { id: 'claude-3-haiku', name: 'Claude 3 Haiku', description: 'Quick responses' },
+    ],
+    color: 'from-orange-500 to-red-600'
+  },
+  google: {
+    name: 'Google',
+    models: [
+      { id: 'gemini-pro', name: 'Gemini Pro', description: 'Advanced reasoning' },
+    ],
+    color: 'from-blue-500 to-indigo-600'
+  },
+  deepseek: {
+    name: 'DeepSeek',
+    models: [
+      { id: 'deepseek-chat', name: 'DeepSeek Chat', description: 'Coding specialist' },
+    ],
+    color: 'from-purple-500 to-violet-600'
+  },
+  openrouter: {
+    name: 'OpenRouter',
+    models: [
+      { id: 'openai/gpt-4o', name: 'GPT-4o via OpenRouter', description: 'OpenAI via OpenRouter' },
+      { id: 'anthropic/claude-3-sonnet', name: 'Claude 3 Sonnet via OpenRouter', description: 'Anthropic via OpenRouter' },
+    ],
+    color: 'from-gray-500 to-slate-600'
+  }
+};
 
 export default function AIChatInterface() {
   const [input, setInput] = useState('');
@@ -22,6 +69,8 @@ export default function AIChatInterface() {
   const [isLoading, setIsLoading] = useState(false);
   const [reasoning, setReasoning] = useState(false);
   const [isOnline, setIsOnline] = useState(navigator.onLine);
+  const [selectedProvider, setSelectedProvider] = useState('openai');
+  const [selectedModel, setSelectedModel] = useState('gpt-4o-mini');
   
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
@@ -154,6 +203,7 @@ export default function AIChatInterface() {
       sessionId: currentSessionId || undefined,
       message: messageContent,
       reasoning: reasoning,
+      model: selectedModel,
     });
   };
 
@@ -205,33 +255,91 @@ export default function AIChatInterface() {
   const currentSession = sessions?.find(s => s.id === currentSessionId);
   const messageCount = messages.length;
   const userMessageCount = messages.filter(m => m.role === 'user').length;
+  const currentProviderData = AI_PROVIDERS[selectedProvider as keyof typeof AI_PROVIDERS];
+  const currentModelData = currentProviderData?.models.find(m => m.id === selectedModel);
 
   return (
     <div className="flex flex-col h-full bg-gradient-to-br from-slate-50 via-white to-blue-50/30 overflow-hidden">
-      {/* Professional Header */}
+      {/* Enhanced Professional Header */}
       <div className="border-b bg-white/95 backdrop-blur-sm shadow-sm relative overflow-hidden">
         <div className="absolute inset-0 bg-gradient-to-r from-blue-600/5 via-purple-600/5 to-indigo-600/5"></div>
         <div className="relative px-6 py-4">
           <div className="flex items-center justify-between max-w-7xl mx-auto">
-            <div className="flex items-center gap-4">
+            <div className="flex items-center gap-6">
               {/* AI Assistant Brand */}
               <div className="flex items-center gap-3">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-600 via-purple-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
-                  <Bot className="w-5 h-5 text-white" />
+                <div className={`w-12 h-12 bg-gradient-to-br ${currentProviderData?.color || 'from-blue-600 via-purple-600 to-indigo-600'} rounded-2xl flex items-center justify-center shadow-lg`}>
+                  <Bot className="w-6 h-6 text-white" />
                 </div>
                 <div>
-                  <h1 className="text-lg font-bold text-gray-900">AI Assistant</h1>
-                  <div className="flex items-center gap-2">
+                  <h1 className="text-xl font-bold text-gray-900">AI Assistant</h1>
+                  <div className="flex items-center gap-3">
                     <Badge variant={isOnline ? "default" : "destructive"} className="text-xs px-2 py-0.5">
                       {isOnline ? "Online" : "Offline"}
                     </Badge>
                     <span className="text-xs text-gray-500">Ready to help</span>
+                    {currentModelData && (
+                      <Badge variant="outline" className="text-xs px-2 py-0.5 bg-gradient-to-r from-gray-50 to-gray-100">
+                        {currentProviderData.name} · {currentModelData.name}
+                      </Badge>
+                    )}
                   </div>
                 </div>
               </div>
 
+              {/* AI Provider & Model Selection */}
+              <div className="flex items-center gap-3">
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button variant="outline" className="gap-2 h-10 px-4 bg-white hover:bg-gray-50 border-gray-200 transition-all duration-200 hover:border-blue-300 hover:shadow-sm">
+                      <div className={`w-3 h-3 rounded-full bg-gradient-to-br ${currentProviderData?.color}`}></div>
+                      <span className="font-medium">{currentProviderData?.name}</span>
+                      <ChevronDown className="w-4 h-4 opacity-50" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="w-56">
+                    {Object.entries(AI_PROVIDERS).map(([key, provider]) => (
+                      <DropdownMenuItem
+                        key={key}
+                        onClick={() => {
+                          setSelectedProvider(key);
+                          setSelectedModel(provider.models[0].id);
+                        }}
+                        className="flex items-center gap-3"
+                      >
+                        <div className={`w-3 h-3 rounded-full bg-gradient-to-br ${provider.color}`}></div>
+                        <span>{provider.name}</span>
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+
+                <Select value={selectedModel} onValueChange={setSelectedModel}>
+                  <SelectTrigger className="w-56 h-10 bg-white shadow-sm border-gray-200 hover:border-gray-300 transition-all duration-200 focus:ring-2 focus:ring-blue-500/20">
+                    <SelectValue>
+                      <div className="flex items-center gap-2">
+                        <Brain className="w-4 h-4 text-gray-500" />
+                        <span className="font-medium truncate">
+                          {currentModelData?.name || 'Select model...'}
+                        </span>
+                      </div>
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="w-56">
+                    {currentProviderData?.models.map((model) => (
+                      <SelectItem key={model.id} value={model.id}>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{model.name}</span>
+                          <span className="text-xs text-gray-500">{model.description}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+
               {/* Session Selector */}
-              <div className="ml-6">
+              <div className="ml-2">
                 <Select value={currentSessionId || ""} onValueChange={switchSession}>
                   <SelectTrigger className="w-64 h-10 bg-white shadow-sm border-gray-200 hover:border-gray-300 transition-all duration-200 focus:ring-2 focus:ring-blue-500/20">
                     <SelectValue placeholder="Select session...">
@@ -315,14 +423,14 @@ export default function AIChatInterface() {
             {messages.length === 0 ? (
               <div className="text-center py-16">
                 <div className="relative mb-8">
-                  <div className="w-24 h-24 bg-gradient-to-br from-blue-500 via-purple-500 to-indigo-600 rounded-3xl flex items-center justify-center mx-auto shadow-2xl">
+                  <div className={`w-24 h-24 bg-gradient-to-br ${currentProviderData?.color || 'from-blue-500 via-purple-500 to-indigo-600'} rounded-3xl flex items-center justify-center mx-auto shadow-2xl`}>
                     <Bot className="w-12 h-12 text-white" />
                   </div>
                   <div className="absolute -top-2 -right-2 w-6 h-6 bg-green-500 rounded-full border-4 border-white shadow-lg animate-pulse"></div>
                 </div>
                 <h3 className="text-3xl font-bold text-gray-900 mb-4">Welcome to AI Assistant</h3>
                 <p className="text-gray-600 max-w-2xl mx-auto text-lg leading-relaxed mb-8">
-                  Your intelligent companion for learning, research, and creative work. Ask questions, explore ideas, 
+                  Your intelligent companion powered by {currentProviderData?.name} {currentModelData?.name}. Ask questions, explore ideas, 
                   or get help with any task you're working on.
                 </p>
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-3xl mx-auto">
@@ -344,8 +452,8 @@ export default function AIChatInterface() {
                     <div className="w-8 h-8 bg-indigo-100 rounded-lg flex items-center justify-center mb-3">
                       <Settings className="w-4 h-4 text-indigo-600" />
                     </div>
-                    <h4 className="font-semibold text-gray-900 mb-2">Personalized</h4>
-                    <p className="text-sm text-gray-600">Tailored responses based on your preferences</p>
+                    <h4 className="font-semibold text-gray-900 mb-2">Multiple Models</h4>
+                    <p className="text-sm text-gray-600">Choose from various AI providers and models</p>
                   </div>
                 </div>
               </div>
@@ -354,7 +462,7 @@ export default function AIChatInterface() {
                 {messages.map((message, index) => (
                   <div key={index} className={`flex items-start gap-4 group ${message.role === 'user' ? 'flex-row-reverse' : ''} transition-all duration-300 hover:scale-[1.01]`}>
                     {message.role !== 'user' && (
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 via-purple-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0 group-hover:shadow-xl transition-all duration-300">
+                      <div className={`w-10 h-10 bg-gradient-to-br ${currentProviderData?.color || 'from-blue-500 via-purple-500 to-indigo-600'} rounded-2xl flex items-center justify-center shadow-lg flex-shrink-0 group-hover:shadow-xl transition-all duration-300`}>
                         <Bot className="w-5 h-5 text-white" />
                       </div>
                     )}
@@ -379,7 +487,7 @@ export default function AIChatInterface() {
                         </span>
                         {message.role !== 'user' && (
                           <Badge variant="secondary" className="text-xs px-2 py-0.5">
-                            AI Response
+                            {currentProviderData?.name} Response
                           </Badge>
                         )}
                       </div>
@@ -391,7 +499,7 @@ export default function AIChatInterface() {
             
             {isLoading && (
               <div className="flex items-start gap-4 mt-8 animate-fade-in">
-                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 via-purple-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
+                <div className={`w-10 h-10 bg-gradient-to-br ${currentProviderData?.color || 'from-blue-500 via-purple-500 to-indigo-600'} rounded-2xl flex items-center justify-center shadow-lg`}>
                   <Bot className="w-5 h-5 text-white animate-pulse" />
                 </div>
                 <div className="px-6 py-4 rounded-3xl bg-gradient-to-r from-gray-100 to-gray-50 text-gray-700 shadow-sm border border-gray-100">
@@ -401,7 +509,7 @@ export default function AIChatInterface() {
                       <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
                       <div className="w-2 h-2 bg-indigo-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
                     </div>
-                    <span className="font-medium">AI is thinking...</span>
+                    <span className="font-medium">{currentProviderData?.name} is thinking...</span>
                     {reasoning && (
                       <Badge variant="outline" className="text-xs border-purple-200 text-purple-700 bg-purple-50">
                         Deep reasoning mode
@@ -427,7 +535,7 @@ export default function AIChatInterface() {
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder={reasoning ? "Ask with detailed reasoning and analysis..." : "Type your message here..."}
+                    placeholder={reasoning ? "Ask with detailed reasoning and analysis..." : `Type your message for ${currentProviderData?.name} ${currentModelData?.name}...`}
                     className="min-h-[64px] max-h-32 resize-none pr-20 text-base bg-white border-gray-200 focus:border-blue-400 focus:ring-blue-400/20 rounded-2xl shadow-sm transition-all duration-300 group-hover:shadow-md focus:shadow-lg"
                     disabled={isLoading}
                   />
@@ -470,7 +578,7 @@ export default function AIChatInterface() {
               <Button
                 onClick={sendMessage}
                 disabled={isLoading || !input.trim() || !isOnline}
-                className="shrink-0 h-16 w-16 rounded-2xl bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 hover:from-blue-700 hover:via-purple-700 hover:to-indigo-700 text-white shadow-xl hover:shadow-2xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed group"
+                className={`shrink-0 h-16 w-16 rounded-2xl bg-gradient-to-r ${currentProviderData?.color || 'from-blue-600 via-purple-600 to-indigo-600'} hover:opacity-90 text-white shadow-xl hover:shadow-2xl transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed group`}
               >
                 {isLoading ? (
                   <Loader2 className="w-6 h-6 animate-spin" />
