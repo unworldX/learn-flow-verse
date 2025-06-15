@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -66,9 +65,7 @@ const AppRoutes = () => (
     <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
     <Route path="/chats" element={<ProtectedRoute><DirectMessages /></ProtectedRoute>} />
     <Route path="/groups" element={<ProtectedRoute><StudyGroups /></ProtectedRoute>} />
-    
-    {/* Settings placeholder */}
-    <Route path="/settings" element={<ProtectedRoute><div className="p-6"><h1 className="text-2xl font-bold">Settings - Coming Soon!</h1></div></ProtectedRoute>} />
+    <Route path="/settings" element={<ProtectedRoute><Settings /></ProtectedRoute>} />
 
     {/* Catch all */}
     <Route path="*" element={<NotFound />} />
