@@ -10,9 +10,10 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Separator } from "@/components/ui/separator";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
-import { Settings as SettingsIcon, User, Bell, Shield, Palette, HelpCircle, LogOut, Camera, Save } from "lucide-react";
+import { Settings as SettingsIcon, User, Bell, Shield, Palette, HelpCircle, LogOut, Camera, Save, Bot } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { useToast } from "@/hooks/use-toast";
+import AISettings from "@/components/AIChat/AISettings";
 
 const Settings = () => {
   const { user, signOut } = useAuth();
@@ -103,7 +104,7 @@ const Settings = () => {
         </div>
 
         <Tabs defaultValue="profile" className="space-y-6">
-          <TabsList className="bg-white/80 backdrop-blur-sm border-0 shadow-lg rounded-2xl p-2 grid w-full grid-cols-2 lg:grid-cols-5 lg:w-auto lg:inline-grid">
+          <TabsList className="bg-white/80 backdrop-blur-sm border-0 shadow-lg rounded-2xl p-2 grid w-full grid-cols-3 lg:grid-cols-6 lg:w-auto lg:inline-grid">
             <TabsTrigger value="profile" className="rounded-xl font-medium flex items-center gap-2">
               <User className="w-4 h-4" />
               <span className="hidden sm:inline">Profile</span>
@@ -119,6 +120,10 @@ const Settings = () => {
             <TabsTrigger value="appearance" className="rounded-xl font-medium flex items-center gap-2">
               <Palette className="w-4 h-4" />
               <span className="hidden sm:inline">Appearance</span>
+            </TabsTrigger>
+            <TabsTrigger value="ai" className="rounded-xl font-medium flex items-center gap-2">
+              <Bot className="w-4 h-4" />
+              <span className="hidden sm:inline">AI</span>
             </TabsTrigger>
             <TabsTrigger value="help" className="rounded-xl font-medium flex items-center gap-2">
               <HelpCircle className="w-4 h-4" />
@@ -400,6 +405,11 @@ const Settings = () => {
                 </div>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* AI Settings */}
+          <TabsContent value="ai" className="space-y-6">
+            <AISettings />
           </TabsContent>
 
           {/* Help & Support */}

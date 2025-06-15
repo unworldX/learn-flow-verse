@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -43,7 +42,7 @@ const AIChatInterface = () => {
     }
 
     if (message) {
-      await sendMessage(message, reasoning); // reasoning sent as second arg for future API use
+      await sendMessage(message); // Fixed: removed second argument
     }
   };
 
