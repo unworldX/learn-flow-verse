@@ -345,6 +345,7 @@ const DirectMessages = () => {
     const email = (u.email || '').toLowerCase();
     const fullName = (u.full_name || '').toLowerCase();
     
+    // Search by email (username) OR full name
     return email.includes(query) || fullName.includes(query);
   });
 
