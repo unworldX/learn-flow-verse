@@ -387,6 +387,33 @@ export type Database = {
           },
         ]
       }
+      message_reactions: {
+        Row: {
+          chat_type: string
+          created_at: string | null
+          id: string
+          message_id: string
+          reaction: string
+          user_id: string
+        }
+        Insert: {
+          chat_type: string
+          created_at?: string | null
+          id?: string
+          message_id: string
+          reaction: string
+          user_id: string
+        }
+        Update: {
+          chat_type?: string
+          created_at?: string | null
+          id?: string
+          message_id?: string
+          reaction?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       message_reads: {
         Row: {
           id: string
@@ -415,6 +442,54 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      message_replies: {
+        Row: {
+          chat_type: string
+          created_at: string | null
+          id: string
+          parent_message_id: string
+          reply_message_id: string
+        }
+        Insert: {
+          chat_type: string
+          created_at?: string | null
+          id?: string
+          parent_message_id: string
+          reply_message_id: string
+        }
+        Update: {
+          chat_type?: string
+          created_at?: string | null
+          id?: string
+          parent_message_id?: string
+          reply_message_id?: string
+        }
+        Relationships: []
+      }
+      pinned_chats: {
+        Row: {
+          chat_id: string
+          chat_type: string
+          id: string
+          pinned_at: string | null
+          user_id: string
+        }
+        Insert: {
+          chat_id: string
+          chat_type: string
+          id?: string
+          pinned_at?: string | null
+          user_id: string
+        }
+        Update: {
+          chat_id?: string
+          chat_type?: string
+          id?: string
+          pinned_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
       }
       reminders: {
         Row: {
@@ -679,6 +754,33 @@ export type Database = {
           },
         ]
       }
+      typing_status: {
+        Row: {
+          chat_id: string
+          chat_type: string
+          id: string
+          is_typing: boolean | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          chat_id: string
+          chat_type: string
+          id?: string
+          is_typing?: boolean | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          chat_id?: string
+          chat_type?: string
+          id?: string
+          is_typing?: boolean | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       user_api_keys: {
         Row: {
           created_at: string
@@ -738,6 +840,24 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      user_presence: {
+        Row: {
+          last_online: string | null
+          online: boolean | null
+          user_id: string
+        }
+        Insert: {
+          last_online?: string | null
+          online?: boolean | null
+          user_id: string
+        }
+        Update: {
+          last_online?: string | null
+          online?: boolean | null
+          user_id?: string
+        }
+        Relationships: []
       }
       user_progress: {
         Row: {

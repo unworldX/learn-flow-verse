@@ -13,6 +13,12 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Upload, Send, Search, MoreVertical, Phone, VideoIcon, Plus, MessageSquare, ArrowLeft, Paperclip, Smile, Mic } from 'lucide-react';
 import { encryptText, decryptText } from '@/lib/encryption';
 import { useIsMobile } from '@/hooks/use-mobile';
+import ChatList from '@/components/chat/ChatList';
+import ChatHeader from '@/components/chat/ChatHeader';
+import MessageInput from '@/components/chat/MessageInput';
+import TypingIndicator from '@/components/chat/TypingIndicator';
+import MessageBubble from '@/components/chat/MessageBubble';
+import Reactions from '@/components/chat/Reactions';
 
 interface User {
   id: string;
@@ -608,6 +614,18 @@ const DirectMessages = () => {
     );
   }
 
+  // New State: group chats and view filter
+  const [groups, setGroups] = useState<any[]>([]);
+  const [view, setView] = useState<'all'|'direct'|'group'>('all');
+  const [filters, setFilters] = useState({ showPinned: false, showUnread: false });
+
+  // Example handler and wiring for modular components:
+  const handleSelectChat = (id: string, type: "direct"|"group") => {
+    // ... logic to set selected chat or group ...
+  };
+
+  // ... fetch and wire all recent chats, group chats, and map group shape as needed ...
+
   // Desktop Layout
   return (
     <div className="h-full flex bg-gray-50">
@@ -677,43 +695,21 @@ const DirectMessages = () => {
         </div>
 
         <ScrollArea className="flex-1">
-          {chats.map((chat) => (
-            <div
-              key={chat.user.id}
-              onClick={() => setSelectedChat(chat.user)}
-              className={`p-4 cursor-pointer hover:bg-gray-50 border-b border-gray-100 transition-all duration-200 ${
-                selectedChat?.id === chat.user.id ? 'bg-blue-50 border-l-4 border-l-blue-500' : ''
-              }`}
-            >
-              <div className="flex items-center gap-3">
-                <div className="relative">
-                  <Avatar className="w-12 h-12">
-                    <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-medium">
-                      {chat.user.full_name?.[0] || chat.user.email[0].toUpperCase()}
-                    </AvatarFallback>
-                  </Avatar>
-                  <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white rounded-full"></div>
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between mb-1">
-                    <p className="font-medium text-gray-900 truncate">
-                      {chat.user.full_name || chat.user.email}
-                    </p>
-                    {chat.unreadCount > 0 && (
-                      <Badge className="bg-blue-500 text-white text-xs px-2 py-1 rounded-full">
-                        {chat.unreadCount}
-                      </Badge>
-                    )}
-                  </div>
-                  <p className="text-sm text-gray-500 truncate">
-                    {chat.lastMessage?.message_type === 'text' ? '💬 Text message' : 
-                     chat.lastMessage?.message_type === 'image' ? '📷 Photo' :
-                     chat.lastMessage?.message_type === 'video' ? '🎥 Video' : '📎 File'}
-                  </p>
-                </div>
-              </div>
-            </div>
-          ))}
+          <div className="p-4 flex items-center">
+            {/* Add filter/switch view */}
+            <button onClick={()=>setView('all')}>All</button>
+            <button onClick={()=>setView('direct')}>Direct</button>
+            <button onClick={()=>setView('group')}>Group</button>
+            <button onClick={()=>setFilters(f=>({...f,showPinned:!f.showPinned}))}>Pinned</button>
+            <button onClick={()=>setFilters(f=>({...f,showUnread:!f.showUnread}))}>Unread</button>
+          </div>
+          <ChatList
+            chats={chats} groups={groups}
+            selectedChatId={selectedChat?.id ?? null}
+            filters={filters}
+            onSelectChat={handleSelectChat}
+            view={view}
+          />
         </ScrollArea>
       </div>
 
@@ -722,86 +718,34 @@ const DirectMessages = () => {
         {selectedChat ? (
           <>
             {/* Chat Header */}
-            <div className="p-4 bg-white border-b border-gray-200 flex items-center justify-between shadow-sm">
-              <div className="flex items-center gap-3">
-                <Avatar className="w-10 h-10">
-                  <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-medium">
-                    {selectedChat.full_name?.[0] || selectedChat.email[0].toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <div>
-                  <h3 className="font-semibold text-gray-900">{selectedChat.full_name || selectedChat.email}</h3>
-                  <p className="text-sm text-green-500">● Online</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" size="icon" className="rounded-full">
-                  <Phone className="w-4 h-4" />
-                </Button>
-                <Button variant="ghost" size="icon" className="rounded-full">
-                  <VideoIcon className="w-4 h-4" />
-                </Button>
-                <Button variant="ghost" size="icon" className="rounded-full">
-                  <MoreVertical className="w-4 h-4" />
-                </Button>
-              </div>
+            <ChatHeader
+              title={selectedChat.full_name || selectedChat.email}
+              subtitle="● Online"
+              isGroup={false}
+              onBack={()=>setSelectedChat(null)}
+              avatar={<div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-medium">
+                {selectedChat.full_name?.[0] || selectedChat.email[0]}</div>}
+            />
+            {/* Real-time typing indicator */}
+            <TypingIndicator users={[]} />
+            <div className="flex-1 overflow-y-auto">
+              {messages.map((msg, idx) =>
+                <MessageBubble key={msg.id} message={msg} isOwn={msg.sender_id === user?.id}
+                  onReply={()=>{}} onForward={()=>{}} onReact={()=>{}} showThread={false}
+                />
+              )}
             </div>
-
-            {/* Messages */}
-            <ScrollArea className="flex-1 bg-gradient-to-b from-gray-50 to-white">
-              <div className="py-2">
-                {messages.map(renderMessage)}
-              </div>
-              <div ref={messagesEndRef} />
-            </ScrollArea>
-
-            {/* Message Input */}
-            <div className="p-4 bg-white border-t border-gray-200">
-              <div className="flex gap-3 items-end">
-                <div className="flex-1 relative">
-                  <Input
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    placeholder="Type a message..."
-                    onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendTextMessage()}
-                    className="pr-20 py-3 rounded-full border-gray-300 focus:border-blue-500 bg-gray-50"
-                  />
-                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex gap-1">
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleFileUpload(file);
-                      }}
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={loading}
-                      className="rounded-full"
-                    >
-                      <Paperclip className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="rounded-full"
-                    >
-                      <Smile className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-                <Button 
-                  onClick={sendTextMessage} 
-                  disabled={loading || !newMessage.trim()}
-                  className="rounded-full px-6 bg-blue-500 hover:bg-blue-600"
-                >
-                  <Send className="w-4 h-4" />
-                </Button>
-              </div>
+            <div className="p-4 bg-white border-t">
+              <MessageInput
+                value={newMessage}
+                onChange={setNewMessage}
+                onSend={sendTextMessage}
+                disabled={loading}
+                onPickEmoji={emoji => setNewMessage(prev => prev + emoji)}
+                onUpload={handleFileUpload}
+                showEmoji={false}
+                setShowEmoji={()=>{}}
+              />
             </div>
           </>
         ) : (
