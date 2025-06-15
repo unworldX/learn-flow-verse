@@ -11,3 +11,9 @@ export interface ChatSession {
   name: string;
   createdAt: string;
 }
+
+export interface CreateChatCompletionParams {
+  sessionId?: string;
+  message: string;
+  reasoning: boolean;
+}
