@@ -16,52 +16,67 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createChatCompletion, deleteChatSession, getChatMessages, getChatSessions, uploadPdf, createChatSession } from "@/lib/api";
 import { ChatMessage, ChatSession } from "@/types";
 
-// AI Models configuration organized by provider
-const AI_PROVIDERS = {
+// AI Models configuration organized by provider - matching AISettings.tsx
+const API_PROVIDERS = {
+  openrouter: {
+    name: 'OpenRouter',
+    keyName: 'openrouter_api_key',
+    models: [
+      { id: 'microsoft/phi-4-reasoning-plus:free', name: 'Microsoft Phi-4 Reasoning Plus', free: true },
+      { id: 'deepseek/deepseek-r1-0528:free', name: 'DeepSeek R1 (0528)', free: true },
+      { id: 'deepseek/deepseek-r1-0528-qwen3-8b:free', name: 'DeepSeek R1 Qwen3 8B', free: true },
+      { id: 'google/gemma-3-27b-it:free', name: 'Google Gemma 3 27B IT', free: true }
+    ]
+  },
   openai: {
     name: 'OpenAI',
-    models: {
-      'gpt-4o-mini': { name: 'GPT-4o Mini', description: 'Fast and efficient' },
-      'gpt-4o': { name: 'GPT-4o', description: 'Most capable' },
-      'gpt-4-turbo': { name: 'GPT-4 Turbo', description: 'High performance' },
-      'gpt-3.5-turbo': { name: 'GPT-3.5 Turbo', description: 'Balanced option' }
-    }
+    keyName: 'openai_api_key',
+    models: [
+      { id: 'gpt-4o', name: 'GPT-4o', free: false },
+      { id: 'gpt-4o-mini', name: 'GPT-4o Mini', free: false },
+      { id: 'gpt-4-turbo', name: 'GPT-4 Turbo', free: false },
+      { id: 'gpt-3.5-turbo', name: 'GPT-3.5 Turbo', free: false }
+    ]
   },
   anthropic: {
     name: 'Anthropic',
-    models: {
-      'claude-3-opus': { name: 'Claude 3 Opus', description: 'Most powerful' },
-      'claude-3-sonnet': { name: 'Claude 3 Sonnet', description: 'Balanced reasoning' },
-      'claude-3-haiku': { name: 'Claude 3 Haiku', description: 'Fast responses' }
-    }
+    keyName: 'anthropic_api_key',
+    models: [
+      { id: 'claude-3-opus-20240229', name: 'Claude 3 Opus', free: false },
+      { id: 'claude-3-sonnet-20240229', name: 'Claude 3 Sonnet', free: false },
+      { id: 'claude-3-haiku-20240307', name: 'Claude 3 Haiku', free: false }
+    ]
   },
   google: {
-    name: 'Google',
-    models: {
-      'gemini-pro': { name: 'Gemini Pro', description: 'Advanced AI' },
-      'gemini-pro-vision': { name: 'Gemini Pro Vision', description: 'Multimodal' }
-    }
+    name: 'Google AI',
+    keyName: 'google_api_key',
+    models: [
+      { id: 'gemini-pro', name: 'Gemini Pro', free: false },
+      { id: 'gemini-pro-vision', name: 'Gemini Pro Vision', free: false }
+    ]
   },
   deepseek: {
     name: 'DeepSeek',
-    models: {
-      'deepseek-chat': { name: 'DeepSeek Chat', description: 'Conversational AI' },
-      'deepseek-coder': { name: 'DeepSeek Coder', description: 'Code specialist' }
-    }
+    keyName: 'deepseek_api_key',
+    models: [
+      { id: 'deepseek-chat', name: 'DeepSeek Chat', free: false },
+      { id: 'deepseek-coder', name: 'DeepSeek Coder', free: false }
+    ]
   }
 };
 
 // Get current model info
 const getCurrentModelInfo = (modelId: string) => {
-  for (const provider of Object.values(AI_PROVIDERS)) {
-    if (provider.models[modelId as keyof typeof provider.models]) {
+  for (const [providerId, provider] of Object.entries(API_PROVIDERS)) {
+    const model = provider.models.find(m => m.id === modelId);
+    if (model) {
       return {
         provider: provider.name,
-        model: provider.models[modelId as keyof typeof provider.models]
+        model: model
       };
     }
   }
-  return { provider: 'Unknown', model: { name: modelId, description: '' } };
+  return { provider: 'Unknown', model: { id: modelId, name: modelId, free: false } };
 };
 
 export default function AIChatInterface() {
@@ -70,11 +85,36 @@ export default function AIChatInterface() {
   const [isLoading, setIsLoading] = useState(false);
   const [reasoning, setReasoning] = useState(false);
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [selectedModel, setSelectedModel] = useState<string>('gpt-4o-mini');
+  
+  // Read selected provider and model from localStorage
+  const [selectedProvider, setSelectedProvider] = useState(() => 
+    localStorage.getItem('ai_provider') || 'openrouter'
+  );
+  const [selectedModel, setSelectedModel] = useState(() => 
+    localStorage.getItem('ai_model') || 'microsoft/phi-4-reasoning-plus:free'
+  );
+  
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [currentSessionId, setCurrentSessionId] = useState<string | null>('session-1');
+
+  // Listen for provider changes from settings
+  useEffect(() => {
+    const handleStorageChange = () => {
+      const newProvider = localStorage.getItem('ai_provider') || 'openrouter';
+      const newModel = localStorage.getItem('ai_model') || 'microsoft/phi-4-reasoning-plus:free';
+      setSelectedProvider(newProvider);
+      setSelectedModel(newModel);
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  // Get available models for the current provider
+  const availableModels = API_PROVIDERS[selectedProvider as keyof typeof API_PROVIDERS]?.models || [];
+  const currentProvider = API_PROVIDERS[selectedProvider as keyof typeof API_PROVIDERS];
 
   // Fetch chat sessions
   const { data: sessions = [], refetch: refetchSessions } = useQuery<ChatSession[]>({
@@ -267,6 +307,11 @@ export default function AIChatInterface() {
     deleteSessionMutation(sessionId);
   };
 
+  const handleModelChange = (modelId: string) => {
+    setSelectedModel(modelId);
+    localStorage.setItem('ai_model', modelId);
+  };
+
   const currentModelInfo = getCurrentModelInfo(selectedModel);
 
   return (
@@ -293,31 +338,29 @@ export default function AIChatInterface() {
               </SelectContent>
             </Select>
 
-            {/* Provider-based Model Selection Dropdown */}
-            <Select value={selectedModel} onValueChange={setSelectedModel}>
+            {/* Model Selection for Current Provider */}
+            <Select value={selectedModel} onValueChange={handleModelChange}>
               <SelectTrigger className="w-56 h-10 bg-white shadow-sm border-gray-200 hover:border-gray-300 transition-colors">
                 <SelectValue placeholder="Select model...">
                   <div className="flex flex-col items-start">
                     <span className="font-medium text-sm">{currentModelInfo.model.name}</span>
-                    <span className="text-xs text-gray-500">{currentModelInfo.provider}</span>
+                    <span className="text-xs text-gray-500">{currentProvider?.name || selectedProvider}</span>
                   </div>
                 </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {Object.entries(AI_PROVIDERS).map(([providerId, provider]) => (
-                  <SelectGroup key={providerId}>
-                    <SelectLabel className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-2 py-1">
-                      {provider.name}
-                    </SelectLabel>
-                    {Object.entries(provider.models).map(([modelId, model]) => (
-                      <SelectItem key={modelId} value={modelId}>
-                        <div className="flex flex-col">
-                          <span className="font-medium">{model.name}</span>
-                          <span className="text-xs text-gray-500">{model.description}</span>
-                        </div>
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
+                <SelectLabel className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-2 py-1">
+                  {currentProvider?.name || selectedProvider} Models
+                </SelectLabel>
+                {availableModels.map((model) => (
+                  <SelectItem key={model.id} value={model.id}>
+                    <div className="flex items-center gap-2">
+                      <div className="flex flex-col">
+                        <span className="font-medium">{model.name}</span>
+                        {model.free && <span className="text-xs text-green-600">Free</span>}
+                      </div>
+                    </div>
+                  </SelectItem>
                 ))}
               </SelectContent>
             </Select>
@@ -365,7 +408,7 @@ export default function AIChatInterface() {
                 <div className="mt-6 text-sm text-gray-500">
                   Current model: <span className="font-medium text-gray-700">{currentModelInfo.model.name}</span>
                   <span className="text-gray-400 mx-2">•</span>
-                  <span className="text-gray-500">{currentModelInfo.provider}</span>
+                  <span className="text-gray-500">{currentProvider?.name || selectedProvider}</span>
                 </div>
               </div>
             ) : (
