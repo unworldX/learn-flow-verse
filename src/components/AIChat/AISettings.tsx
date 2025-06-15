@@ -65,10 +65,10 @@ const AISettings = () => {
 
   const loadUserApiKeys = async () => {
     if (!user) return;
-    
     setIsLoading(true);
     try {
-      const { data, error } = await supabase
+      // Use 'any' for the table to avoid type errors
+      const { data, error } = await (supabase as any)
         .from('user_api_keys')
         .select('provider, encrypted_key')
         .eq('user_id', user.id);
@@ -76,8 +76,8 @@ const AISettings = () => {
       if (error) throw error;
 
       const keys: Record<string, string> = {};
-      data?.forEach(item => {
-        keys[item.provider] = item.encrypted_key || '';
+      data?.forEach((item: any) => {
+        keys[item.provider + '_api_key'] = item.encrypted_key || '';
       });
       setApiKeys(keys);
     } catch (error) {
@@ -109,7 +109,7 @@ const AISettings = () => {
     setIsSaving(true);
     try {
       // Delete existing keys for this user
-      await supabase
+      await (supabase as any)
         .from('user_api_keys')
         .delete()
         .eq('user_id', user.id);
@@ -117,23 +117,26 @@ const AISettings = () => {
       // Insert new keys
       const keysToInsert = Object.entries(apiKeys)
         .filter(([_, value]) => value.trim() !== '')
-        .map(([provider, encrypted_key]) => ({
-          user_id: user.id,
-          provider,
-          encrypted_key
-        }));
+        .map(([keyName, encrypted_key]) => {
+          // Extract provider name from keyName, e.g. openai_api_key -> openai
+          const provider = keyName.replace('_api_key', '');
+          return {
+            user_id: user.id,
+            provider,
+            encrypted_key
+          };
+        });
 
       if (keysToInsert.length > 0) {
-        const { error } = await supabase
+        const { error } = await (supabase as any)
           .from('user_api_keys')
           .insert(keysToInsert);
-
         if (error) throw error;
       }
 
       toast({
         title: "API keys saved",
-        description: "Your API keys have been securely saved.",
+        description: "Your API keys have been securely saved."
       });
     } catch (error) {
       console.error('Error saving API keys:', error);
@@ -155,7 +158,7 @@ const AISettings = () => {
     if (!user) return;
 
     try {
-      await supabase
+      await (supabase as any)
         .from('user_api_keys')
         .delete()
         .eq('user_id', user.id);
@@ -163,7 +166,7 @@ const AISettings = () => {
       setApiKeys({});
       toast({
         title: "API Keys Cleared",
-        description: "All API keys have been removed.",
+        description: "All API keys have been removed."
       });
     } catch (error) {
       console.error('Error clearing API keys:', error);
