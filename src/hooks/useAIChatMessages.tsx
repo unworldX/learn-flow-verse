@@ -23,6 +23,23 @@ export const useAIChatMessages = () => {
     return { provider, model };
   };
 
+  const checkApiKeyExists = async (provider: string) => {
+    if (!user) return false;
+    
+    try {
+      const { data, error } = await supabase
+        .from('user_api_keys')
+        .select('id')
+        .eq('user_id', user.id)
+        .eq('provider', provider)
+        .single();
+      
+      return !error && data;
+    } catch {
+      return false;
+    }
+  };
+
   const sendMessage = async (content: string, reasoning: boolean = false) => {
     if (!content.trim()) return;
 
@@ -30,6 +47,19 @@ export const useAIChatMessages = () => {
       toast({
         title: "Authentication required",
         description: "Please sign in to use AI chat.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const { provider, model } = getStoredSettings();
+    
+    // Check if API key exists for the selected provider
+    const hasApiKey = await checkApiKeyExists(provider);
+    if (!hasApiKey) {
+      toast({
+        title: "API Key Missing",
+        description: `Please configure your ${provider} API key in Settings before using AI chat.`,
         variant: "destructive"
       });
       return;
@@ -47,8 +77,6 @@ export const useAIChatMessages = () => {
     setIsLoading(true);
 
     try {
-      const { provider, model } = getStoredSettings();
-      
       console.log('Sending message to AI:', { provider, model, reasoning });
       
       // Call our Supabase edge function
