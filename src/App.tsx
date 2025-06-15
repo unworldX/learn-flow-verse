@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -6,7 +5,6 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
 import { AppLayout } from "./components/AppLayout";
 import { AuthProvider, useAuth } from "./hooks/useAuth";
-import { AIChatProvider } from "./hooks/useAIChat";
 import FloatingAIButton from "./components/AIChat/FloatingAIButton";
 import Dashboard from "./pages/Dashboard";
 import Login from "./pages/Login";
@@ -37,12 +35,10 @@ const ProtectedRoute = ({ children }: { children: React.ReactNode }) => {
   }
   
   return user ? (
-    <AIChatProvider>
-      <AppLayout>
-        {children}
-        <FloatingAIButton />
-      </AppLayout>
-    </AIChatProvider>
+    <AppLayout>
+      {children}
+      <FloatingAIButton />
+    </AppLayout>
   ) : <Navigate to="/login" />;
 };
 

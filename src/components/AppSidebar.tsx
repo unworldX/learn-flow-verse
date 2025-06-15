@@ -12,6 +12,7 @@ import {
   BookOpen,
   MessageSquare,
   LogOut,
+  Bot,
 } from "lucide-react"
 
 import {
@@ -68,6 +69,11 @@ const items = [
 ]
 
 const chatItems = [
+  {
+    title: "AI Assistant",
+    url: "/ai-chat",
+    icon: Bot,
+  },
   {
     title: "Direct Messages",
     url: "/chats",
