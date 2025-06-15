@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -335,12 +334,19 @@ const DirectMessages = () => {
     setSelectedChat(selectedUser);
     setMessages([]);
     setShowNewChatDialog(false);
+    setSearchQuery(''); // Clear search when starting new chat
   };
 
-  const filteredUsers = users.filter(u => 
-    u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    u.full_name?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  // Fix the filtering logic - ensure proper case-insensitive search
+  const filteredUsers = users.filter(u => {
+    const query = searchQuery.toLowerCase().trim();
+    if (!query) return true; // Show all users if no search query
+    
+    const email = (u.email || '').toLowerCase();
+    const fullName = (u.full_name || '').toLowerCase();
+    
+    return email.includes(query) || fullName.includes(query);
+  });
 
   const renderMessage = (message: DirectMessage) => {
     const isOwn = message.sender_id === user?.id;
@@ -432,23 +438,31 @@ const DirectMessages = () => {
                         />
                       </div>
                       <ScrollArea className="h-64">
-                        {filteredUsers.map((user) => (
-                          <div
-                            key={user.id}
-                            onClick={() => startNewChat(user)}
-                            className="p-3 cursor-pointer hover:bg-gray-50 rounded-lg flex items-center gap-3 transition-colors"
-                          >
-                            <Avatar className="w-10 h-10">
-                              <AvatarFallback className="bg-gradient-to-br from-green-500 to-blue-600 text-white font-medium">
-                                {user.full_name?.[0] || user.email[0].toUpperCase()}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-gray-900 truncate">{user.full_name || user.email}</p>
-                              <p className="text-sm text-gray-500 truncate">{user.email}</p>
+                        <div className="space-y-1">
+                          {filteredUsers.length === 0 ? (
+                            <div className="p-4 text-center text-gray-500">
+                              {searchQuery ? 'No users found' : 'No users available'}
                             </div>
-                          </div>
-                        ))}
+                          ) : (
+                            filteredUsers.map((user) => (
+                              <div
+                                key={user.id}
+                                onClick={() => startNewChat(user)}
+                                className="p-3 cursor-pointer hover:bg-gray-50 rounded-lg flex items-center gap-3 transition-colors"
+                              >
+                                <Avatar className="w-10 h-10">
+                                  <AvatarFallback className="bg-gradient-to-br from-green-500 to-blue-600 text-white font-medium">
+                                    {user.full_name?.[0] || user.email[0].toUpperCase()}
+                                  </AvatarFallback>
+                                </Avatar>
+                                <div className="flex-1 min-w-0">
+                                  <p className="font-medium text-gray-900 truncate">{user.full_name || user.email}</p>
+                                  <p className="text-sm text-gray-500 truncate">{user.email}</p>
+                                </div>
+                              </div>
+                            ))
+                          )}
+                        </div>
                       </ScrollArea>
                     </div>
                   </DialogContent>
@@ -622,23 +636,31 @@ const DirectMessages = () => {
                     />
                   </div>
                   <ScrollArea className="h-64">
-                    {filteredUsers.map((user) => (
-                      <div
-                        key={user.id}
-                        onClick={() => startNewChat(user)}
-                        className="p-3 cursor-pointer hover:bg-gray-50 rounded-lg flex items-center gap-3 transition-colors"
-                      >
-                        <Avatar className="w-10 h-10">
-                          <AvatarFallback className="bg-gradient-to-br from-green-500 to-blue-600 text-white font-medium">
-                            {user.full_name?.[0] || user.email[0].toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1 min-w-0">
-                          <p className="font-medium text-gray-900 truncate">{user.full_name || user.email}</p>
-                          <p className="text-sm text-gray-500 truncate">{user.email}</p>
+                    <div className="space-y-1">
+                      {filteredUsers.length === 0 ? (
+                        <div className="p-4 text-center text-gray-500">
+                          {searchQuery ? 'No users found' : 'No users available'}
                         </div>
-                      </div>
-                    ))}
+                      ) : (
+                        filteredUsers.map((user) => (
+                          <div
+                            key={user.id}
+                            onClick={() => startNewChat(user)}
+                            className="p-3 cursor-pointer hover:bg-gray-50 rounded-lg flex items-center gap-3 transition-colors"
+                          >
+                            <Avatar className="w-10 h-10">
+                              <AvatarFallback className="bg-gradient-to-br from-green-500 to-blue-600 text-white font-medium">
+                                {user.full_name?.[0] || user.email[0].toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-gray-900 truncate">{user.full_name || user.email}</p>
+                              <p className="text-sm text-gray-500 truncate">{user.email}</p>
+                            </div>
+                          </div>
+                        ))
+                      )}
+                    </div>
                   </ScrollArea>
                 </div>
               </DialogContent>
