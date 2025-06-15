@@ -623,6 +623,17 @@ const DirectMessages = () => {
   }
 
   // Desktop Layout
+  const handleSelectChat = (id: string, type: "direct" | "group") => {
+    if (type === "direct") {
+      const found = chats.find((chat) => chat.user.id === id);
+      if (found) {
+        setSelectedChat(found.user);
+        setMessages([]);
+      }
+    }
+    // You may expand this later for group chat selection logic
+  };
+
   return (
     <div className="h-full flex bg-gray-50">
       {/* Chat List */}
