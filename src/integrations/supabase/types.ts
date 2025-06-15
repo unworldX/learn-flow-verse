@@ -83,6 +83,60 @@ export type Database = {
           },
         ]
       }
+      file_uploads: {
+        Row: {
+          file_name: string
+          file_path: string
+          file_size: number | null
+          file_type: string | null
+          id: string
+          is_processed: boolean | null
+          upload_date: string | null
+          user_id: string
+        }
+        Insert: {
+          file_name: string
+          file_path: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          is_processed?: boolean | null
+          upload_date?: string | null
+          user_id: string
+        }
+        Update: {
+          file_name?: string
+          file_path?: string
+          file_size?: number | null
+          file_type?: string | null
+          id?: string
+          is_processed?: boolean | null
+          upload_date?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      forum_categories: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
       forum_comments: {
         Row: {
           comment_text: string | null
@@ -124,7 +178,7 @@ export type Database = {
       }
       forum_posts: {
         Row: {
-          category: string | null
+          category_id: string | null
           content: string | null
           created_at: string | null
           id: string
@@ -132,7 +186,7 @@ export type Database = {
           user_id: string | null
         }
         Insert: {
-          category?: string | null
+          category_id?: string | null
           content?: string | null
           created_at?: string | null
           id?: string
@@ -140,7 +194,7 @@ export type Database = {
           user_id?: string | null
         }
         Update: {
-          category?: string | null
+          category_id?: string | null
           content?: string | null
           created_at?: string | null
           id?: string
@@ -148,6 +202,13 @@ export type Database = {
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "forum_posts_category_id_fkey"
+            columns: ["category_id"]
+            isOneToOne: false
+            referencedRelation: "forum_categories"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "forum_posts_user_id_fkey"
             columns: ["user_id"]
@@ -233,6 +294,39 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      reminders: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          is_completed: boolean | null
+          reminder_date: string
+          reminder_type: string | null
+          title: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_completed?: boolean | null
+          reminder_date: string
+          reminder_type?: string | null
+          title: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          is_completed?: boolean | null
+          reminder_date?: string
+          reminder_type?: string | null
+          title?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       resources: {
         Row: {

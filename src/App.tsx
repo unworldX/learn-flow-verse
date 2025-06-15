@@ -12,6 +12,9 @@ import Signup from "./pages/Signup";
 import Resources from "./pages/Resources";
 import Profile from "./pages/Profile";
 import StudyPlans from "./pages/StudyPlans";
+import Forums from "./pages/Forums";
+import Reminders from "./pages/Reminders";
+import Upload from "./pages/Upload";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -54,14 +57,14 @@ const AppRoutes = () => (
     <Route path="/" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
     <Route path="/resources" element={<ProtectedRoute><Resources /></ProtectedRoute>} />
     <Route path="/profile" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
+    <Route path="/study-plans" element={<ProtectedRoute><StudyPlans /></ProtectedRoute>} />
+    <Route path="/forums" element={<ProtectedRoute><Forums /></ProtectedRoute>} />
+    <Route path="/reminders" element={<ProtectedRoute><Reminders /></ProtectedRoute>} />
+    <Route path="/upload" element={<ProtectedRoute><Upload /></ProtectedRoute>} />
     
     {/* Placeholder routes - to be implemented */}
-    <Route path="/study-plans" element={<ProtectedRoute><div className="p-6"><h1 className="text-2xl font-bold">Study Plans - Coming Soon!</h1></div></ProtectedRoute>} />
-    <Route path="/forums" element={<ProtectedRoute><div className="p-6"><h1 className="text-2xl font-bold">Forums - Coming Soon!</h1></div></ProtectedRoute>} />
-    <Route path="/upload" element={<ProtectedRoute><div className="p-6"><h1 className="text-2xl font-bold">Upload - Coming Soon!</h1></div></ProtectedRoute>} />
     <Route path="/chats" element={<ProtectedRoute><div className="p-6"><h1 className="text-2xl font-bold">Direct Messages - Coming Soon!</h1></div></ProtectedRoute>} />
     <Route path="/groups" element={<ProtectedRoute><div className="p-6"><h1 className="text-2xl font-bold">Study Groups - Coming Soon!</h1></div></ProtectedRoute>} />
-    <Route path="/reminders" element={<ProtectedRoute><div className="p-6"><h1 className="text-2xl font-bold">Reminders - Coming Soon!</h1></div></ProtectedRoute>} />
     <Route path="/settings" element={<ProtectedRoute><div className="p-6"><h1 className="text-2xl font-bold">Settings - Coming Soon!</h1></div></ProtectedRoute>} />
 
     {/* Catch all */}
