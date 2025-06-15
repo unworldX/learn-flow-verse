@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -290,286 +289,316 @@ const StudyPlans = () => {
 
   if (!user) {
     return (
-      <div className="flex items-center justify-center min-h-[400px]">
-        <div className="text-lg">Please sign in to access study plans</div>
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md text-center shadow-xl border-0">
+          <CardContent className="p-8">
+            <BookOpen className="w-16 h-16 text-blue-500 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold mb-2 text-slate-800">Authentication Required</h2>
+            <p className="text-slate-600">Please sign in to access your study plans</p>
+          </CardContent>
+        </Card>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Study Plans</h1>
-          <p className="text-muted-foreground">Create and manage your personalized study schedules</p>
-        </div>
-        <div className="flex gap-2">
-          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-            <DialogTrigger asChild>
-              <Button className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
-                <Plus className="w-4 h-4 mr-2" />
-                New Plan
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create Study Plan</DialogTitle>
-                <DialogDescription>Plan your learning journey</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="plan_name">Plan Name *</Label>
-                  <Input
-                    id="plan_name"
-                    value={planData.plan_name}
-                    onChange={(e) => setPlanData(prev => ({ ...prev, plan_name: e.target.value }))}
-                    placeholder="e.g. Final Exam Preparation"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="description">Description</Label>
-                  <Textarea
-                    id="description"
-                    value={planData.description}
-                    onChange={(e) => setPlanData(prev => ({ ...prev, description: e.target.value }))}
-                    placeholder="Describe your study plan"
-                    rows={3}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label htmlFor="start_date">Start Date *</Label>
-                    <Input
-                      id="start_date"
-                      type="date"
-                      value={planData.start_date}
-                      onChange={(e) => setPlanData(prev => ({ ...prev, start_date: e.target.value }))}
-                    />
-                  </div>
-                  <div>
-                    <Label htmlFor="end_date">End Date *</Label>
-                    <Input
-                      id="end_date"
-                      type="date"
-                      value={planData.end_date}
-                      onChange={(e) => setPlanData(prev => ({ ...prev, end_date: e.target.value }))}
-                    />
-                  </div>
-                </div>
-                <Button onClick={createStudyPlan} className="w-full">
-                  Create Plan
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-
-          <Dialog open={isTaskOpen} onOpenChange={setIsTaskOpen}>
-            <DialogTrigger asChild>
-              <Button variant="outline">
-                <Target className="w-4 h-4 mr-2" />
-                Add Task
-              </Button>
-            </DialogTrigger>
-            <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Create Task</DialogTitle>
-                <DialogDescription>Add a new task to your study plan</DialogDescription>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div>
-                  <Label htmlFor="task_name">Task Name *</Label>
-                  <Input
-                    id="task_name"
-                    value={taskData.task_name}
-                    onChange={(e) => setTaskData(prev => ({ ...prev, task_name: e.target.value }))}
-                    placeholder="e.g. Review Chapter 5"
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="task_description">Description</Label>
-                  <Textarea
-                    id="task_description"
-                    value={taskData.description}
-                    onChange={(e) => setTaskData(prev => ({ ...prev, description: e.target.value }))}
-                    placeholder="Task details"
-                    rows={3}
-                  />
-                </div>
-                <div>
-                  <Label htmlFor="plan_select">Study Plan *</Label>
-                  <Select onValueChange={(value) => setSelectedPlan(value)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a study plan" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {studyPlans.map(plan => (
-                        <SelectItem key={plan.id} value={plan.id}>
-                          {plan.plan_name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <div>
-                  <Label htmlFor="due_date">Due Date *</Label>
-                  <Input
-                    id="due_date"
-                    type="datetime-local"
-                    value={taskData.due_date}
-                    onChange={(e) => setTaskData(prev => ({ ...prev, due_date: e.target.value }))}
-                  />
-                </div>
-                <Button onClick={createTask} className="w-full">
-                  Create Task
-                </Button>
-              </div>
-            </DialogContent>
-          </Dialog>
-        </div>
-      </div>
-
-      {/* Progress by Subject */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Target className="w-5 h-5" />
-            Progress by Subject
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {getProgressBySubject().map(({ subject, percentage, completed, total }) => (
-              <div key={subject} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium">{subject}</span>
-                  <span className="text-sm text-muted-foreground">
-                    {completed}/{total}
-                  </span>
-                </div>
-                <Progress value={percentage} className="h-2" />
-                <div className="flex items-center gap-2">
-                  <div className={`w-3 h-3 rounded-full ${subjectColors[subject] || 'bg-gray-500'}`} />
-                  <span className="text-xs text-muted-foreground">{percentage}% complete</span>
-                </div>
-              </div>
-            ))}
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-4 md:p-6">
+      <div className="max-w-7xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex flex-col gap-4">
+          <div className="text-center md:text-left">
+            <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              Study Plans
+            </h1>
+            <p className="text-slate-600 mt-2">Create and manage your personalized study schedules</p>
           </div>
-        </CardContent>
-      </Card>
+          
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+              <DialogTrigger asChild>
+                <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl h-12">
+                  <Plus className="w-5 h-5 mr-2" />
+                  New Plan
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md mx-4 rounded-2xl border-0 shadow-2xl">
+                <DialogHeader>
+                  <DialogTitle className="text-xl font-semibold text-slate-800">Create Study Plan</DialogTitle>
+                  <DialogDescription className="text-slate-600">Plan your learning journey</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="plan_name" className="text-sm font-medium text-slate-700">Plan Name *</Label>
+                    <Input
+                      id="plan_name"
+                      value={planData.plan_name}
+                      onChange={(e) => setPlanData(prev => ({ ...prev, plan_name: e.target.value }))}
+                      placeholder="e.g. Final Exam Preparation"
+                      className="mt-1 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="description" className="text-sm font-medium text-slate-700">Description</Label>
+                    <Textarea
+                      id="description"
+                      value={planData.description}
+                      onChange={(e) => setPlanData(prev => ({ ...prev, description: e.target.value }))}
+                      placeholder="Describe your study plan"
+                      rows={3}
+                      className="mt-1 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl"
+                    />
+                  </div>
+                  <div className="grid grid-cols-2 gap-3">
+                    <div>
+                      <Label htmlFor="start_date" className="text-sm font-medium text-slate-700">Start Date *</Label>
+                      <Input
+                        id="start_date"
+                        type="date"
+                        value={planData.start_date}
+                        onChange={(e) => setPlanData(prev => ({ ...prev, start_date: e.target.value }))}
+                        className="mt-1 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl"
+                      />
+                    </div>
+                    <div>
+                      <Label htmlFor="end_date" className="text-sm font-medium text-slate-700">End Date *</Label>
+                      <Input
+                        id="end_date"
+                        type="date"
+                        value={planData.end_date}
+                        onChange={(e) => setPlanData(prev => ({ ...prev, end_date: e.target.value }))}
+                        className="mt-1 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl"
+                      />
+                    </div>
+                  </div>
+                  <Button onClick={createStudyPlan} className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-xl h-12">
+                    Create Plan
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
 
-      {/* Calendar Views */}
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <CardTitle className="flex items-center gap-2">
-              <CalendarIcon className="w-5 h-5" />
-              Schedule
+            <Dialog open={isTaskOpen} onOpenChange={setIsTaskOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline" className="border-2 border-slate-200 hover:border-blue-300 hover:bg-blue-50 rounded-xl h-12">
+                  <Target className="w-5 h-5 mr-2" />
+                  Add Task
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="max-w-md mx-4 rounded-2xl border-0 shadow-2xl">
+                <DialogHeader>
+                  <DialogTitle className="text-xl font-semibold text-slate-800">Create Task</DialogTitle>
+                  <DialogDescription className="text-slate-600">Add a new task to your study plan</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div>
+                    <Label htmlFor="task_name" className="text-sm font-medium text-slate-700">Task Name *</Label>
+                    <Input
+                      id="task_name"
+                      value={taskData.task_name}
+                      onChange={(e) => setTaskData(prev => ({ ...prev, task_name: e.target.value }))}
+                      placeholder="e.g. Review Chapter 5"
+                      className="mt-1 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="task_description" className="text-sm font-medium text-slate-700">Description</Label>
+                    <Textarea
+                      id="task_description"
+                      value={taskData.description}
+                      onChange={(e) => setTaskData(prev => ({ ...prev, description: e.target.value }))}
+                      placeholder="Task details"
+                      rows={3}
+                      className="mt-1 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl"
+                    />
+                  </div>
+                  <div>
+                    <Label htmlFor="plan_select" className="text-sm font-medium text-slate-700">Study Plan *</Label>
+                    <Select onValueChange={(value) => setSelectedPlan(value)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select a study plan" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {studyPlans.map(plan => (
+                          <SelectItem key={plan.id} value={plan.id}>
+                            {plan.plan_name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="due_date" className="text-sm font-medium text-slate-700">Due Date *</Label>
+                    <Input
+                      id="due_date"
+                      type="datetime-local"
+                      value={taskData.due_date}
+                      onChange={(e) => setTaskData(prev => ({ ...prev, due_date: e.target.value }))}
+                      className="mt-1 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl"
+                    />
+                  </div>
+                  <Button onClick={createTask} className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-xl h-12">
+                    Create Task
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
+
+        {/* Progress by Subject */}
+        <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm rounded-2xl">
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-3 text-xl text-slate-800">
+              <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
+                <Target className="w-5 h-5 text-white" />
+              </div>
+              Progress by Subject
             </CardTitle>
-            <Tabs value={viewMode} onValueChange={setViewMode}>
-              <TabsList>
-                <TabsTrigger value="daily">Daily</TabsTrigger>
-                <TabsTrigger value="weekly">Weekly</TabsTrigger>
-                <TabsTrigger value="monthly">Monthly</TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </div>
-        </CardHeader>
-        <CardContent>
-          <div className="grid md:grid-cols-3 gap-6">
-            <div className="md:col-span-1">
-              <Calendar
-                mode="single"
-                selected={selectedDate}
-                onSelect={setSelectedDate}
-                className="rounded-md border"
-              />
-            </div>
-            <div className="md:col-span-2">
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">
-                    {viewMode === "daily" && format(selectedDate, "EEEE, MMMM d, yyyy")}
-                    {viewMode === "weekly" && `Week of ${format(startOfWeek(selectedDate), "MMM d")}`}
-                    {viewMode === "monthly" && format(selectedDate, "MMMM yyyy")}
-                  </h3>
-                  <Badge variant="outline">
-                    {getTasksForPeriod().length} tasks
-                  </Badge>
-                </div>
-                
-                {getTasksForPeriod().length === 0 ? (
-                  <div className="text-center py-8">
-                    <Clock className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                    <p className="text-gray-500 mb-2">No tasks scheduled</p>
-                    <p className="text-sm text-gray-400">Create a task to get started</p>
+          </CardHeader>
+          <CardContent>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {getProgressBySubject().map(({ subject, percentage, completed, total }) => (
+                <div key={subject} className="p-4 bg-gradient-to-br from-slate-50 to-white rounded-xl border border-slate-200 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <span className="font-medium text-slate-800">{subject}</span>
+                    <span className="text-sm text-slate-600 bg-slate-100 px-2 py-1 rounded-lg">
+                      {completed}/{total}
+                    </span>
                   </div>
-                ) : (
-                  renderDayTasks(getTasksForPeriod())
-                )}
+                  <Progress value={percentage} className="h-3 bg-slate-200" />
+                  <div className="flex items-center gap-2">
+                    <div className={`w-3 h-3 rounded-full ${subjectColors[subject] || 'bg-gray-500'}`} />
+                    <span className="text-sm text-slate-600">{percentage}% complete</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Calendar Views */}
+        <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm rounded-2xl">
+          <CardHeader className="pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+              <CardTitle className="flex items-center gap-3 text-xl text-slate-800">
+                <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+                  <CalendarIcon className="w-5 h-5 text-white" />
+                </div>
+                Schedule
+              </CardTitle>
+              <Tabs value={viewMode} onValueChange={setViewMode} className="w-full sm:w-auto">
+                <TabsList className="grid w-full grid-cols-3 sm:w-auto bg-slate-100 rounded-xl p-1">
+                  <TabsTrigger value="daily" className="rounded-lg">Daily</TabsTrigger>
+                  <TabsTrigger value="weekly" className="rounded-lg">Weekly</TabsTrigger>
+                  <TabsTrigger value="monthly" className="rounded-lg">Monthly</TabsTrigger>
+                </TabsList>
+              </Tabs>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <div className="grid lg:grid-cols-3 gap-6">
+              <div className="lg:col-span-1">
+                <div className="bg-gradient-to-br from-slate-50 to-white p-4 rounded-xl border border-slate-200">
+                  <Calendar
+                    mode="single"
+                    selected={selectedDate}
+                    onSelect={setSelectedDate}
+                    className="rounded-xl border-0"
+                  />
+                </div>
+              </div>
+              <div className="lg:col-span-2">
+                <div className="space-y-4">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-lg font-semibold text-slate-800">
+                      {viewMode === "daily" && format(selectedDate, "EEEE, MMMM d, yyyy")}
+                      {viewMode === "weekly" && `Week of ${format(startOfWeek(selectedDate), "MMM d")}`}
+                      {viewMode === "monthly" && format(selectedDate, "MMMM yyyy")}
+                    </h3>
+                    <Badge variant="outline" className="bg-blue-50 text-blue-700 border-blue-200 rounded-lg">
+                      {getTasksForPeriod().length} tasks
+                    </Badge>
+                  </div>
+                  
+                  {getTasksForPeriod().length === 0 ? (
+                    <div className="text-center py-12 bg-gradient-to-br from-slate-50 to-white rounded-xl border border-slate-200">
+                      <Clock className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                      <h4 className="text-lg font-medium text-slate-600 mb-2">No tasks scheduled</h4>
+                      <p className="text-slate-500 text-sm">Create a task to get started</p>
+                    </div>
+                  ) : (
+                    renderDayTasks(getTasksForPeriod())
+                  )}
+                </div>
               </div>
             </div>
-          </div>
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
 
-      {/* Study Plans List */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <BookOpen className="w-5 h-5" />
-            Your Study Plans
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {loading ? (
-            <div className="text-center py-8">Loading your study plans...</div>
-          ) : studyPlans.length === 0 ? (
-            <div className="text-center py-8">
-              <BookOpen className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-              <p className="text-gray-500 mb-2">No study plans yet</p>
-              <p className="text-sm text-gray-400 mb-4">Create your first study plan to get organized</p>
-              <Button onClick={() => setIsCreateOpen(true)} variant="outline">
-                <Plus className="w-4 h-4 mr-2" />
-                Create Study Plan
-              </Button>
-            </div>
-          ) : (
-            <div className="grid md:grid-cols-2 gap-4">
-              {studyPlans.map(plan => {
-                const currentPlanTasks = planTasks.filter(task => task.plan_id === plan.id);
-                const completedTasks = currentPlanTasks.filter(task => task.is_completed).length;
-                const totalTasks = currentPlanTasks.length;
-                const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
+        {/* Study Plans List */}
+        <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm rounded-2xl">
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-3 text-xl text-slate-800">
+              <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-600 rounded-xl flex items-center justify-center">
+                <BookOpen className="w-5 h-5 text-white" />
+              </div>
+              Your Study Plans
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {loading ? (
+              <div className="text-center py-12">
+                <div className="animate-spin w-8 h-8 border-4 border-blue-500 border-t-transparent rounded-full mx-auto mb-4"></div>
+                <p className="text-slate-600">Loading your study plans...</p>
+              </div>
+            ) : studyPlans.length === 0 ? (
+              <div className="text-center py-12 bg-gradient-to-br from-slate-50 to-white rounded-xl border border-slate-200">
+                <BookOpen className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                <h4 className="text-lg font-medium text-slate-600 mb-2">No study plans yet</h4>
+                <p className="text-slate-500 text-sm mb-6">Create your first study plan to get organized</p>
+                <Button onClick={() => setIsCreateOpen(true)} className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-xl">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Create Study Plan
+                </Button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {studyPlans.map(plan => {
+                  const currentPlanTasks = planTasks.filter(task => task.plan_id === plan.id);
+                  const completedTasks = currentPlanTasks.filter(task => task.is_completed).length;
+                  const totalTasks = currentPlanTasks.length;
+                  const progress = totalTasks > 0 ? Math.round((completedTasks / totalTasks) * 100) : 0;
 
-                return (
-                  <Card key={plan.id} className="hover:shadow-md transition-shadow">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <CardTitle className="text-lg">{plan.plan_name}</CardTitle>
-                          <CardDescription>{plan.description}</CardDescription>
+                  return (
+                    <Card key={plan.id} className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-gradient-to-br from-white to-slate-50 rounded-2xl">
+                      <CardHeader className="pb-3">
+                        <div className="flex items-start justify-between">
+                          <div className="flex-1">
+                            <CardTitle className="text-lg text-slate-800 mb-1">{plan.plan_name}</CardTitle>
+                            <CardDescription className="text-slate-600">{plan.description}</CardDescription>
+                          </div>
+                          <Badge variant={progress === 100 ? "default" : "secondary"} className="rounded-lg ml-3">
+                            {progress}%
+                          </Badge>
                         </div>
-                        <Badge variant={progress === 100 ? "default" : "secondary"}>
-                          {progress}%
-                        </Badge>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="space-y-3">
-                      <Progress value={progress} className="h-2" />
-                      <div className="flex items-center justify-between text-sm text-muted-foreground">
-                        <span>{completedTasks}/{totalTasks} tasks completed</span>
-                        <span>
-                          {format(new Date(plan.start_date), "MMM d")} - {format(new Date(plan.end_date), "MMM d")}
-                        </span>
-                      </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <Progress value={progress} className="h-3 bg-slate-200" />
+                        <div className="flex items-center justify-between text-sm">
+                          <span className="text-slate-600">{completedTasks}/{totalTasks} tasks completed</span>
+                          <span className="text-slate-500 bg-slate-100 px-2 py-1 rounded-lg text-xs">
+                            {format(new Date(plan.start_date), "MMM d")} - {format(new Date(plan.end_date), "MMM d")}
+                          </span>
+                        </div>
+                      </CardContent>
+                    </Card>
+                  );
+                })}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };

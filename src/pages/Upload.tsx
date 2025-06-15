@@ -7,8 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Upload as UploadIcon, File, FileText, Video, Image, Download, Trash2, Eye } from "lucide-react";
+import { Upload as UploadIcon, File, FileText, Video, Image, Download, Trash2, Eye, Cloud, FolderOpen } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -195,10 +194,10 @@ const Upload = () => {
   };
 
   const getFileIcon = (fileType: string) => {
-    if (fileType.startsWith('image/')) return <Image className="w-5 h-5" />;
-    if (fileType.startsWith('video/')) return <Video className="w-5 h-5" />;
-    if (fileType.includes('pdf') || fileType.includes('document')) return <FileText className="w-5 h-5" />;
-    return <File className="w-5 h-5" />;
+    if (fileType.startsWith('image/')) return <Image className="w-5 h-5 text-green-600" />;
+    if (fileType.startsWith('video/')) return <Video className="w-5 h-5 text-purple-600" />;
+    if (fileType.includes('pdf') || fileType.includes('document')) return <FileText className="w-5 h-5 text-red-600" />;
+    return <File className="w-5 h-5 text-blue-600" />;
   };
 
   const formatFileSize = (bytes: number) => {
@@ -210,188 +209,271 @@ const Upload = () => {
   };
 
   const getFileTypeColor = (fileType: string) => {
-    if (fileType.startsWith('image/')) return 'bg-green-100 text-green-800';
-    if (fileType.startsWith('video/')) return 'bg-purple-100 text-purple-800';
-    if (fileType.includes('pdf')) return 'bg-red-100 text-red-800';
-    if (fileType.includes('document')) return 'bg-blue-100 text-blue-800';
-    return 'bg-gray-100 text-gray-800';
+    if (fileType.startsWith('image/')) return 'bg-green-50 text-green-700 border-green-200';
+    if (fileType.startsWith('video/')) return 'bg-purple-50 text-purple-700 border-purple-200';
+    if (fileType.includes('pdf')) return 'bg-red-50 text-red-700 border-red-200';
+    if (fileType.includes('document')) return 'bg-blue-50 text-blue-700 border-blue-200';
+    return 'bg-slate-50 text-slate-700 border-slate-200';
   };
 
-  return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">File Upload</h1>
-          <p className="text-muted-foreground">Upload and manage your study materials</p>
-        </div>
+  if (!user) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-4">
+        <Card className="w-full max-w-md text-center shadow-xl border-0 rounded-2xl">
+          <CardContent className="p-8">
+            <Cloud className="w-16 h-16 text-blue-500 mx-auto mb-4" />
+            <h2 className="text-xl font-semibold mb-2 text-slate-800">Authentication Required</h2>
+            <p className="text-slate-600">Please sign in to access file uploads</p>
+          </CardContent>
+        </Card>
       </div>
+    );
+  }
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Upload New Files</CardTitle>
-          <CardDescription>
-            Select files to upload to your personal library
-          </CardDescription>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          <div>
-            <Label htmlFor="files">Select Files</Label>
-            <Input
-              id="files"
-              type="file"
-              multiple
-              onChange={handleFileSelect}
-              accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.jpg,.jpeg,.png,.gif,.mp4,.avi,.mov,.mp3,.wav"
-              disabled={isUploading}
-            />
-            <p className="text-sm text-gray-500 mt-1">
-              Supported formats: PDF, Office documents, images, videos, audio files
-            </p>
-          </div>
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-4 md:p-6">
+      <div className="max-w-6xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="text-center md:text-left">
+          <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent mb-2">
+            File Upload
+          </h1>
+          <p className="text-slate-600">Upload and manage your study materials securely</p>
+        </div>
 
-          <div>
-            <Label htmlFor="category">Category</Label>
-            <Select 
-              value={uploadMetadata.category}
-              onValueChange={(value) => setUploadMetadata(prev => ({ ...prev, category: value }))}
-              disabled={isUploading}
-            >
-              <SelectTrigger>
-                <SelectValue placeholder="Select category" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="general">General</SelectItem>
-                <SelectItem value="notes">Notes</SelectItem>
-                <SelectItem value="assignments">Assignments</SelectItem>
-                <SelectItem value="presentations">Presentations</SelectItem>
-                <SelectItem value="media">Media</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
+        {/* Upload Stats */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-2xl">
+            <CardContent className="p-6 text-center">
+              <Cloud className="w-8 h-8 mx-auto mb-2 opacity-90" />
+              <div className="text-2xl font-bold">{uploads.length}</div>
+              <div className="text-sm opacity-90">Total Files</div>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-lg bg-gradient-to-br from-green-500 to-green-600 text-white rounded-2xl">
+            <CardContent className="p-6 text-center">
+              <FileText className="w-8 h-8 mx-auto mb-2 opacity-90" />
+              <div className="text-2xl font-bold">{uploads.filter(f => f.file_type.includes('pdf') || f.file_type.includes('document')).length}</div>
+              <div className="text-sm opacity-90">Documents</div>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-lg bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-2xl">
+            <CardContent className="p-6 text-center">
+              <Image className="w-8 h-8 mx-auto mb-2 opacity-90" />
+              <div className="text-2xl font-bold">{uploads.filter(f => f.file_type.startsWith('image/')).length}</div>
+              <div className="text-sm opacity-90">Images</div>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-lg bg-gradient-to-br from-orange-500 to-orange-600 text-white rounded-2xl">
+            <CardContent className="p-6 text-center">
+              <Video className="w-8 h-8 mx-auto mb-2 opacity-90" />
+              <div className="text-2xl font-bold">{uploads.filter(f => f.file_type.startsWith('video/')).length}</div>
+              <div className="text-sm opacity-90">Videos</div>
+            </CardContent>
+          </Card>
+        </div>
 
-          <div>
-            <Label htmlFor="description">Description (Optional)</Label>
-            <Textarea
-              id="description"
-              value={uploadMetadata.description}
-              onChange={(e) => setUploadMetadata(prev => ({ ...prev, description: e.target.value }))}
-              placeholder="Add a description for these files..."
-              rows={3}
-              disabled={isUploading}
-            />
-          </div>
-
-          {selectedFiles && selectedFiles.length > 0 && (
+        {/* Upload Form */}
+        <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm rounded-2xl">
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-3 text-xl text-slate-800">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+                <UploadIcon className="w-5 h-5 text-white" />
+              </div>
+              Upload New Files
+            </CardTitle>
+            <CardDescription className="text-slate-600">
+              Select files to upload to your personal library
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-6">
             <div className="space-y-2">
-              <Label>Selected Files ({selectedFiles.length})</Label>
-              <div className="space-y-1 max-h-32 overflow-y-auto">
-                {Array.from(selectedFiles).map((file, index) => (
-                  <div key={index} className="flex items-center justify-between p-2 bg-gray-50 rounded">
-                    <div className="flex items-center gap-2">
-                      {getFileIcon(file.type)}
-                      <span className="text-sm">{file.name}</span>
+              <Label htmlFor="files" className="text-sm font-medium text-slate-700">Select Files</Label>
+              <div className="relative">
+                <Input
+                  id="files"
+                  type="file"
+                  multiple
+                  onChange={handleFileSelect}
+                  accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.jpg,.jpeg,.png,.gif,.mp4,.avi,.mov,.mp3,.wav"
+                  disabled={isUploading}
+                  className="border-2 border-dashed border-slate-300 hover:border-blue-400 focus:border-blue-500 rounded-xl h-20 file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-gradient-to-r file:from-blue-600 file:to-purple-600 file:text-white file:font-medium hover:file:from-blue-700 hover:file:to-purple-700 transition-all duration-300"
+                />
+              </div>
+              <p className="text-sm text-slate-500">
+                Supported formats: PDF, Office documents, images, videos, audio files (Max 50MB per file)
+              </p>
+            </div>
+
+            <div className="grid md:grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="category" className="text-sm font-medium text-slate-700">Category</Label>
+                <Select 
+                  value={uploadMetadata.category}
+                  onValueChange={(value) => setUploadMetadata(prev => ({ ...prev, category: value }))}
+                  disabled={isUploading}
+                >
+                  <SelectTrigger className="mt-1 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl h-12">
+                    <SelectValue placeholder="Select category" />
+                  </SelectTrigger>
+                  <SelectContent className="rounded-xl border-0 shadow-2xl">
+                    <SelectItem value="general" className="rounded-lg">General</SelectItem>
+                    <SelectItem value="notes" className="rounded-lg">Notes</SelectItem>
+                    <SelectItem value="assignments" className="rounded-lg">Assignments</SelectItem>
+                    <SelectItem value="presentations" className="rounded-lg">Presentations</SelectItem>
+                    <SelectItem value="media" className="rounded-lg">Media</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label htmlFor="description" className="text-sm font-medium text-slate-700">Description (Optional)</Label>
+                <Textarea
+                  id="description"
+                  value={uploadMetadata.description}
+                  onChange={(e) => setUploadMetadata(prev => ({ ...prev, description: e.target.value }))}
+                  placeholder="Add a description for these files..."
+                  rows={3}
+                  disabled={isUploading}
+                  className="mt-1 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl"
+                />
+              </div>
+            </div>
+
+            {selectedFiles && selectedFiles.length > 0 && (
+              <div className="space-y-3">
+                <Label className="text-sm font-medium text-slate-700">Selected Files ({selectedFiles.length})</Label>
+                <div className="space-y-2 max-h-40 overflow-y-auto bg-slate-50 rounded-xl p-4">
+                  {Array.from(selectedFiles).map((file, index) => (
+                    <div key={index} className="flex items-center justify-between p-3 bg-white rounded-lg border border-slate-200">
+                      <div className="flex items-center gap-3">
+                        {getFileIcon(file.type)}
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium text-slate-800 truncate">{file.name}</p>
+                          <p className="text-xs text-slate-500">{formatFileSize(file.size)}</p>
+                        </div>
+                      </div>
+                      <Badge className={getFileTypeColor(file.type)} variant="outline">
+                        {file.type.split('/')[0]}
+                      </Badge>
                     </div>
-                    <span className="text-xs text-gray-500">{formatFileSize(file.size)}</span>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {isUploading && (
+              <div className="space-y-3 p-4 bg-blue-50 rounded-xl border border-blue-200">
+                <div className="flex items-center justify-between">
+                  <Label className="text-sm font-medium text-blue-800">Upload Progress</Label>
+                  <span className="text-sm text-blue-600 font-medium">{Math.round(uploadProgress)}%</span>
+                </div>
+                <Progress value={uploadProgress} className="w-full h-3 bg-blue-100" />
+                <p className="text-xs text-blue-600">Uploading files to secure cloud storage...</p>
+              </div>
+            )}
+
+            <Button 
+              onClick={uploadFiles} 
+              disabled={!selectedFiles || selectedFiles.length === 0 || isUploading}
+              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-slate-400 disabled:to-slate-500 text-white shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl h-12"
+            >
+              <UploadIcon className="w-5 h-5 mr-2" />
+              {isUploading ? 'Uploading...' : 'Upload Files'}
+            </Button>
+          </CardContent>
+        </Card>
+
+        {/* Files List */}
+        <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm rounded-2xl">
+          <CardHeader className="pb-4">
+            <CardTitle className="flex items-center gap-3 text-xl text-slate-800">
+              <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
+                <FolderOpen className="w-5 h-5 text-white" />
+              </div>
+              Your Files ({uploads.length})
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            {uploads.length === 0 ? (
+              <div className="text-center py-16 bg-gradient-to-br from-slate-50 to-white rounded-xl border border-slate-200">
+                <Cloud className="w-20 h-20 text-slate-300 mx-auto mb-6" />
+                <h3 className="text-xl font-semibold text-slate-600 mb-2">No files uploaded yet</h3>
+                <p className="text-slate-500 mb-6">Upload your first file to get started with your digital library</p>
+                <Button onClick={() => document.getElementById('files')?.click()} className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-xl">
+                  <UploadIcon className="w-4 h-4 mr-2" />
+                  Choose Files
+                </Button>
+              </div>
+            ) : (
+              <div className="grid gap-4">
+                {uploads.map(upload => (
+                  <div 
+                    key={upload.id} 
+                    className="flex items-center justify-between p-6 border border-slate-200 rounded-2xl hover:shadow-lg transition-all duration-300 bg-gradient-to-r from-white to-slate-50"
+                  >
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl flex items-center justify-center">
+                        {getFileIcon(upload.file_type)}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <h4 className="font-medium text-slate-800 truncate">{upload.file_name}</h4>
+                        <p className="text-sm text-slate-500 flex items-center gap-2">
+                          <span>Uploaded {new Date(upload.upload_date).toLocaleDateString()}</span>
+                          <span>•</span>
+                          <span>{formatFileSize(upload.file_size)}</span>
+                        </p>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center gap-3">
+                      <Badge className={getFileTypeColor(upload.file_type)} variant="outline">
+                        {upload.file_type.split('/')[0]}
+                      </Badge>
+                      
+                      <div className="flex items-center gap-1">
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => window.open(upload.file_path, '_blank')}
+                          className="h-10 w-10 p-0 hover:bg-blue-50 hover:text-blue-600 rounded-xl"
+                        >
+                          <Eye className="w-4 h-4" />
+                        </Button>
+                        
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const link = document.createElement('a');
+                            link.href = upload.file_path;
+                            link.download = upload.file_name;
+                            document.body.appendChild(link);
+                            link.click();
+                            document.body.removeChild(link);
+                          }}
+                          className="h-10 w-10 p-0 hover:bg-green-50 hover:text-green-600 rounded-xl"
+                        >
+                          <Download className="w-4 h-4" />
+                        </Button>
+                        
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => deleteFile(upload)}
+                          className="h-10 w-10 p-0 hover:bg-red-50 hover:text-red-600 rounded-xl"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    </div>
                   </div>
                 ))}
               </div>
-            </div>
-          )}
-
-          {isUploading && (
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <Label>Upload Progress</Label>
-                <span className="text-sm text-gray-500">{Math.round(uploadProgress)}%</span>
-              </div>
-              <Progress value={uploadProgress} className="w-full" />
-            </div>
-          )}
-
-          <Button 
-            onClick={uploadFiles} 
-            disabled={!selectedFiles || selectedFiles.length === 0 || isUploading}
-            className="w-full"
-          >
-            <UploadIcon className="w-4 h-4 mr-2" />
-            {isUploading ? 'Uploading...' : 'Upload Files'}
-          </Button>
-        </CardContent>
-      </Card>
-
-      <Card>
-        <CardHeader>
-          <CardTitle>Your Uploads ({uploads.length})</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {uploads.length === 0 ? (
-            <div className="text-center py-12">
-              <UploadIcon className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold mb-2">No files uploaded yet</h3>
-              <p className="text-gray-500">
-                Upload your first file to get started
-              </p>
-            </div>
-          ) : (
-            <div className="grid gap-4">
-              {uploads.map(upload => (
-                <div 
-                  key={upload.id} 
-                  className="flex items-center justify-between p-4 border rounded-lg hover:shadow-sm transition-shadow"
-                >
-                  <div className="flex items-center gap-3">
-                    {getFileIcon(upload.file_type)}
-                    <div>
-                      <h4 className="font-medium">{upload.file_name}</h4>
-                      <p className="text-sm text-gray-500">
-                        Uploaded {new Date(upload.upload_date).toLocaleDateString()} • {formatFileSize(upload.file_size)}
-                      </p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-2">
-                    <Badge className={getFileTypeColor(upload.file_type)}>
-                      {upload.file_type.split('/')[0]}
-                    </Badge>
-                    
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => window.open(upload.file_path, '_blank')}
-                    >
-                      <Eye className="w-4 h-4" />
-                    </Button>
-                    
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        const link = document.createElement('a');
-                        link.href = upload.file_path;
-                        link.download = upload.file_name;
-                        document.body.appendChild(link);
-                        link.click();
-                        document.body.removeChild(link);
-                      }}
-                    >
-                      <Download className="w-4 h-4" />
-                    </Button>
-                    
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => deleteFile(upload)}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
+            )}
+          </CardContent>
+        </Card>
+      </div>
     </div>
   );
 };

@@ -1,405 +1,347 @@
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Textarea } from "@/components/ui/textarea";
+import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { Calendar, Clock, Plus, Check, X, Bell, AlertCircle } from "lucide-react";
-import { useAuth } from "@/hooks/useAuth";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { Checkbox } from "@/components/ui/checkbox";
-
-interface Reminder {
-  id: string;
-  title: string;
-  description: string;
-  reminder_date: string;
-  reminder_type: string;
-  is_completed: boolean;
-  created_at: string;
-}
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Switch } from "@/components/ui/switch";
+import { Calendar } from "@/components/ui/calendar";
+import { Plus, Bell, Clock, Calendar as CalendarIcon, AlertCircle, CheckCircle, Trash2, Edit } from "lucide-react";
 
 const Reminders = () => {
-  const { user } = useAuth();
-  const { toast } = useToast();
-  const [reminders, setReminders] = useState<Reminder[]>([]);
+  const [selectedDate, setSelectedDate] = useState(new Date());
   const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [filter, setFilter] = useState<string>("all");
-  const [newReminder, setNewReminder] = useState({
-    title: "",
-    description: "",
-    reminder_date: "",
-    reminder_type: "general"
-  });
+  const [activeTab, setActiveTab] = useState("upcoming");
 
-  useEffect(() => {
-    if (user) {
-      fetchReminders();
+  const mockReminders = [
+    {
+      id: 1,
+      title: "Math Quiz Tomorrow",
+      description: "Review chapters 5-7 for tomorrow's quiz",
+      dueDate: "2024-12-16T10:00:00",
+      priority: "high",
+      isCompleted: false,
+      type: "exam",
+      notificationEnabled: true
+    },
+    {
+      id: 2,
+      title: "Submit History Essay",
+      description: "Essay on World War II due by midnight",
+      dueDate: "2024-12-17T23:59:00",
+      priority: "medium",
+      isCompleted: false,
+      type: "assignment",
+      notificationEnabled: true
+    },
+    {
+      id: 3,
+      title: "Group Study Session",
+      description: "Chemistry study group at library",
+      dueDate: "2024-12-18T15:00:00",
+      priority: "low",
+      isCompleted: true,
+      type: "study",
+      notificationEnabled: false
     }
-  }, [user]);
+  ];
 
-  const fetchReminders = async () => {
-    if (!user) return;
-
-    const { data, error } = await supabase
-      .from('reminders')
-      .select('*')
-      .eq('user_id', user.id)
-      .order('reminder_date');
-
-    if (error) {
-      console.error('Error fetching reminders:', error);
-      toast({
-        title: "Error fetching reminders",
-        description: "There was an error loading your reminders",
-        variant: "destructive"
-      });
-    } else {
-      setReminders(data || []);
-    }
-  };
-
-  const createReminder = async () => {
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to create reminders",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    if (!newReminder.title || !newReminder.reminder_date) {
-      toast({
-        title: "Missing required fields",
-        description: "Please fill in title and reminder date",
-        variant: "destructive"
-      });
-      return;
-    }
-
-    const { error } = await supabase
-      .from('reminders')
-      .insert({
-        title: newReminder.title,
-        description: newReminder.description,
-        reminder_date: newReminder.reminder_date,
-        reminder_type: newReminder.reminder_type,
-        user_id: user.id
-      });
-
-    if (error) {
-      console.error('Error creating reminder:', error);
-      toast({
-        title: "Error creating reminder",
-        description: "There was an error creating your reminder",
-        variant: "destructive"
-      });
-    } else {
-      toast({
-        title: "Reminder created successfully",
-        description: "Your reminder has been added"
-      });
-      setNewReminder({
-        title: "",
-        description: "",
-        reminder_date: "",
-        reminder_type: "general"
-      });
-      setIsCreateOpen(false);
-      fetchReminders();
+  const getPriorityColor = (priority) => {
+    switch (priority) {
+      case "high": return "bg-red-500";
+      case "medium": return "bg-yellow-500";
+      case "low": return "bg-green-500";
+      default: return "bg-gray-500";
     }
   };
 
-  const toggleCompletion = async (id: string, isCompleted: boolean) => {
-    const { error } = await supabase
-      .from('reminders')
-      .update({ is_completed: !isCompleted })
-      .eq('id', id);
-
-    if (error) {
-      console.error('Error updating reminder:', error);
-      toast({
-        title: "Error updating reminder",
-        description: "There was an error updating your reminder",
-        variant: "destructive"
-      });
-    } else {
-      fetchReminders();
-    }
-  };
-
-  const deleteReminder = async (id: string) => {
-    const { error } = await supabase
-      .from('reminders')
-      .delete()
-      .eq('id', id);
-
-    if (error) {
-      console.error('Error deleting reminder:', error);
-      toast({
-        title: "Error deleting reminder",
-        description: "There was an error deleting your reminder",
-        variant: "destructive"
-      });
-    } else {
-      toast({
-        title: "Reminder deleted",
-        description: "Your reminder has been removed"
-      });
-      fetchReminders();
-    }
-  };
-
-  const getReminderTypeColor = (type: string) => {
+  const getTypeIcon = (type) => {
     switch (type) {
-      case 'study': return 'bg-blue-100 text-blue-800';
-      case 'assignment': return 'bg-red-100 text-red-800';
-      case 'exam': return 'bg-purple-100 text-purple-800';
-      case 'general': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
+      case "exam": return AlertCircle;
+      case "assignment": return Clock;
+      case "study": return CalendarIcon;
+      default: return Bell;
     }
   };
 
-  const isOverdue = (date: string) => {
-    return new Date(date) < new Date() && !reminders.find(r => r.reminder_date === date)?.is_completed;
-  };
-
-  const filteredReminders = reminders.filter(reminder => {
-    if (filter === "completed") return reminder.is_completed;
-    if (filter === "pending") return !reminder.is_completed;
-    if (filter === "overdue") return isOverdue(reminder.reminder_date) && !reminder.is_completed;
-    return true;
-  });
-
-  const upcomingReminders = reminders.filter(r => 
-    !r.is_completed && 
-    new Date(r.reminder_date) > new Date() &&
-    new Date(r.reminder_date) <= new Date(Date.now() + 7 * 24 * 60 * 60 * 1000)
-  );
+  const upcomingReminders = mockReminders.filter(r => !r.isCompleted);
+  const completedReminders = mockReminders.filter(r => r.isCompleted);
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-        <div>
-          <h1 className="text-3xl font-bold">Reminders</h1>
-          <p className="text-muted-foreground">Stay organized with your study schedule</p>
-        </div>
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
-            <Button className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
-              <Plus className="w-4 h-4 mr-2" />
-              New Reminder
-            </Button>
-          </DialogTrigger>
-          <DialogContent className="max-w-md">
-            <DialogHeader>
-              <DialogTitle>Create New Reminder</DialogTitle>
-              <DialogDescription>
-                Set up a reminder for your study schedule
-              </DialogDescription>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="title">Title *</Label>
-                <Input
-                  id="title"
-                  value={newReminder.title}
-                  onChange={(e) => setNewReminder(prev => ({ ...prev, title: e.target.value }))}
-                  placeholder="Reminder title"
-                />
-              </div>
-              
-              <div>
-                <Label htmlFor="type">Type</Label>
-                <Select onValueChange={(value) => setNewReminder(prev => ({ ...prev, reminder_type: value }))}>
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select type" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="general">General</SelectItem>
-                    <SelectItem value="study">Study Session</SelectItem>
-                    <SelectItem value="assignment">Assignment</SelectItem>
-                    <SelectItem value="exam">Exam</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="date">Reminder Date & Time *</Label>
-                <Input
-                  id="date"
-                  type="datetime-local"
-                  value={newReminder.reminder_date}
-                  onChange={(e) => setNewReminder(prev => ({ ...prev, reminder_date: e.target.value }))}
-                />
-              </div>
-
-              <div>
-                <Label htmlFor="description">Description</Label>
-                <Textarea
-                  id="description"
-                  value={newReminder.description}
-                  onChange={(e) => setNewReminder(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Additional details..."
-                  rows={3}
-                />
-              </div>
-
-              <Button onClick={createReminder} className="w-full">
-                <Bell className="w-4 h-4 mr-2" />
-                Create Reminder
-              </Button>
-            </div>
-          </DialogContent>
-        </Dialog>
-      </div>
-
-      {upcomingReminders.length > 0 && (
-        <Card className="border-yellow-200 bg-yellow-50">
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-yellow-800">
-              <AlertCircle className="w-5 h-5" />
-              Upcoming Reminders
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-2">
-              {upcomingReminders.slice(0, 3).map(reminder => (
-                <div key={reminder.id} className="flex items-center justify-between p-2 bg-white rounded">
-                  <div>
-                    <p className="font-medium">{reminder.title}</p>
-                    <p className="text-sm text-gray-600">
-                      {new Date(reminder.reminder_date).toLocaleDateString()} at{' '}
-                      {new Date(reminder.reminder_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                  </div>
-                  <Badge className={getReminderTypeColor(reminder.reminder_type)}>
-                    {reminder.reminder_type}
-                  </Badge>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
-
-      <Card>
-        <CardContent className="p-4">
-          <div className="flex gap-2">
-            <Button
-              variant={filter === "all" ? "default" : "outline"}
-              onClick={() => setFilter("all")}
-              size="sm"
-            >
-              All ({reminders.length})
-            </Button>
-            <Button
-              variant={filter === "pending" ? "default" : "outline"}
-              onClick={() => setFilter("pending")}
-              size="sm"
-            >
-              Pending ({reminders.filter(r => !r.is_completed).length})
-            </Button>
-            <Button
-              variant={filter === "completed" ? "default" : "outline"}
-              onClick={() => setFilter("completed")}
-              size="sm"
-            >
-              Completed ({reminders.filter(r => r.is_completed).length})
-            </Button>
-            <Button
-              variant={filter === "overdue" ? "default" : "outline"}
-              onClick={() => setFilter("overdue")}
-              size="sm"
-            >
-              Overdue ({reminders.filter(r => isOverdue(r.reminder_date) && !r.is_completed).length})
-            </Button>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 p-4 md:p-6">
+      <div className="max-w-6xl mx-auto space-y-6">
+        {/* Header */}
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+          <div className="text-center md:text-left">
+            <h1 className="text-3xl md:text-4xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
+              Reminders
+            </h1>
+            <p className="text-slate-600 mt-2">Stay on top of your deadlines and study schedule</p>
           </div>
-        </CardContent>
-      </Card>
-
-      <div className="grid gap-4">
-        {filteredReminders.length === 0 ? (
-          <Card>
-            <CardContent className="p-12 text-center">
-              <Bell className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold mb-2">No reminders found</h3>
-              <p className="text-gray-500 mb-6">
-                Create your first reminder to stay organized
-              </p>
-              <Button 
-                onClick={() => setIsCreateOpen(true)}
-                className="bg-blue-600 hover:bg-blue-700"
-              >
-                <Plus className="w-4 h-4 mr-2" />
-                Create First Reminder
+          
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <DialogTrigger asChild>
+              <Button className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl h-12">
+                <Plus className="w-5 h-5 mr-2" />
+                New Reminder
               </Button>
+            </DialogTrigger>
+            <DialogContent className="max-w-md mx-4 rounded-2xl border-0 shadow-2xl">
+              <DialogHeader>
+                <DialogTitle className="text-xl font-semibold text-slate-800">Create Reminder</DialogTitle>
+                <DialogDescription className="text-slate-600">Never miss an important deadline again</DialogDescription>
+              </DialogHeader>
+              <div className="space-y-4 mt-4">
+                <div>
+                  <Label htmlFor="title" className="text-sm font-medium text-slate-700">Title *</Label>
+                  <Input
+                    id="title"
+                    placeholder="e.g. Math Quiz Tomorrow"
+                    className="mt-1 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl h-12"
+                  />
+                </div>
+                
+                <div>
+                  <Label htmlFor="description" className="text-sm font-medium text-slate-700">Description</Label>
+                  <Textarea
+                    id="description"
+                    placeholder="Add more details..."
+                    rows={3}
+                    className="mt-1 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <Label htmlFor="type" className="text-sm font-medium text-slate-700">Type</Label>
+                    <Select>
+                      <SelectTrigger className="mt-1 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl">
+                        <SelectValue placeholder="Select type" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl">
+                        <SelectItem value="exam" className="rounded-lg">Exam</SelectItem>
+                        <SelectItem value="assignment" className="rounded-lg">Assignment</SelectItem>
+                        <SelectItem value="study" className="rounded-lg">Study Session</SelectItem>
+                        <SelectItem value="other" className="rounded-lg">Other</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="priority" className="text-sm font-medium text-slate-700">Priority</Label>
+                    <Select>
+                      <SelectTrigger className="mt-1 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl">
+                        <SelectValue placeholder="Priority" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl">
+                        <SelectItem value="high" className="rounded-lg">High</SelectItem>
+                        <SelectItem value="medium" className="rounded-lg">Medium</SelectItem>
+                        <SelectItem value="low" className="rounded-lg">Low</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="dueDate" className="text-sm font-medium text-slate-700">Due Date & Time *</Label>
+                  <Input
+                    id="dueDate"
+                    type="datetime-local"
+                    className="mt-1 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl h-12"
+                  />
+                </div>
+
+                <div className="flex items-center justify-between p-4 bg-slate-50 rounded-xl">
+                  <div>
+                    <Label htmlFor="notifications" className="text-sm font-medium text-slate-700">Enable Notifications</Label>
+                    <p className="text-xs text-slate-500">Get notified before the deadline</p>
+                  </div>
+                  <Switch id="notifications" />
+                </div>
+
+                <div className="flex gap-3 pt-4">
+                  <Button onClick={() => setIsCreateOpen(false)} variant="outline" className="flex-1 rounded-xl border-slate-200">
+                    Cancel
+                  </Button>
+                  <Button className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-xl">
+                    Create Reminder
+                  </Button>
+                </div>
+              </div>
+            </DialogContent>
+          </Dialog>
+        </div>
+
+        {/* Quick Stats */}
+        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+          <Card className="border-0 shadow-lg bg-gradient-to-br from-blue-500 to-blue-600 text-white rounded-2xl">
+            <CardContent className="p-6 text-center">
+              <Bell className="w-8 h-8 mx-auto mb-2 opacity-90" />
+              <div className="text-2xl font-bold">{upcomingReminders.length}</div>
+              <div className="text-sm opacity-90">Upcoming</div>
             </CardContent>
           </Card>
-        ) : (
-          filteredReminders.map(reminder => (
-            <Card 
-              key={reminder.id} 
-              className={`${reminder.is_completed ? 'opacity-60' : ''} ${
-                isOverdue(reminder.reminder_date) && !reminder.is_completed ? 'border-red-200 bg-red-50' : ''
-              }`}
-            >
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-start gap-3">
-                    <Checkbox
-                      checked={reminder.is_completed}
-                      onCheckedChange={() => toggleCompletion(reminder.id, reminder.is_completed)}
-                      className="mt-1"
-                    />
-                    <div>
-                      <CardTitle className={`text-lg ${reminder.is_completed ? 'line-through' : ''}`}>
-                        {reminder.title}
-                      </CardTitle>
-                      <CardDescription className="flex items-center gap-4 mt-1">
-                        <span className="flex items-center gap-1">
-                          <Calendar className="w-4 h-4" />
-                          {new Date(reminder.reminder_date).toLocaleDateString()}
-                        </span>
-                        <span className="flex items-center gap-1">
-                          <Clock className="w-4 h-4" />
-                          {new Date(reminder.reminder_date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </span>
-                        {isOverdue(reminder.reminder_date) && !reminder.is_completed && (
-                          <Badge className="bg-red-100 text-red-800">Overdue</Badge>
-                        )}
-                      </CardDescription>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Badge className={getReminderTypeColor(reminder.reminder_type)}>
-                      {reminder.reminder_type}
-                    </Badge>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => deleteReminder(reminder.id)}
-                      className="text-red-600 hover:text-red-700"
-                    >
-                      <X className="w-4 h-4" />
-                    </Button>
-                  </div>
+          <Card className="border-0 shadow-lg bg-gradient-to-br from-green-500 to-green-600 text-white rounded-2xl">
+            <CardContent className="p-6 text-center">
+              <CheckCircle className="w-8 h-8 mx-auto mb-2 opacity-90" />
+              <div className="text-2xl font-bold">{completedReminders.length}</div>
+              <div className="text-sm opacity-90">Completed</div>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-lg bg-gradient-to-br from-red-500 to-red-600 text-white rounded-2xl">
+            <CardContent className="p-6 text-center">
+              <AlertCircle className="w-8 h-8 mx-auto mb-2 opacity-90" />
+              <div className="text-2xl font-bold">2</div>
+              <div className="text-sm opacity-90">High Priority</div>
+            </CardContent>
+          </Card>
+          <Card className="border-0 shadow-lg bg-gradient-to-br from-purple-500 to-purple-600 text-white rounded-2xl">
+            <CardContent className="p-6 text-center">
+              <Clock className="w-8 h-8 mx-auto mb-2 opacity-90" />
+              <div className="text-2xl font-bold">Today</div>
+              <div className="text-sm opacity-90">1 Due</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <div className="grid lg:grid-cols-3 gap-6">
+          {/* Calendar */}
+          <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm rounded-2xl">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-3 text-lg text-slate-800">
+                <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
+                  <CalendarIcon className="w-4 h-4 text-white" />
                 </div>
-              </CardHeader>
-              {reminder.description && (
-                <CardContent>
-                  <p className="text-gray-600">{reminder.description}</p>
-                </CardContent>
-              )}
-            </Card>
-          ))
-        )}
+                Calendar
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <Calendar
+                mode="single"
+                selected={selectedDate}
+                onSelect={setSelectedDate}
+                className="rounded-xl border-0 w-full"
+              />
+            </CardContent>
+          </Card>
+
+          {/* Reminders List */}
+          <div className="lg:col-span-2">
+            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+              <TabsList className="bg-white/80 backdrop-blur-sm border-0 shadow-lg rounded-2xl p-2 grid w-full grid-cols-2">
+                <TabsTrigger value="upcoming" className="rounded-xl font-medium">Upcoming</TabsTrigger>
+                <TabsTrigger value="completed" className="rounded-xl font-medium">Completed</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="upcoming" className="space-y-4">
+                {upcomingReminders.length === 0 ? (
+                  <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm rounded-2xl">
+                    <CardContent className="p-12 text-center">
+                      <Bell className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                      <h3 className="text-xl font-semibold text-slate-600 mb-2">No upcoming reminders</h3>
+                      <p className="text-slate-500 mb-6">Create your first reminder to stay organized</p>
+                      <Button onClick={() => setIsCreateOpen(true)} className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-xl">
+                        <Plus className="w-4 h-4 mr-2" />
+                        Create Reminder
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  upcomingReminders.map(reminder => {
+                    const IconComponent = getTypeIcon(reminder.type);
+                    const isOverdue = new Date(reminder.dueDate) < new Date();
+                    
+                    return (
+                      <Card key={reminder.id} className={`border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80 backdrop-blur-sm rounded-2xl ${isOverdue ? 'ring-2 ring-red-200' : ''}`}>
+                        <CardContent className="p-6">
+                          <div className="flex items-start gap-4">
+                            <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${getPriorityColor(reminder.priority)}`}>
+                              <IconComponent className="w-6 h-6 text-white" />
+                            </div>
+                            
+                            <div className="flex-1 space-y-2">
+                              <div className="flex items-start justify-between">
+                                <h3 className="font-semibold text-slate-800">{reminder.title}</h3>
+                                <div className="flex items-center gap-2">
+                                  <Badge className={`${getPriorityColor(reminder.priority)} text-white hover:${getPriorityColor(reminder.priority)} rounded-lg`}>
+                                    {reminder.priority}
+                                  </Badge>
+                                  {reminder.notificationEnabled && (
+                                    <Badge variant="outline" className="rounded-lg">
+                                      <Bell className="w-3 h-3 mr-1" />
+                                      Notifications
+                                    </Badge>
+                                  )}
+                                </div>
+                              </div>
+                              
+                              <p className="text-slate-600 text-sm">{reminder.description}</p>
+                              
+                              <div className="flex items-center justify-between">
+                                <div className="text-sm text-slate-500">
+                                  Due: {new Date(reminder.dueDate).toLocaleDateString()} at {new Date(reminder.dueDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0 hover:bg-slate-100 rounded-lg">
+                                    <Edit className="w-4 h-4" />
+                                  </Button>
+                                  <Button size="sm" variant="ghost" className="h-8 w-8 p-0 hover:bg-red-50 hover:text-red-600 rounded-lg">
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })
+                )}
+              </TabsContent>
+
+              <TabsContent value="completed" className="space-y-4">
+                {completedReminders.length === 0 ? (
+                  <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm rounded-2xl">
+                    <CardContent className="p-12 text-center">
+                      <CheckCircle className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                      <h3 className="text-xl font-semibold text-slate-600 mb-2">No completed reminders</h3>
+                      <p className="text-slate-500">Completed reminders will appear here</p>
+                    </CardContent>
+                  </Card>
+                ) : (
+                  completedReminders.map(reminder => {
+                    const IconComponent = getTypeIcon(reminder.type);
+                    
+                    return (
+                      <Card key={reminder.id} className="border-0 shadow-lg bg-white/60 backdrop-blur-sm rounded-2xl opacity-75">
+                        <CardContent className="p-6">
+                          <div className="flex items-start gap-4">
+                            <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                              <CheckCircle className="w-6 h-6 text-green-600" />
+                            </div>
+                            
+                            <div className="flex-1 space-y-2">
+                              <h3 className="font-semibold text-slate-600 line-through">{reminder.title}</h3>
+                              <p className="text-slate-500 text-sm">{reminder.description}</p>
+                              <div className="text-sm text-slate-400">
+                                Completed: {new Date(reminder.dueDate).toLocaleDateString()}
+                              </div>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })
+                )}
+              </TabsContent>
+            </Tabs>
+          </div>
+        </div>
       </div>
     </div>
   );
