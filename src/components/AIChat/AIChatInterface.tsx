@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { Textarea } from "@/components/ui/textarea";
 import { Button } from "@/components/ui/button";
@@ -10,18 +9,59 @@ import {
   SelectItem,
   SelectTrigger,
   SelectValue,
+  SelectGroup,
+  SelectLabel,
 } from "@/components/ui/select"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { createChatCompletion, deleteChatSession, getChatMessages, getChatSessions, uploadPdf, createChatSession } from "@/lib/api";
 import { ChatMessage, ChatSession } from "@/types";
 
-// AI Models configuration
-const AI_MODELS = {
-  'gpt-4o-mini': { name: 'GPT-4o Mini', provider: 'OpenAI' },
-  'gpt-4o': { name: 'GPT-4o', provider: 'OpenAI' },
-  'claude-3-haiku': { name: 'Claude 3 Haiku', provider: 'Anthropic' },
-  'claude-3-sonnet': { name: 'Claude 3 Sonnet', provider: 'Anthropic' },
-  'gemini-pro': { name: 'Gemini Pro', provider: 'Google' },
+// AI Models configuration organized by provider
+const AI_PROVIDERS = {
+  openai: {
+    name: 'OpenAI',
+    models: {
+      'gpt-4o-mini': { name: 'GPT-4o Mini', description: 'Fast and efficient' },
+      'gpt-4o': { name: 'GPT-4o', description: 'Most capable' },
+      'gpt-4-turbo': { name: 'GPT-4 Turbo', description: 'High performance' },
+      'gpt-3.5-turbo': { name: 'GPT-3.5 Turbo', description: 'Balanced option' }
+    }
+  },
+  anthropic: {
+    name: 'Anthropic',
+    models: {
+      'claude-3-opus': { name: 'Claude 3 Opus', description: 'Most powerful' },
+      'claude-3-sonnet': { name: 'Claude 3 Sonnet', description: 'Balanced reasoning' },
+      'claude-3-haiku': { name: 'Claude 3 Haiku', description: 'Fast responses' }
+    }
+  },
+  google: {
+    name: 'Google',
+    models: {
+      'gemini-pro': { name: 'Gemini Pro', description: 'Advanced AI' },
+      'gemini-pro-vision': { name: 'Gemini Pro Vision', description: 'Multimodal' }
+    }
+  },
+  deepseek: {
+    name: 'DeepSeek',
+    models: {
+      'deepseek-chat': { name: 'DeepSeek Chat', description: 'Conversational AI' },
+      'deepseek-coder': { name: 'DeepSeek Coder', description: 'Code specialist' }
+    }
+  }
+};
+
+// Get current model info
+const getCurrentModelInfo = (modelId: string) => {
+  for (const provider of Object.values(AI_PROVIDERS)) {
+    if (provider.models[modelId as keyof typeof provider.models]) {
+      return {
+        provider: provider.name,
+        model: provider.models[modelId as keyof typeof provider.models]
+      };
+    }
+  }
+  return { provider: 'Unknown', model: { name: modelId, description: '' } };
 };
 
 export default function AIChatInterface() {
@@ -227,6 +267,8 @@ export default function AIChatInterface() {
     deleteSessionMutation(sessionId);
   };
 
+  const currentModelInfo = getCurrentModelInfo(selectedModel);
+
   return (
     <div className="flex flex-col h-full bg-gradient-to-br from-slate-50 via-white to-blue-50/30">
       {/* Session Management Bar */}
@@ -251,19 +293,31 @@ export default function AIChatInterface() {
               </SelectContent>
             </Select>
 
-            {/* Model Selection Dropdown */}
+            {/* Provider-based Model Selection Dropdown */}
             <Select value={selectedModel} onValueChange={setSelectedModel}>
-              <SelectTrigger className="w-48 h-10 bg-white shadow-sm border-gray-200 hover:border-gray-300 transition-colors">
-                <SelectValue placeholder="Select model..." />
+              <SelectTrigger className="w-56 h-10 bg-white shadow-sm border-gray-200 hover:border-gray-300 transition-colors">
+                <SelectValue placeholder="Select model...">
+                  <div className="flex flex-col items-start">
+                    <span className="font-medium text-sm">{currentModelInfo.model.name}</span>
+                    <span className="text-xs text-gray-500">{currentModelInfo.provider}</span>
+                  </div>
+                </SelectValue>
               </SelectTrigger>
               <SelectContent>
-                {Object.entries(AI_MODELS).map(([modelId, model]) => (
-                  <SelectItem key={modelId} value={modelId}>
-                    <div className="flex flex-col">
-                      <span className="font-medium">{model.name}</span>
-                      <span className="text-xs text-gray-500">{model.provider}</span>
-                    </div>
-                  </SelectItem>
+                {Object.entries(AI_PROVIDERS).map(([providerId, provider]) => (
+                  <SelectGroup key={providerId}>
+                    <SelectLabel className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-2 py-1">
+                      {provider.name}
+                    </SelectLabel>
+                    {Object.entries(provider.models).map(([modelId, model]) => (
+                      <SelectItem key={modelId} value={modelId}>
+                        <div className="flex flex-col">
+                          <span className="font-medium">{model.name}</span>
+                          <span className="text-xs text-gray-500">{model.description}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
                 ))}
               </SelectContent>
             </Select>
@@ -309,7 +363,9 @@ export default function AIChatInterface() {
                   Start a conversation with our AI assistant. Ask questions, get help with your studies, or explore new topics together.
                 </p>
                 <div className="mt-6 text-sm text-gray-500">
-                  Current model: <span className="font-medium text-gray-700">{AI_MODELS[selectedModel as keyof typeof AI_MODELS]?.name}</span>
+                  Current model: <span className="font-medium text-gray-700">{currentModelInfo.model.name}</span>
+                  <span className="text-gray-400 mx-2">•</span>
+                  <span className="text-gray-500">{currentModelInfo.provider}</span>
                 </div>
               </div>
             ) : (
@@ -348,7 +404,7 @@ export default function AIChatInterface() {
                 <div className="px-6 py-4 rounded-3xl bg-gray-100 text-gray-600 shadow-sm border border-gray-100">
                   <div className="flex items-center gap-2">
                     <Loader2 className="w-4 h-4 animate-spin" />
-                    Thinking with {AI_MODELS[selectedModel as keyof typeof AI_MODELS]?.name}...
+                    Thinking with {currentModelInfo.model.name}...
                   </div>
                 </div>
               </div>
