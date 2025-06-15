@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Eye, EyeOff, Bot, Key, Shield, Trash2, Save, RefreshCw } from 'lucide-react';
+import { Eye, EyeOff, Bot, Key, Shield, Trash2, Save, RefreshCw, Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -17,7 +16,8 @@ const AI_PROVIDERS = {
     description: 'GPT models and advanced AI capabilities',
     keyName: 'openai_api_key',
     website: 'https://platform.openai.com/',
-    placeholder: 'sk-...'
+    placeholder: 'sk-...',
+    fetchModels: false
   },
   anthropic: {
     name: 'Anthropic',
@@ -25,7 +25,8 @@ const AI_PROVIDERS = {
     description: 'Claude models for thoughtful AI conversations',
     keyName: 'anthropic_api_key',
     website: 'https://console.anthropic.com/',
-    placeholder: 'sk-ant-...'
+    placeholder: 'sk-ant-...',
+    fetchModels: false
   },
   google: {
     name: 'Google AI',
@@ -33,7 +34,8 @@ const AI_PROVIDERS = {
     description: 'Gemini models and Google AI services',
     keyName: 'google_api_key',
     website: 'https://makersuite.google.com/',
-    placeholder: 'AIza...'
+    placeholder: 'AIza...',
+    fetchModels: false
   },
   deepseek: {
     name: 'DeepSeek',
@@ -41,7 +43,17 @@ const AI_PROVIDERS = {
     description: 'Advanced reasoning and coding models',
     keyName: 'deepseek_api_key',
     website: 'https://platform.deepseek.com/',
-    placeholder: 'sk-...'
+    placeholder: 'sk-...',
+    fetchModels: false
+  },
+  openrouter: {
+    name: 'OpenRouter',
+    models: [], // Will be fetched dynamically
+    description: 'Access to multiple AI models through OpenRouter',
+    keyName: 'openrouter_api_key',
+    website: 'https://openrouter.ai/',
+    placeholder: 'sk-or-...',
+    fetchModels: true
   }
 };
 
@@ -54,6 +66,8 @@ const AISettings = () => {
   const [showApiKeys, setShowApiKeys] = useState<Record<string, boolean>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [fetchingModels, setFetchingModels] = useState<Record<string, boolean>>({});
+  const [dynamicModels, setDynamicModels] = useState<Record<string, string[]>>({});
 
   // New: Provider/model selection
   const [provider, setProvider] = useState(() =>
@@ -100,8 +114,54 @@ const AISettings = () => {
     }
   };
 
+  const fetchOpenRouterModels = async (apiKey: string) => {
+    setFetchingModels(prev => ({ ...prev, openrouter: true }));
+    try {
+      const response = await fetch('https://openrouter.ai/api/v1/models', {
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch models');
+      }
+
+      const data = await response.json();
+      const modelIds = data.data?.map((model: any) => model.id) || [];
+      
+      setDynamicModels(prev => ({ ...prev, openrouter: modelIds }));
+      
+      toast({
+        title: "Models loaded",
+        description: `Fetched ${modelIds.length} OpenRouter models`,
+      });
+    } catch (error) {
+      console.error('Error fetching OpenRouter models:', error);
+      toast({
+        title: "Error fetching models",
+        description: "Failed to load OpenRouter models. Check your API key.",
+        variant: "destructive"
+      });
+    } finally {
+      setFetchingModels(prev => ({ ...prev, openrouter: false }));
+    }
+  };
+
   const handleApiKeyChange = (keyName: string, value: string) => {
     setApiKeys(prev => ({ ...prev, [keyName]: value }));
+    
+    // Auto-fetch models for OpenRouter when API key is entered
+    if (keyName === 'openrouter_api_key' && value.trim().length > 10) {
+      fetchOpenRouterModels(value.trim());
+    }
+  };
+
+  const getCurrentModels = (providerKey: string) => {
+    if (AI_PROVIDERS[providerKey].fetchModels && dynamicModels[providerKey]) {
+      return dynamicModels[providerKey];
+    }
+    return AI_PROVIDERS[providerKey].models;
   };
 
   const saveApiKeys = async () => {
@@ -171,6 +231,7 @@ const AISettings = () => {
         .eq('user_id', user.id);
 
       setApiKeys({});
+      setDynamicModels({});
       toast({
         title: "API Keys Cleared",
         description: "All API keys have been removed."
@@ -187,10 +248,11 @@ const AISettings = () => {
 
   // Update models when provider changes
   useEffect(() => {
-    if (!AI_PROVIDERS[provider]?.models.includes(model)) {
-      setModel(AI_PROVIDERS[provider]?.models[0] || '');
+    const currentModels = getCurrentModels(provider);
+    if (!currentModels.includes(model)) {
+      setModel(currentModels[0] || '');
     }
-  }, [provider]);
+  }, [provider, dynamicModels]);
 
   if (!user) {
     return (
@@ -219,7 +281,7 @@ const AISettings = () => {
             AI Provider Settings
           </CardTitle>
           <CardDescription className="text-blue-700">
-            Configure your AI provider, preferred model, and API keys. All keys are encrypted and stored per user.
+            Configure your AI provider, preferred model, and API keys. Models are fetched in real-time for supported providers.
           </CardDescription>
         </CardHeader>
 
@@ -230,7 +292,7 @@ const AISettings = () => {
               <div className="space-y-1">
                 <h4 className="font-semibold text-blue-800">Security & Privacy</h4>
                 <p className="text-sm text-blue-700">
-                  Your API keys are encrypted and stored securely. Only you can access your keys.
+                  Your API keys are encrypted and stored securely. Models are fetched dynamically when available.
                 </p>
               </div>
             </div>
@@ -238,7 +300,7 @@ const AISettings = () => {
 
           {/* Provider Setting Toggle */}
           <Tabs value={provider} onValueChange={setProvider}>
-            <TabsList className="grid grid-cols-4 w-full mb-6">
+            <TabsList className="grid grid-cols-5 w-full mb-6">
               {ALL_PROVIDER_KEYS.map(p => (
                 <TabsTrigger 
                   key={p}
@@ -256,7 +318,12 @@ const AISettings = () => {
                     <CardHeader className="pb-3">
                       <div className="flex items-center justify-between">
                         <div>
-                          <CardTitle className="text-base font-semibold text-gray-800">{AI_PROVIDERS[p].name}</CardTitle>
+                          <CardTitle className="text-base font-semibold text-gray-800 flex items-center gap-2">
+                            {AI_PROVIDERS[p].name}
+                            {AI_PROVIDERS[p].fetchModels && (
+                              <Badge variant="secondary" className="text-xs">Real-time Models</Badge>
+                            )}
+                          </CardTitle>
                           <CardDescription className="text-sm text-gray-600 mt-1">
                             {AI_PROVIDERS[p].description}
                           </CardDescription>
@@ -291,21 +358,54 @@ const AISettings = () => {
                           }
                         </Button>
                       </div>
+                      {AI_PROVIDERS[p].fetchModels && apiKeys[AI_PROVIDERS[p].keyName] && (
+                        <div className="mt-2 flex items-center gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => fetchOpenRouterModels(apiKeys[AI_PROVIDERS[p].keyName])}
+                            disabled={fetchingModels[p]}
+                            className="text-xs"
+                          >
+                            {fetchingModels[p] ? (
+                              <>
+                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
+                                Fetching...
+                              </>
+                            ) : (
+                              <>
+                                <RefreshCw className="w-3 h-3 mr-1" />
+                                Refresh Models
+                              </>
+                            )}
+                          </Button>
+                          {dynamicModels[p] && (
+                            <span className="text-xs text-gray-600">
+                              {dynamicModels[p].length} models available
+                            </span>
+                          )}
+                        </div>
+                      )}
                     </CardContent>
                   </Card>
                   {/* Model select */}
                   <div>
                     <Label className="text-sm font-medium text-slate-800">Default Model</Label>
                     <select
-                      value={provider === p ? model : AI_PROVIDERS[p].models[0]}
+                      value={provider === p ? model : getCurrentModels(p)[0]}
                       onChange={e => setModel(e.target.value)}
                       className="mt-2 w-full border-slate-200 rounded-xl h-11 px-3 text-base"
                       disabled={provider !== p}
                     >
-                      {AI_PROVIDERS[p].models.map(m => (
+                      {getCurrentModels(p).map(m => (
                         <option key={m} value={m}>{m}</option>
                       ))}
                     </select>
+                    {AI_PROVIDERS[p].fetchModels && !dynamicModels[p] && apiKeys[AI_PROVIDERS[p].keyName] && (
+                      <p className="text-xs text-gray-500 mt-1">
+                        Enter API key and refresh to load available models
+                      </p>
+                    )}
                   </div>
                 </div>
               </TabsContent>
@@ -336,7 +436,7 @@ const AISettings = () => {
             </Button>
           </div>
           <div className="text-xs text-gray-500 text-center pt-4 border-t border-gray-100">
-            API keys and model selection are encrypted and securely stored in your user account.
+            API keys and model selection are encrypted and securely stored. Models are fetched in real-time for supported providers.
           </div>
         </CardContent>
       </Card>

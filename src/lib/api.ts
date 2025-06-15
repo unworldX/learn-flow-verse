@@ -1,4 +1,3 @@
-
 // Mock API functions for AI chat functionality with proper state management
 export interface ChatMessage {
   id: string;
@@ -41,12 +40,30 @@ const generateModelResponse = (message: string, model: string, reasoning: boolea
   const modelPersonalities = {
     'gpt-4o-mini': 'I\'m GPT-4o Mini, a fast and efficient AI assistant. ',
     'gpt-4o': 'I\'m GPT-4o, an advanced AI model with enhanced capabilities. ',
-    'claude-3-haiku': 'I\'m Claude 3 Haiku, designed for quick and thoughtful responses. ',
-    'claude-3-sonnet': 'I\'m Claude 3 Sonnet, built for balanced performance and intelligence. ',
-    'gemini-pro': 'I\'m Gemini Pro, Google\'s advanced AI assistant. ',
+    'claude-opus-4-20250514': 'I\'m Claude Opus 4, the most capable and intelligent model with superior reasoning. ',
+    'claude-sonnet-4-20250514': 'I\'m Claude Sonnet 4, a high-performance model with exceptional reasoning and efficiency. ',
+    'claude-3-5-haiku-20241022': 'I\'m Claude 3.5 Haiku, the fastest model for quick responses. ',
+    'gemini-1.5-flash': 'I\'m Gemini 1.5 Flash, Google\'s fast AI assistant. ',
+    'gemini-1.5-pro': 'I\'m Gemini 1.5 Pro, Google\'s advanced AI assistant. ',
+    'deepseek-chat': 'I\'m DeepSeek Chat, designed for advanced reasoning and conversations. ',
+    'deepseek-coder': 'I\'m DeepSeek Coder, specialized in coding and programming tasks. ',
   };
 
-  const modelIntro = modelPersonalities[model as keyof typeof modelPersonalities] || 'I\'m your AI assistant. ';
+  // Handle OpenRouter models
+  let modelIntro = modelPersonalities[model as keyof typeof modelPersonalities];
+  if (!modelIntro) {
+    if (model.includes('openai') || model.includes('gpt')) {
+      modelIntro = `I'm ${model}, an OpenAI model accessed through OpenRouter. `;
+    } else if (model.includes('claude') || model.includes('anthropic')) {
+      modelIntro = `I'm ${model}, an Anthropic model accessed through OpenRouter. `;
+    } else if (model.includes('gemini') || model.includes('google')) {
+      modelIntro = `I'm ${model}, a Google model accessed through OpenRouter. `;
+    } else if (model.includes('llama') || model.includes('meta')) {
+      modelIntro = `I'm ${model}, a Meta model accessed through OpenRouter. `;
+    } else {
+      modelIntro = `I'm ${model}, an AI model accessed through OpenRouter. `;
+    }
+  }
 
   if (lowerMessage.includes('hello') || lowerMessage.includes('hi')) {
     return `${modelIntro}Hello! How can I help you today?`;
@@ -129,16 +146,31 @@ const generateDetailedResponse = (message: string): string => {
 export const createChatCompletion = async (params: CreateChatCompletionParams): Promise<ChatMessage> => {
   console.log('Creating chat completion with params:', params);
   
-  // Simulate API delay (shorter for faster models)
+  // Simulate API delay (shorter for faster models, longer for more complex ones)
   const delays = {
     'gpt-4o-mini': 800,
-    'claude-3-haiku': 700,
+    'claude-3-5-haiku-20241022': 700,
     'gpt-4o': 1500,
-    'claude-3-sonnet': 1200,
-    'gemini-pro': 1000,
+    'claude-sonnet-4-20250514': 1200,
+    'claude-opus-4-20250514': 1800,
+    'gemini-1.5-flash': 900,
+    'gemini-1.5-pro': 1300,
+    'deepseek-chat': 1100,
+    'deepseek-coder': 1400,
   };
   
-  const delay = delays[params.model as keyof typeof delays] || 1000;
+  // Default delay for OpenRouter models or unknown models
+  let delay = delays[params.model as keyof typeof delays] || 1000;
+  
+  // Add extra delay for complex OpenRouter models
+  if (params.model && !delays[params.model as keyof typeof delays]) {
+    if (params.model.includes('gpt-4') || params.model.includes('claude-3-opus')) {
+      delay = 1800;
+    } else if (params.model.includes('llama') || params.model.includes('mixtral')) {
+      delay = 1400;
+    }
+  }
+  
   await new Promise(resolve => setTimeout(resolve, delay + Math.random() * 1000));
   
   // Generate response based on model and reasoning
