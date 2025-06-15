@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -9,8 +10,8 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Separator } from '@/components/ui/separator';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Upload, Send, Image, Video, FileText, Search, MoreVertical, Phone, VideoIcon, Plus, MessageSquare } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Upload, Send, Search, MoreVertical, Phone, VideoIcon, Plus, MessageSquare, ArrowLeft, Paperclip, Smile, Mic } from 'lucide-react';
 import { encryptText, decryptText } from '@/lib/encryption';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -51,6 +52,7 @@ const DirectMessages = () => {
   const [users, setUsers] = useState<User[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [loading, setLoading] = useState(false);
+  const [showNewChatDialog, setShowNewChatDialog] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -332,6 +334,7 @@ const DirectMessages = () => {
   const startNewChat = (selectedUser: User) => {
     setSelectedChat(selectedUser);
     setMessages([]);
+    setShowNewChatDialog(false);
   };
 
   const filteredUsers = users.filter(u => 
@@ -348,47 +351,50 @@ const DirectMessages = () => {
       : messageTime.toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
     
     return (
-      <div key={message.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-3 group`}>
+      <div key={message.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-2 group px-4`}>
         {!isOwn && (
-          <Avatar className="w-8 h-8 mr-2 mt-1">
-            <AvatarFallback className="text-xs bg-gradient-to-br from-blue-400 to-purple-500 text-white">
+          <Avatar className="w-8 h-8 mr-3 mt-1 flex-shrink-0">
+            <AvatarFallback className="text-xs bg-gradient-to-br from-blue-500 to-purple-600 text-white font-medium">
               {selectedChat?.full_name?.[0] || selectedChat?.email[0].toUpperCase()}
             </AvatarFallback>
           </Avatar>
         )}
         <div className={`max-w-xs lg:max-w-md ${isOwn ? 'ml-12' : 'mr-12'}`}>
-          <div className={`px-4 py-2 rounded-2xl shadow-sm ${
+          <div className={`px-4 py-2 rounded-2xl shadow-sm relative ${
             isOwn 
-              ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white ml-auto' 
+              ? 'bg-blue-500 text-white ml-auto' 
               : 'bg-white border border-gray-200 text-gray-900'
           } ${isOwn ? 'rounded-br-md' : 'rounded-bl-md'}`}>
             {message.message_type === 'text' ? (
-              <p className="text-sm leading-relaxed">{message.decrypted_content || message.encrypted_content}</p>
-            ) : message.message_type === 'image' ? (
-              <div className="space-y-2">
-                <img src={message.file_url} alt={message.file_name} className="max-w-full rounded-lg" />
-                <p className="text-xs opacity-75">{message.file_name}</p>
-              </div>
-            ) : message.message_type === 'video' ? (
-              <div className="space-y-2">
-                <video controls className="max-w-full rounded-lg">
-                  <source src={message.file_url} />
-                </video>
-                <p className="text-xs opacity-75">{message.file_name}</p>
-              </div>
+              <p className="text-sm leading-relaxed break-words">{message.decrypted_content || message.encrypted_content}</p>
             ) : (
-              <div className="flex items-center gap-2">
-                <FileText className="w-4 h-4" />
-                <a href={message.file_url} download={message.file_name} className="underline text-sm">
-                  {message.file_name}
-                </a>
+              <div className="space-y-2">
+                {message.message_type === 'image' && (
+                  <img src={message.file_url} alt={message.file_name} className="max-w-full rounded-lg" />
+                )}
+                {message.message_type === 'video' && (
+                  <video controls className="max-w-full rounded-lg">
+                    <source src={message.file_url} />
+                  </video>
+                )}
+                {message.message_type === 'file' && (
+                  <div className="flex items-center gap-2">
+                    <Paperclip className="w-4 h-4" />
+                    <a href={message.file_url} download={message.file_name} className="underline text-sm">
+                      {message.file_name}
+                    </a>
+                  </div>
+                )}
+                <p className="text-xs opacity-75">{message.file_name}</p>
               </div>
             )}
           </div>
-          <div className={`flex items-center gap-1 mt-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
+          <div className={`flex items-center gap-1 mt-1 px-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
             <span className="text-xs text-gray-500">{timeDisplay}</span>
-            {isOwn && message.is_read && (
-              <span className="text-xs text-blue-500">✓✓</span>
+            {isOwn && (
+              <span className={`text-xs ${message.is_read ? 'text-blue-500' : 'text-gray-400'}`}>
+                {message.is_read ? '✓✓' : '✓'}
+              </span>
             )}
           </div>
         </div>
@@ -401,33 +407,74 @@ const DirectMessages = () => {
       <div className="h-full flex flex-col bg-gray-50">
         {!selectedChat ? (
           <>
-            {/* Mobile Header with Search */}
-            <div className="bg-white border-b border-gray-200 p-4">
-              <h1 className="text-2xl font-bold mb-4 text-gray-800">Messages</h1>
+            {/* Mobile Header */}
+            <div className="bg-white border-b border-gray-200 p-4 shadow-sm">
+              <div className="flex items-center justify-between mb-4">
+                <h1 className="text-2xl font-bold text-gray-800">Messages</h1>
+                <Dialog open={showNewChatDialog} onOpenChange={setShowNewChatDialog}>
+                  <DialogTrigger asChild>
+                    <Button className="bg-blue-500 hover:bg-blue-600 rounded-full w-10 h-10 p-0">
+                      <Plus className="w-5 h-5" />
+                    </Button>
+                  </DialogTrigger>
+                  <DialogContent className="sm:max-w-md">
+                    <DialogHeader>
+                      <DialogTitle>Start New Chat</DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                      <div className="relative">
+                        <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                        <Input
+                          placeholder="Search by name or email..."
+                          value={searchQuery}
+                          onChange={(e) => setSearchQuery(e.target.value)}
+                          className="pl-10"
+                        />
+                      </div>
+                      <ScrollArea className="h-64">
+                        {filteredUsers.map((user) => (
+                          <div
+                            key={user.id}
+                            onClick={() => startNewChat(user)}
+                            className="p-3 cursor-pointer hover:bg-gray-50 rounded-lg flex items-center gap-3 transition-colors"
+                          >
+                            <Avatar className="w-10 h-10">
+                              <AvatarFallback className="bg-gradient-to-br from-green-500 to-blue-600 text-white font-medium">
+                                {user.full_name?.[0] || user.email[0].toUpperCase()}
+                              </AvatarFallback>
+                            </Avatar>
+                            <div className="flex-1 min-w-0">
+                              <p className="font-medium text-gray-900 truncate">{user.full_name || user.email}</p>
+                              <p className="text-sm text-gray-500 truncate">{user.email}</p>
+                            </div>
+                          </div>
+                        ))}
+                      </ScrollArea>
+                    </div>
+                  </DialogContent>
+                </Dialog>
+              </div>
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
                 <Input
                   placeholder="Search conversations..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-10 bg-gray-50 border-gray-200 focus:bg-white transition-colors"
+                  className="pl-10 bg-gray-50 border-gray-200 focus:bg-white"
                 />
               </div>
             </div>
 
             {/* Chat List */}
             <ScrollArea className="flex-1">
-              {/* Existing Chats */}
               {chats.map((chat) => (
                 <div
                   key={chat.user.id}
                   onClick={() => setSelectedChat(chat.user)}
-                  className="p-4 cursor-pointer hover:bg-gray-50 border-b border-gray-100 transition-all duration-200 bg-white"
+                  className="p-4 cursor-pointer hover:bg-gray-50 border-b border-gray-100 transition-all duration-200 bg-white active:bg-gray-100"
                 >
                   <div className="flex items-center gap-3">
                     <div className="relative">
-                      <Avatar className="w-12 h-12">
-                        <AvatarFallback className="bg-gradient-to-br from-blue-400 to-purple-500 text-white font-medium">
+                      <Avatar className="w-14 h-14">
+                        <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-medium text-lg">
                           {chat.user.full_name?.[0] || chat.user.email[0].toUpperCase()}
                         </AvatarFallback>
                       </Avatar>
@@ -435,11 +482,11 @@ const DirectMessages = () => {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between mb-1">
-                        <p className="font-medium text-gray-900 truncate">
+                        <p className="font-semibold text-gray-900 truncate text-lg">
                           {chat.user.full_name || chat.user.email}
                         </p>
                         {chat.unreadCount > 0 && (
-                          <Badge className="bg-blue-500 text-white text-xs px-2 py-1 rounded-full">
+                          <Badge className="bg-blue-500 text-white text-xs px-2 py-1 rounded-full ml-2">
                             {chat.unreadCount}
                           </Badge>
                         )}
@@ -453,64 +500,24 @@ const DirectMessages = () => {
                   </div>
                 </div>
               ))}
-
-              {/* New Chat Options */}
-              {searchQuery && (
-                <>
-                  <Separator className="my-2" />
-                  <div className="p-2 bg-white">
-                    <p className="text-sm font-medium text-gray-500 mb-2 px-2">Start new chat</p>
-                    {filteredUsers.map((user) => (
-                      <div
-                        key={user.id}
-                        onClick={() => startNewChat(user)}
-                        className="p-3 cursor-pointer hover:bg-gray-50 rounded-lg flex items-center gap-3 transition-colors"
-                      >
-                        <Avatar className="w-10 h-10">
-                          <AvatarFallback className="text-sm bg-gradient-to-br from-green-400 to-blue-500 text-white">
-                            {user.full_name?.[0] || user.email[0].toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
-                        <div>
-                          <p className="text-sm font-medium text-gray-900">{user.full_name || user.email}</p>
-                          <p className="text-xs text-gray-500">{user.email}</p>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </>
-              )}
             </ScrollArea>
-
-            {/* Floating Action Button */}
-            <div className="fixed bottom-6 right-6">
-              <Button 
-                onClick={() => setSearchQuery('')}
-                className="rounded-full w-14 h-14 bg-blue-500 hover:bg-blue-600 shadow-lg"
-                size="icon"
-              >
-                <MessageSquare className="w-6 h-6" />
-              </Button>
-            </div>
           </>
         ) : (
           /* Chat View for Mobile */
           <>
             {/* Chat Header */}
-            <div className="p-4 bg-white border-b border-gray-200 flex items-center justify-between">
-              <div className="flex items-center gap-3">
-                <Button variant="ghost" size="icon" onClick={() => setSelectedChat(null)}>
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
+            <div className="p-4 bg-white border-b border-gray-200 flex items-center justify-between shadow-sm">
+              <div className="flex items-center gap-3 flex-1">
+                <Button variant="ghost" size="icon" onClick={() => setSelectedChat(null)} className="flex-shrink-0">
+                  <ArrowLeft className="w-5 h-5" />
                 </Button>
-                <Avatar className="w-10 h-10">
-                  <AvatarFallback className="bg-gradient-to-br from-blue-400 to-purple-500 text-white font-medium">
+                <Avatar className="w-10 h-10 flex-shrink-0">
+                  <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-medium">
                     {selectedChat.full_name?.[0] || selectedChat.email[0].toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
-                <div>
-                  <h3 className="font-semibold text-gray-900">{selectedChat.full_name || selectedChat.email}</h3>
+                <div className="min-w-0 flex-1">
+                  <h3 className="font-semibold text-gray-900 truncate">{selectedChat.full_name || selectedChat.email}</h3>
                   <p className="text-sm text-green-500">● Online</p>
                 </div>
               </div>
@@ -525,8 +532,8 @@ const DirectMessages = () => {
             </div>
 
             {/* Messages */}
-            <ScrollArea className="flex-1 p-4 bg-gradient-to-b from-gray-50 to-white">
-              <div className="space-y-1">
+            <ScrollArea className="flex-1 bg-gradient-to-b from-gray-50 to-white">
+              <div className="py-2">
                 {messages.map(renderMessage)}
               </div>
               <div ref={messagesEndRef} />
@@ -534,40 +541,49 @@ const DirectMessages = () => {
 
             {/* Message Input */}
             <div className="p-4 bg-white border-t border-gray-200">
-              <div className="flex gap-3 items-end">
+              <div className="flex gap-2 items-end">
                 <div className="flex-1 relative">
                   <Input
                     value={newMessage}
                     onChange={(e) => setNewMessage(e.target.value)}
                     placeholder="Type a message..."
                     onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendTextMessage()}
-                    className="pr-12 py-3 rounded-full border-gray-300 focus:border-blue-500 transition-colors"
+                    className="pr-20 py-3 rounded-full border-gray-300 focus:border-blue-500 bg-gray-50"
                   />
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleFileUpload(file);
-                    }}
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={loading}
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2 rounded-full"
-                  >
-                    <Upload className="w-4 h-4" />
-                  </Button>
+                  <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex gap-1">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleFileUpload(file);
+                      }}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={loading}
+                      className="rounded-full w-8 h-8"
+                    >
+                      <Paperclip className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="rounded-full w-8 h-8"
+                    >
+                      <Smile className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
                 <Button 
                   onClick={sendTextMessage} 
                   disabled={loading || !newMessage.trim()}
-                  className="rounded-full px-6 bg-blue-500 hover:bg-blue-600"
+                  className="rounded-full w-12 h-12 bg-blue-500 hover:bg-blue-600 p-0"
                 >
-                  <Send className="w-4 h-4" />
+                  {newMessage.trim() ? <Send className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
                 </Button>
               </div>
             </div>
@@ -577,26 +593,67 @@ const DirectMessages = () => {
     );
   }
 
-  // Desktop Layout (existing code)
+  // Desktop Layout
   return (
     <div className="h-full flex bg-gray-50">
       {/* Chat List */}
-      <div className="w-1/3 bg-white border-r border-gray-200">
-        <div className="p-4 bg-white border-b border-gray-100">
-          <h2 className="text-xl font-bold mb-4 text-gray-800">Messages</h2>
+      <div className="w-1/3 bg-white border-r border-gray-200 flex flex-col">
+        <div className="p-4 bg-white border-b border-gray-100 shadow-sm">
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-xl font-bold text-gray-800">Messages</h2>
+            <Dialog open={showNewChatDialog} onOpenChange={setShowNewChatDialog}>
+              <DialogTrigger asChild>
+                <Button className="bg-blue-500 hover:bg-blue-600 rounded-full w-10 h-10 p-0">
+                  <Plus className="w-5 h-5" />
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                  <DialogTitle>Start New Chat</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
+                    <Input
+                      placeholder="Search by name or email..."
+                      value={searchQuery}
+                      onChange={(e) => setSearchQuery(e.target.value)}
+                      className="pl-10"
+                    />
+                  </div>
+                  <ScrollArea className="h-64">
+                    {filteredUsers.map((user) => (
+                      <div
+                        key={user.id}
+                        onClick={() => startNewChat(user)}
+                        className="p-3 cursor-pointer hover:bg-gray-50 rounded-lg flex items-center gap-3 transition-colors"
+                      >
+                        <Avatar className="w-10 h-10">
+                          <AvatarFallback className="bg-gradient-to-br from-green-500 to-blue-600 text-white font-medium">
+                            {user.full_name?.[0] || user.email[0].toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-medium text-gray-900 truncate">{user.full_name || user.email}</p>
+                          <p className="text-sm text-gray-500 truncate">{user.email}</p>
+                        </div>
+                      </div>
+                    ))}
+                  </ScrollArea>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
           <div className="relative">
             <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
             <Input
               placeholder="Search conversations..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-gray-50 border-gray-200 focus:bg-white transition-colors"
+              className="pl-10 bg-gray-50 border-gray-200 focus:bg-white"
             />
           </div>
         </div>
 
-        <ScrollArea className="h-[calc(100vh-200px)]">
-          {/* Existing Chats */}
+        <ScrollArea className="flex-1">
           {chats.map((chat) => (
             <div
               key={chat.user.id}
@@ -608,7 +665,7 @@ const DirectMessages = () => {
               <div className="flex items-center gap-3">
                 <div className="relative">
                   <Avatar className="w-12 h-12">
-                    <AvatarFallback className="bg-gradient-to-br from-blue-400 to-purple-500 text-white font-medium">
+                    <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-medium">
                       {chat.user.full_name?.[0] || chat.user.email[0].toUpperCase()}
                     </AvatarFallback>
                   </Avatar>
@@ -634,33 +691,6 @@ const DirectMessages = () => {
               </div>
             </div>
           ))}
-
-          {/* New Chat Options */}
-          {searchQuery && (
-            <>
-              <Separator className="my-2" />
-              <div className="p-2">
-                <p className="text-sm font-medium text-gray-500 mb-2 px-2">Start new chat</p>
-                {filteredUsers.map((user) => (
-                  <div
-                    key={user.id}
-                    onClick={() => startNewChat(user)}
-                    className="p-3 cursor-pointer hover:bg-gray-50 rounded-lg flex items-center gap-3 transition-colors"
-                  >
-                    <Avatar className="w-10 h-10">
-                      <AvatarFallback className="text-sm bg-gradient-to-br from-green-400 to-blue-500 text-white">
-                        {user.full_name?.[0] || user.email[0].toUpperCase()}
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <p className="text-sm font-medium text-gray-900">{user.full_name || user.email}</p>
-                      <p className="text-xs text-gray-500">{user.email}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </>
-          )}
         </ScrollArea>
       </div>
 
@@ -669,15 +699,10 @@ const DirectMessages = () => {
         {selectedChat ? (
           <>
             {/* Chat Header */}
-            <div className="p-4 bg-white border-b border-gray-200 flex items-center justify-between">
+            <div className="p-4 bg-white border-b border-gray-200 flex items-center justify-between shadow-sm">
               <div className="flex items-center gap-3">
-                <Button variant="ghost" size="icon" onClick={() => setSelectedChat(null)}>
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-                  </svg>
-                </Button>
                 <Avatar className="w-10 h-10">
-                  <AvatarFallback className="bg-gradient-to-br from-blue-400 to-purple-500 text-white font-medium">
+                  <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-medium">
                     {selectedChat.full_name?.[0] || selectedChat.email[0].toUpperCase()}
                   </AvatarFallback>
                 </Avatar>
@@ -700,8 +725,8 @@ const DirectMessages = () => {
             </div>
 
             {/* Messages */}
-            <ScrollArea className="flex-1 p-4 bg-gradient-to-b from-gray-50 to-white">
-              <div className="space-y-1">
+            <ScrollArea className="flex-1 bg-gradient-to-b from-gray-50 to-white">
+              <div className="py-2">
                 {messages.map(renderMessage)}
               </div>
               <div ref={messagesEndRef} />
@@ -716,26 +741,35 @@ const DirectMessages = () => {
                     onChange={(e) => setNewMessage(e.target.value)}
                     placeholder="Type a message..."
                     onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendTextMessage()}
-                    className="pr-12 py-3 rounded-full border-gray-300 focus:border-blue-500 transition-colors"
+                    className="pr-20 py-3 rounded-full border-gray-300 focus:border-blue-500 bg-gray-50"
                   />
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    className="hidden"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleFileUpload(file);
-                    }}
-                  />
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={loading}
-                    className="absolute right-2 top-1/2 transform -translate-y-1/2 rounded-full"
-                  >
-                    <Upload className="w-4 h-4" />
-                  </Button>
+                  <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex gap-1">
+                    <input
+                      ref={fileInputRef}
+                      type="file"
+                      className="hidden"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleFileUpload(file);
+                      }}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={loading}
+                      className="rounded-full"
+                    >
+                      <Paperclip className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className="rounded-full"
+                    >
+                      <Smile className="w-4 h-4" />
+                    </Button>
+                  </div>
                 </div>
                 <Button 
                   onClick={sendTextMessage} 
@@ -751,11 +785,11 @@ const DirectMessages = () => {
           <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50">
             <div className="text-center max-w-md mx-auto p-8">
               <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Send className="w-10 h-10 text-white" />
+                <MessageSquare className="w-10 h-10 text-white" />
               </div>
               <h3 className="text-xl font-semibold text-gray-900 mb-3">Select a conversation</h3>
               <p className="text-gray-500 leading-relaxed">
-                Choose from your existing conversations or search for someone new to start messaging
+                Choose from your existing conversations or start a new chat
               </p>
             </div>
           </div>
