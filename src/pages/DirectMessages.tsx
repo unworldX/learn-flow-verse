@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/integrations/supabase/client';
@@ -28,6 +29,7 @@ interface DirectMessage {
   file_size?: number;
   created_at: string;
   is_read: boolean;
+  decrypted_content?: string;
 }
 
 interface Chat {
@@ -119,37 +121,69 @@ const DirectMessages = () => {
     if (!user) return;
 
     try {
+      // Fetch messages with sender and receiver information
       const { data: messagesData, error } = await supabase
         .from('direct_messages')
         .select(`
-          *,
-          sender:users!direct_messages_sender_id_fkey(id, email, full_name),
-          receiver:users!direct_messages_receiver_id_fkey(id, email, full_name)
+          id,
+          sender_id,
+          receiver_id,
+          encrypted_content,
+          message_type,
+          file_url,
+          file_name,
+          file_size,
+          created_at,
+          is_read,
+          deleted_by_sender,
+          deleted_by_receiver
         `)
         .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
+      // Get unique user IDs to fetch user details
+      const userIds = new Set<string>();
+      messagesData?.forEach(message => {
+        userIds.add(message.sender_id);
+        userIds.add(message.receiver_id);
+      });
+
+      // Fetch user details
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('id, email, full_name')
+        .in('id', Array.from(userIds));
+
+      if (usersError) throw usersError;
+
+      const usersMap = new Map(usersData?.map(u => [u.id, u]) || []);
+
       // Group messages by chat partner
       const chatMap = new Map<string, Chat>();
       
       for (const message of messagesData || []) {
         const partnerId = message.sender_id === user.id ? message.receiver_id : message.sender_id;
-        const partner = message.sender_id === user.id ? message.receiver : message.sender;
+        const partner = usersMap.get(partnerId);
         
-        if (!chatMap.has(partnerId)) {
+        if (partner && !chatMap.has(partnerId)) {
           chatMap.set(partnerId, {
             user: partner,
-            lastMessage: message,
+            lastMessage: {
+              ...message,
+              message_type: message.message_type as 'text' | 'image' | 'video' | 'file'
+            },
             unreadCount: 0
           });
         }
 
         // Count unread messages
         if (message.receiver_id === user.id && !message.is_read) {
-          const chat = chatMap.get(partnerId)!;
-          chat.unreadCount++;
+          const chat = chatMap.get(partnerId);
+          if (chat) {
+            chat.unreadCount++;
+          }
         }
       }
 
@@ -171,16 +205,21 @@ const DirectMessages = () => {
 
       if (error) throw error;
 
-      // Decrypt text messages
+      // Decrypt text messages and fix types
       const decryptedMessages = await Promise.all(
         (data || []).map(async (message) => {
+          const typedMessage: DirectMessage = {
+            ...message,
+            message_type: message.message_type as 'text' | 'image' | 'video' | 'file'
+          };
+
           if (message.message_type === 'text' && message.encrypted_content) {
             return {
-              ...message,
+              ...typedMessage,
               decrypted_content: await decryptText(message.encrypted_content)
             };
           }
-          return message;
+          return typedMessage;
         })
       );
 
@@ -297,7 +336,7 @@ const DirectMessages = () => {
     u.full_name?.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const renderMessage = (message: DirectMessage & { decrypted_content?: string }) => {
+  const renderMessage = (message: DirectMessage) => {
     const isOwn = message.sender_id === user?.id;
     
     return (

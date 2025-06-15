@@ -133,21 +133,43 @@ const StudyGroups = () => {
     if (!user) return;
 
     try {
-      const { data, error } = await supabase
-        .from('study_groups')
+      // First get groups where user is a member
+      const { data: membershipData, error: membershipError } = await supabase
+        .from('study_group_members')
         .select(`
-          *,
-          study_group_members!inner(role),
-          member_count:study_group_members(count)
+          role,
+          study_groups!inner(
+            id,
+            name,
+            description,
+            created_by,
+            created_at,
+            is_private,
+            max_members
+          )
         `)
-        .eq('study_group_members.user_id', user.id);
+        .eq('user_id', user.id);
 
-      if (error) throw error;
+      if (membershipError) throw membershipError;
 
-      const groupsWithRole = data?.map(group => ({
-        ...group,
-        user_role: group.study_group_members[0]?.role,
-        member_count: group.member_count?.[0]?.count || 0
+      // Get member counts for each group
+      const groupIds = membershipData?.map(m => m.study_groups.id) || [];
+      const { data: memberCounts, error: countError } = await supabase
+        .from('study_group_members')
+        .select('group_id')
+        .in('group_id', groupIds);
+
+      if (countError) throw countError;
+
+      const countMap = new Map<string, number>();
+      memberCounts?.forEach(member => {
+        countMap.set(member.group_id, (countMap.get(member.group_id) || 0) + 1);
+      });
+
+      const groupsWithRole = membershipData?.map(membership => ({
+        ...membership.study_groups,
+        user_role: membership.role,
+        member_count: countMap.get(membership.study_groups.id) || 0
       })) || [];
 
       setGroups(groupsWithRole);
@@ -160,28 +182,55 @@ const StudyGroups = () => {
     if (!selectedGroup) return;
 
     try {
-      const { data, error } = await supabase
+      // Fetch messages
+      const { data: messagesData, error: messagesError } = await supabase
         .from('group_messages')
         .select(`
-          *,
-          sender:users!group_messages_sender_id_fkey(email, full_name)
+          id,
+          group_id,
+          sender_id,
+          encrypted_content,
+          message_type,
+          file_url,
+          file_name,
+          file_size,
+          created_at,
+          deleted_at
         `)
         .eq('group_id', selectedGroup.id)
         .is('deleted_at', null)
         .order('created_at', { ascending: true });
 
-      if (error) throw error;
+      if (messagesError) throw messagesError;
 
-      // Decrypt text messages
+      // Get sender information
+      const senderIds = [...new Set(messagesData?.map(m => m.sender_id) || [])];
+      const { data: sendersData, error: sendersError } = await supabase
+        .from('users')
+        .select('id, email, full_name')
+        .in('id', senderIds);
+
+      if (sendersError) throw sendersError;
+
+      const sendersMap = new Map(sendersData?.map(s => [s.id, s]) || []);
+
+      // Decrypt text messages and fix types
       const decryptedMessages = await Promise.all(
-        (data || []).map(async (message) => {
+        (messagesData || []).map(async (message) => {
+          const sender = sendersMap.get(message.sender_id);
+          const typedMessage: GroupMessage = {
+            ...message,
+            message_type: message.message_type as 'text' | 'image' | 'video' | 'file',
+            sender
+          };
+
           if (message.message_type === 'text' && message.encrypted_content) {
             return {
-              ...message,
+              ...typedMessage,
               decrypted_content: await decryptText(message.encrypted_content)
             };
           }
-          return message;
+          return typedMessage;
         })
       );
 
@@ -195,17 +244,38 @@ const StudyGroups = () => {
     if (!selectedGroup) return;
 
     try {
-      const { data, error } = await supabase
+      // Fetch group members
+      const { data: membersData, error: membersError } = await supabase
         .from('study_group_members')
         .select(`
-          *,
-          user:users!study_group_members_user_id_fkey(email, full_name)
+          id,
+          user_id,
+          role,
+          joined_at
         `)
         .eq('group_id', selectedGroup.id)
         .order('joined_at', { ascending: true });
 
-      if (error) throw error;
-      setMembers(data || []);
+      if (membersError) throw membersError;
+
+      // Get user information
+      const userIds = membersData?.map(m => m.user_id) || [];
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('id, email, full_name')
+        .in('id', userIds);
+
+      if (usersError) throw usersError;
+
+      const usersMap = new Map(usersData?.map(u => [u.id, u]) || []);
+
+      const membersWithUsers: GroupMember[] = membersData?.map(member => ({
+        ...member,
+        role: member.role as 'admin' | 'moderator' | 'member',
+        user: usersMap.get(member.user_id)
+      })) || [];
+
+      setMembers(membersWithUsers);
     } catch (error) {
       console.error('Error fetching members:', error);
     }
