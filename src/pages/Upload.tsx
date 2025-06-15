@@ -1,5 +1,5 @@
-
 import { useState, useEffect } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
@@ -7,11 +7,12 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Upload as UploadIcon, File, FileText, Video, Image, Download, Trash2, Eye, Cloud, FolderOpen } from "lucide-react";
+import { Upload as UploadIcon, File, FileText, Video, Image, Download, Trash2, Eye, Cloud, FolderOpen, Plus, Loader2 } from "lucide-react";
 import { useAuth } from "@/hooks/useAuth";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { Progress } from "@/components/ui/progress";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 interface FileUpload {
   id: string;
@@ -26,6 +27,7 @@ interface FileUpload {
 const Upload = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const queryClient = useQueryClient();
   const [uploads, setUploads] = useState<FileUpload[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -33,6 +35,18 @@ const Upload = () => {
   const [uploadMetadata, setUploadMetadata] = useState({
     description: "",
     category: "general"
+  });
+
+  // Resource upload state
+  const [isResourceUploading, setIsResourceUploading] = useState(false);
+  const [resourceUploadData, setResourceUploadData] = useState({
+    title: "",
+    author: "",
+    subject: "",
+    class: "",
+    description: "",
+    resourceType: "",
+    file: null as File | null
   });
 
   useEffect(() => {
@@ -149,6 +163,95 @@ const Upload = () => {
     }
   };
 
+  const handleResourceFileUpload = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (file) {
+      setResourceUploadData(prev => ({ ...prev, file }));
+    }
+  };
+
+  const handleResourceUpload = async () => {
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to upload resources",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    if (!resourceUploadData.title || !resourceUploadData.resourceType || !resourceUploadData.file) {
+      toast({
+        title: "Missing required fields",
+        description: "Please fill in title, resource type, and select a file",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsResourceUploading(true);
+    try {
+      const file = resourceUploadData.file;
+      const fileName = `resources/${user.id}/${Date.now()}-${file.name}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('uploads')
+        .upload(fileName, file);
+
+      if (uploadError) {
+        throw uploadError;
+      }
+
+      const { data: urlData } = supabase.storage
+        .from('uploads')
+        .getPublicUrl(fileName);
+      
+      const fileUrl = urlData.publicUrl;
+
+      const { error } = await supabase
+        .from('resources')
+        .insert({
+          title: resourceUploadData.title,
+          author: resourceUploadData.author || 'Unknown',
+          subject: resourceUploadData.subject,
+          class: resourceUploadData.class,
+          description: resourceUploadData.description,
+          resource_type: resourceUploadData.resourceType,
+          file_url: fileUrl,
+          uploader_id: user.id
+        });
+
+      if (error) throw error;
+
+      toast({
+        title: "Resource uploaded successfully",
+        description: "Your resource has been added to the library"
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ['resources'] });
+
+      setResourceUploadData({
+        title: "",
+        author: "",
+        subject: "",
+        class: "",
+        description: "",
+        resourceType: "",
+        file: null
+      });
+
+    } catch (error) {
+      console.error('Upload error:', error);
+      toast({
+        title: "Upload failed",
+        description: "There was an error uploading your resource",
+        variant: "destructive"
+      });
+    } finally {
+      setIsResourceUploading(false);
+    }
+  };
+
   const deleteFile = async (upload: FileUpload) => {
     try {
       // Extract file path from URL
@@ -216,6 +319,18 @@ const Upload = () => {
     return 'bg-slate-50 text-slate-700 border-slate-200';
   };
 
+  const subjects = [
+    "Mathematics", "Physics", "Chemistry", "Biology", "Computer Science",
+    "Literature", "History", "Geography", "Economics", "Psychology"
+  ];
+
+  const resourceTypes = [
+    { value: "PDF", label: "PDF Document", icon: FileText },
+    { value: "Video", label: "Video", icon: Video },
+    { value: "Book", label: "E-Book", icon: FileText },
+    { value: "Other", label: "Other", icon: FileText }
+  ];
+
   if (!user) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50 flex items-center justify-center p-4">
@@ -273,206 +388,269 @@ const Upload = () => {
           </Card>
         </div>
 
-        {/* Upload Form */}
-        <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm rounded-2xl">
-          <CardHeader className="pb-4">
-            <CardTitle className="flex items-center gap-3 text-xl text-slate-800">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
-                <UploadIcon className="w-5 h-5 text-white" />
-              </div>
-              Upload New Files
-            </CardTitle>
-            <CardDescription className="text-slate-600">
-              Select files to upload to your personal library
-            </CardDescription>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="files" className="text-sm font-medium text-slate-700">Select Files</Label>
-              <div className="relative">
-                <Input
-                  id="files"
-                  type="file"
-                  multiple
-                  onChange={handleFileSelect}
-                  accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.jpg,.jpeg,.png,.gif,.mp4,.avi,.mov,.mp3,.wav"
-                  disabled={isUploading}
-                  className="border-2 border-dashed border-slate-300 hover:border-blue-400 focus:border-blue-500 rounded-xl h-20 file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-gradient-to-r file:from-blue-600 file:to-purple-600 file:text-white file:font-medium hover:file:from-blue-700 hover:file:to-purple-700 transition-all duration-300"
-                />
-              </div>
-              <p className="text-sm text-slate-500">
-                Supported formats: PDF, Office documents, images, videos, audio files (Max 50MB per file)
-              </p>
-            </div>
+        <Tabs defaultValue="files" className="w-full">
+          <TabsList className="grid w-full grid-cols-2 rounded-2xl bg-white/80 backdrop-blur-sm border-0 shadow-lg">
+            <TabsTrigger value="files" className="rounded-xl">Personal Files</TabsTrigger>
+            <TabsTrigger value="resources" className="rounded-xl">Upload Resources</TabsTrigger>
+          </TabsList>
 
-            <div className="grid md:grid-cols-2 gap-4">
-              <div>
-                <Label htmlFor="category" className="text-sm font-medium text-slate-700">Category</Label>
-                <Select 
-                  value={uploadMetadata.category}
-                  onValueChange={(value) => setUploadMetadata(prev => ({ ...prev, category: value }))}
-                  disabled={isUploading}
+          {/* Personal Files Upload */}
+          <TabsContent value="files" className="space-y-6">
+            {/* Upload Form */}
+            <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm rounded-2xl">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-3 text-xl text-slate-800">
+                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+                    <UploadIcon className="w-5 h-5 text-white" />
+                  </div>
+                  Upload New Files
+                </CardTitle>
+                <CardDescription className="text-slate-600">
+                  Select files to upload to your personal library
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="files" className="text-sm font-medium text-slate-700">Select Files</Label>
+                  <div className="relative">
+                    <Input
+                      id="files"
+                      type="file"
+                      multiple
+                      onChange={handleFileSelect}
+                      accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.jpg,.jpeg,.png,.gif,.mp4,.avi,.mov,.mp3,.wav"
+                      disabled={isUploading}
+                      className="border-2 border-dashed border-slate-300 hover:border-blue-400 focus:border-blue-500 rounded-xl h-20 file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-gradient-to-r file:from-blue-600 file:to-purple-600 file:text-white file:font-medium hover:file:from-blue-700 hover:file:to-purple-700 transition-all duration-300"
+                    />
+                  </div>
+                  <p className="text-sm text-slate-500">
+                    Supported formats: PDF, Office documents, images, videos, audio files (Max 50MB per file)
+                  </p>
+                </div>
+
+                <Button 
+                  onClick={uploadFiles} 
+                  disabled={!selectedFiles || selectedFiles.length === 0 || isUploading}
+                  className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-slate-400 disabled:to-slate-500 text-white shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl h-12"
                 >
-                  <SelectTrigger className="mt-1 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl h-12">
-                    <SelectValue placeholder="Select category" />
-                  </SelectTrigger>
-                  <SelectContent className="rounded-xl border-0 shadow-2xl">
-                    <SelectItem value="general" className="rounded-lg">General</SelectItem>
-                    <SelectItem value="notes" className="rounded-lg">Notes</SelectItem>
-                    <SelectItem value="assignments" className="rounded-lg">Assignments</SelectItem>
-                    <SelectItem value="presentations" className="rounded-lg">Presentations</SelectItem>
-                    <SelectItem value="media" className="rounded-lg">Media</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label htmlFor="description" className="text-sm font-medium text-slate-700">Description (Optional)</Label>
-                <Textarea
-                  id="description"
-                  value={uploadMetadata.description}
-                  onChange={(e) => setUploadMetadata(prev => ({ ...prev, description: e.target.value }))}
-                  placeholder="Add a description for these files..."
-                  rows={3}
-                  disabled={isUploading}
-                  className="mt-1 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl"
-                />
-              </div>
-            </div>
-
-            {selectedFiles && selectedFiles.length > 0 && (
-              <div className="space-y-3">
-                <Label className="text-sm font-medium text-slate-700">Selected Files ({selectedFiles.length})</Label>
-                <div className="space-y-2 max-h-40 overflow-y-auto bg-slate-50 rounded-xl p-4">
-                  {Array.from(selectedFiles).map((file, index) => (
-                    <div key={index} className="flex items-center justify-between p-3 bg-white rounded-lg border border-slate-200">
-                      <div className="flex items-center gap-3">
-                        {getFileIcon(file.type)}
-                        <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium text-slate-800 truncate">{file.name}</p>
-                          <p className="text-xs text-slate-500">{formatFileSize(file.size)}</p>
+                  <UploadIcon className="w-5 h-5 mr-2" />
+                  {isUploading ? 'Uploading...' : 'Upload Files'}
+                </Button>
+              </CardContent>
+            </Card>
+            {/* Files List */}
+            <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm rounded-2xl">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-3 text-xl text-slate-800">
+                  <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
+                    <FolderOpen className="w-5 h-5 text-white" />
+                  </div>
+                  Your Files ({uploads.length})
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                {uploads.length === 0 ? (
+                  <div className="text-center py-16 bg-gradient-to-br from-slate-50 to-white rounded-xl border border-slate-200">
+                    <Cloud className="w-20 h-20 text-slate-300 mx-auto mb-6" />
+                    <h3 className="text-xl font-semibold text-slate-600 mb-2">No files uploaded yet</h3>
+                    <p className="text-slate-500 mb-6">Upload your first file to get started with your digital library</p>
+                    <Button onClick={() => document.getElementById('files')?.click()} className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-xl">
+                      <UploadIcon className="w-4 h-4 mr-2" />
+                      Choose Files
+                    </Button>
+                  </div>
+                ) : (
+                  <div className="grid gap-4">
+                    {uploads.map(upload => (
+                      <div 
+                        key={upload.id} 
+                        className="flex items-center justify-between p-6 border border-slate-200 rounded-2xl hover:shadow-lg transition-all duration-300 bg-gradient-to-r from-white to-slate-50"
+                      >
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl flex items-center justify-center">
+                            {getFileIcon(upload.file_type)}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <h4 className="font-medium text-slate-800 truncate">{upload.file_name}</h4>
+                            <p className="text-sm text-slate-500 flex items-center gap-2">
+                              <span>Uploaded {new Date(upload.upload_date).toLocaleDateString()}</span>
+                              <span>•</span>
+                              <span>{formatFileSize(upload.file_size)}</span>
+                            </p>
+                          </div>
+                        </div>
+                        
+                        <div className="flex items-center gap-3">
+                          <Badge className={getFileTypeColor(upload.file_type)} variant="outline">
+                            {upload.file_type.split('/')[0]}
+                          </Badge>
+                          
+                          <div className="flex items-center gap-1">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => window.open(upload.file_path, '_blank')}
+                              className="h-10 w-10 p-0 hover:bg-blue-50 hover:text-blue-600 rounded-xl"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                            
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => {
+                                const link = document.createElement('a');
+                                link.href = upload.file_path;
+                                link.download = upload.file_name;
+                                document.body.appendChild(link);
+                                link.click();
+                                document.body.removeChild(link);
+                              }}
+                              className="h-10 w-10 p-0 hover:bg-green-50 hover:text-green-600 rounded-xl"
+                            >
+                              <Download className="w-4 h-4" />
+                            </Button>
+                            
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => deleteFile(upload)}
+                              className="h-10 w-10 p-0 hover:bg-red-50 hover:text-red-600 rounded-xl"
+                            >
+                              <Trash2 className="w-4 h-4" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                      <Badge className={getFileTypeColor(file.type)} variant="outline">
-                        {file.type.split('/')[0]}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {isUploading && (
-              <div className="space-y-3 p-4 bg-blue-50 rounded-xl border border-blue-200">
-                <div className="flex items-center justify-between">
-                  <Label className="text-sm font-medium text-blue-800">Upload Progress</Label>
-                  <span className="text-sm text-blue-600 font-medium">{Math.round(uploadProgress)}%</span>
-                </div>
-                <Progress value={uploadProgress} className="w-full h-3 bg-blue-100" />
-                <p className="text-xs text-blue-600">Uploading files to secure cloud storage...</p>
-              </div>
-            )}
-
-            <Button 
-              onClick={uploadFiles} 
-              disabled={!selectedFiles || selectedFiles.length === 0 || isUploading}
-              className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 disabled:from-slate-400 disabled:to-slate-500 text-white shadow-lg hover:shadow-xl transition-all duration-300 rounded-xl h-12"
-            >
-              <UploadIcon className="w-5 h-5 mr-2" />
-              {isUploading ? 'Uploading...' : 'Upload Files'}
-            </Button>
-          </CardContent>
-        </Card>
-
-        {/* Files List */}
-        <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm rounded-2xl">
-          <CardHeader className="pb-4">
-            <CardTitle className="flex items-center gap-3 text-xl text-slate-800">
-              <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-emerald-600 rounded-xl flex items-center justify-center">
-                <FolderOpen className="w-5 h-5 text-white" />
-              </div>
-              Your Files ({uploads.length})
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            {uploads.length === 0 ? (
-              <div className="text-center py-16 bg-gradient-to-br from-slate-50 to-white rounded-xl border border-slate-200">
-                <Cloud className="w-20 h-20 text-slate-300 mx-auto mb-6" />
-                <h3 className="text-xl font-semibold text-slate-600 mb-2">No files uploaded yet</h3>
-                <p className="text-slate-500 mb-6">Upload your first file to get started with your digital library</p>
-                <Button onClick={() => document.getElementById('files')?.click()} className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-xl">
-                  <UploadIcon className="w-4 h-4 mr-2" />
-                  Choose Files
-                </Button>
-              </div>
-            ) : (
-              <div className="grid gap-4">
-                {uploads.map(upload => (
-                  <div 
-                    key={upload.id} 
-                    className="flex items-center justify-between p-6 border border-slate-200 rounded-2xl hover:shadow-lg transition-all duration-300 bg-gradient-to-r from-white to-slate-50"
-                  >
-                    <div className="flex items-center gap-4">
-                      <div className="w-12 h-12 bg-gradient-to-br from-slate-100 to-slate-200 rounded-xl flex items-center justify-center">
-                        {getFileIcon(upload.file_type)}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h4 className="font-medium text-slate-800 truncate">{upload.file_name}</h4>
-                        <p className="text-sm text-slate-500 flex items-center gap-2">
-                          <span>Uploaded {new Date(upload.upload_date).toLocaleDateString()}</span>
-                          <span>•</span>
-                          <span>{formatFileSize(upload.file_size)}</span>
-                        </p>
-                      </div>
-                    </div>
-                    
-                    <div className="flex items-center gap-3">
-                      <Badge className={getFileTypeColor(upload.file_type)} variant="outline">
-                        {upload.file_type.split('/')[0]}
-                      </Badge>
-                      
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => window.open(upload.file_path, '_blank')}
-                          className="h-10 w-10 p-0 hover:bg-blue-50 hover:text-blue-600 rounded-xl"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </Button>
-                        
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => {
-                            const link = document.createElement('a');
-                            link.href = upload.file_path;
-                            link.download = upload.file_name;
-                            document.body.appendChild(link);
-                            link.click();
-                            document.body.removeChild(link);
-                          }}
-                          className="h-10 w-10 p-0 hover:bg-green-50 hover:text-green-600 rounded-xl"
-                        >
-                          <Download className="w-4 h-4" />
-                        </Button>
-                        
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => deleteFile(upload)}
-                          className="h-10 w-10 p-0 hover:bg-red-50 hover:text-red-600 rounded-xl"
-                        >
-                          <Trash2 className="w-4 h-4" />
-                        </Button>
-                      </div>
-                    </div>
+                    ))}
                   </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Resource Upload */}
+          <TabsContent value="resources" className="space-y-6">
+            <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm rounded-2xl">
+              <CardHeader className="pb-4">
+                <CardTitle className="flex items-center gap-3 text-xl text-slate-800">
+                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
+                    <UploadIcon className="w-5 h-5 text-white" />
+                  </div>
+                  Upload New Resource
+                </CardTitle>
+                <CardDescription className="text-slate-600">
+                  Share your study materials with the community
+                </CardDescription>
+              </CardHeader>
+              <CardContent className="grid gap-6">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="resource-title" className="text-sm font-medium text-slate-700">Resource Title *</Label>
+                    <Input
+                      id="resource-title"
+                      value={resourceUploadData.title}
+                      onChange={(e) => setResourceUploadData(prev => ({ ...prev, title: e.target.value }))}
+                      placeholder="Enter resource title"
+                      className="mt-1 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl h-12"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="resource-author" className="text-sm font-medium text-slate-700">Author Name</Label>
+                    <Input
+                      id="resource-author"
+                      value={resourceUploadData.author}
+                      onChange={(e) => setResourceUploadData(prev => ({ ...prev, author: e.target.value }))}
+                      placeholder="Enter author name"
+                      className="mt-1 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl h-12"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="resource-subject" className="text-sm font-medium text-slate-700">Subject</Label>
+                    <Select onValueChange={(value) => setResourceUploadData(prev => ({ ...prev, subject: value }))} value={resourceUploadData.subject}>
+                      <SelectTrigger className="mt-1 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl h-12">
+                        <SelectValue placeholder="Select subject" />
+                      </SelectTrigger>
+                      <SelectContent className="rounded-xl border-0 shadow-2xl">
+                        {subjects.map(subject => (
+                          <SelectItem key={subject} value={subject} className="rounded-lg">{subject}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="resource-class" className="text-sm font-medium text-slate-700">Class</Label>
+                    <Input
+                      id="resource-class"
+                      value={resourceUploadData.class}
+                      onChange={(e) => setResourceUploadData(prev => ({ ...prev, class: e.target.value }))}
+                      placeholder="e.g. Grade 12"
+                      className="mt-1 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl h-12"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <Label htmlFor="resource-type" className="text-sm font-medium text-slate-700">Resource Type *</Label>
+                  <Select
+                    onValueChange={(value) => setResourceUploadData(prev => ({ ...prev, resourceType: value }))}
+                    value={resourceUploadData.resourceType}
+                  >
+                    <SelectTrigger className="mt-1 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl h-12">
+                      <SelectValue placeholder="Select resource type" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl border-0 shadow-2xl">
+                      {resourceTypes.map(type => (
+                        <SelectItem key={type.value} value={type.value} className="rounded-lg">
+                          {type.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
+                <div>
+                  <Label htmlFor="resource-description" className="text-sm font-medium text-slate-700">Description</Label>
+                  <Textarea
+                    id="resource-description"
+                    value={resourceUploadData.description}
+                    onChange={(e) => setResourceUploadData(prev => ({ ...prev, description: e.target.value }))}
+                    placeholder="Brief description of the resource"
+                    rows={4}
+                    className="mt-1 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl"
+                  />
+                </div>
+
+                <div>
+                  <Label htmlFor="resource-file" className="text-sm font-medium text-slate-700">File *</Label>
+                  <Input
+                    id="resource-file"
+                    type="file"
+                    onChange={handleResourceFileUpload}
+                    accept=".pdf,.mp4,.avi,.mov,.epub,.doc,.docx"
+                    disabled={isResourceUploading}
+                    className="mt-1 border-2 border-dashed border-slate-300 hover:border-blue-400 focus:border-blue-500 rounded-xl h-20 file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-gradient-to-r file:from-blue-600 file:to-purple-600 file:text-white file:font-medium hover:file:from-blue-700 hover:file:to-purple-700 transition-all duration-300"
+                  />
+                  {resourceUploadData.file ? (
+                    <p className="text-sm text-green-600 mt-1">File selected: {resourceUploadData.file.name}</p>
+                  ) : (
+                    <p className="text-sm text-slate-500 mt-1">No file chosen</p>
+                  )}
+                </div>
+
+                <Button onClick={handleResourceUpload} className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-xl h-12" disabled={isResourceUploading}>
+                  {isResourceUploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Plus className="w-4 h-4 mr-2" />}
+                  {isResourceUploading ? 'Uploading...' : 'Upload Resource'}
+                </Button>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   );
