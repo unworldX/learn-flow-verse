@@ -8,12 +8,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-interface ChatRequest {
-  message: string;
-  provider: string;
-  model: string;
-  reasoning?: boolean;
-}
+const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -21,87 +17,58 @@ serve(async (req) => {
   }
 
   try {
-    const supabaseClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
-    );
+    const { message, provider, model, reasoning, userId } = await req.json();
 
-    // Get auth header
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader) {
-      throw new Error('No authorization header');
+    if (!userId) {
+      throw new Error('User authentication required');
     }
 
-    // Set auth for supabase client
-    const token = authHeader.replace('Bearer ', '');
-    const { data: { user }, error: authError } = await supabaseClient.auth.getUser(token);
-    
-    if (authError || !user) {
-      throw new Error('Authentication failed');
-    }
-
-    const { message, provider, model, reasoning = false }: ChatRequest = await req.json();
+    // Initialize Supabase client
+    const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Get user's API key for the provider
-    const { data: apiKeyData, error: keyError } = await supabaseClient
+    const { data: apiKeyData, error: apiKeyError } = await supabase
       .from('user_api_keys')
       .select('encrypted_key')
-      .eq('user_id', user.id)
+      .eq('user_id', userId)
       .eq('provider', provider)
       .single();
 
-    if (keyError || !apiKeyData) {
-      throw new Error(`No API key found for provider: ${provider}`);
+    if (apiKeyError || !apiKeyData) {
+      throw new Error(`No API key found for ${provider}. Please configure it in Settings.`);
     }
 
     const apiKey = apiKeyData.encrypted_key;
-    let response;
 
-    switch (provider) {
-      case 'openai':
-        response = await callOpenAI(message, model, apiKey, reasoning);
-        break;
-      case 'anthropic':
-        response = await callAnthropic(message, model, apiKey, reasoning);
-        break;
-      case 'google':
-        response = await callGoogle(message, model, apiKey, reasoning);
-        break;
-      case 'deepseek':
-        response = await callDeepSeek(message, model, apiKey, reasoning);
-        break;
-      case 'openrouter':
-        response = await callOpenRouter(message, model, apiKey, reasoning);
-        break;
-      default:
-        throw new Error(`Unsupported provider: ${provider}`);
+    // Call the appropriate AI API
+    let response;
+    if (provider === 'openai') {
+      response = await callOpenAI(apiKey, model, message, reasoning);
+    } else if (provider === 'anthropic') {
+      response = await callAnthropic(apiKey, model, message, reasoning);
+    } else if (provider === 'google') {
+      response = await callGoogle(apiKey, model, message, reasoning);
+    } else if (provider === 'deepseek') {
+      response = await callDeepSeek(apiKey, model, message, reasoning);
+    } else if (provider === 'openrouter') {
+      response = await callOpenRouter(apiKey, model, message, reasoning);
+    } else {
+      throw new Error(`Unsupported provider: ${provider}`);
     }
 
-    return new Response(JSON.stringify(response), {
+    return new Response(JSON.stringify({ content: response }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
-    console.error('AI Chat Error:', error);
-    return new Response(JSON.stringify({ 
-      error: error.message || 'An error occurred processing your request' 
-    }), {
+    console.error('Error in ai-chat function:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });
 
-async function callOpenAI(message: string, model: string, apiKey: string, reasoning: boolean) {
-  const messages = [
-    {
-      role: 'system',
-      content: reasoning 
-        ? 'You are a helpful assistant. Think through problems step by step and show your reasoning.'
-        : 'You are a helpful assistant.'
-    },
-    { role: 'user', content: message }
-  ];
-
+async function callOpenAI(apiKey: string, model: string, message: string, reasoning: boolean) {
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -110,30 +77,29 @@ async function callOpenAI(message: string, model: string, apiKey: string, reason
     },
     body: JSON.stringify({
       model,
-      messages,
-      max_tokens: 2000,
+      messages: [
+        { 
+          role: 'system', 
+          content: reasoning 
+            ? 'You are a helpful AI assistant. Think step by step and provide detailed reasoning for your responses.'
+            : 'You are a helpful AI assistant.'
+        },
+        { role: 'user', content: message }
+      ],
       temperature: 0.7,
+      max_tokens: 1000,
     }),
   });
 
   if (!response.ok) {
-    throw new Error(`OpenAI API error: ${response.status}`);
+    throw new Error(`OpenAI API error: ${response.statusText}`);
   }
 
   const data = await response.json();
-  
-  return {
-    id: data.id || Math.random().toString(36).substr(2, 9),
-    content: data.choices[0].message.content,
-    createdAt: new Date().toISOString(),
-  };
+  return data.choices[0].message.content;
 }
 
-async function callAnthropic(message: string, model: string, apiKey: string, reasoning: boolean) {
-  const systemPrompt = reasoning 
-    ? 'You are a helpful assistant. Think through problems step by step and show your reasoning.'
-    : 'You are a helpful assistant.';
-
+async function callAnthropic(apiKey: string, model: string, message: string, reasoning: boolean) {
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -143,69 +109,56 @@ async function callAnthropic(message: string, model: string, apiKey: string, rea
     },
     body: JSON.stringify({
       model,
-      max_tokens: 2000,
-      system: systemPrompt,
-      messages: [{ role: 'user', content: message }],
+      max_tokens: 1000,
+      messages: [
+        { 
+          role: 'user', 
+          content: reasoning 
+            ? `Think step by step and provide detailed reasoning: ${message}`
+            : message 
+        }
+      ],
     }),
   });
 
   if (!response.ok) {
-    throw new Error(`Anthropic API error: ${response.status}`);
+    throw new Error(`Anthropic API error: ${response.statusText}`);
   }
 
   const data = await response.json();
-  
-  return {
-    id: data.id || Math.random().toString(36).substr(2, 9),
-    content: data.content[0].text,
-    createdAt: new Date().toISOString(),
-  };
+  return data.content[0].text;
 }
 
-async function callGoogle(message: string, model: string, apiKey: string, reasoning: boolean) {
-  const systemInstruction = reasoning 
-    ? 'You are a helpful assistant. Think through problems step by step and show your reasoning.'
-    : 'You are a helpful assistant.';
-
+async function callGoogle(apiKey: string, model: string, message: string, reasoning: boolean) {
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      system_instruction: { parts: [{ text: systemInstruction }] },
-      contents: [{ parts: [{ text: message }] }],
+      contents: [{
+        parts: [{
+          text: reasoning 
+            ? `Think step by step and provide detailed reasoning: ${message}`
+            : message
+        }]
+      }],
       generationConfig: {
-        maxOutputTokens: 2000,
         temperature: 0.7,
+        maxOutputTokens: 1000,
       },
     }),
   });
 
   if (!response.ok) {
-    throw new Error(`Google API error: ${response.status}`);
+    throw new Error(`Google API error: ${response.statusText}`);
   }
 
   const data = await response.json();
-  
-  return {
-    id: Math.random().toString(36).substr(2, 9),
-    content: data.candidates[0].content.parts[0].text,
-    createdAt: new Date().toISOString(),
-  };
+  return data.candidates[0].content.parts[0].text;
 }
 
-async function callDeepSeek(message: string, model: string, apiKey: string, reasoning: boolean) {
-  const messages = [
-    {
-      role: 'system',
-      content: reasoning 
-        ? 'You are a helpful assistant. Think through problems step by step and show your reasoning.'
-        : 'You are a helpful assistant.'
-    },
-    { role: 'user', content: message }
-  ];
-
+async function callDeepSeek(apiKey: string, model: string, message: string, reasoning: boolean) {
   const response = await fetch('https://api.deepseek.com/chat/completions', {
     method: 'POST',
     headers: {
@@ -214,61 +167,55 @@ async function callDeepSeek(message: string, model: string, apiKey: string, reas
     },
     body: JSON.stringify({
       model,
-      messages,
-      max_tokens: 2000,
+      messages: [
+        { 
+          role: 'system', 
+          content: reasoning 
+            ? 'You are a helpful AI assistant. Think step by step and provide detailed reasoning for your responses.'
+            : 'You are a helpful AI assistant.'
+        },
+        { role: 'user', content: message }
+      ],
       temperature: 0.7,
+      max_tokens: 1000,
     }),
   });
 
   if (!response.ok) {
-    throw new Error(`DeepSeek API error: ${response.status}`);
+    throw new Error(`DeepSeek API error: ${response.statusText}`);
   }
 
   const data = await response.json();
-  
-  return {
-    id: data.id || Math.random().toString(36).substr(2, 9),
-    content: data.choices[0].message.content,
-    createdAt: new Date().toISOString(),
-  };
+  return data.choices[0].message.content;
 }
 
-async function callOpenRouter(message: string, model: string, apiKey: string, reasoning: boolean) {
-  const messages = [
-    {
-      role: 'system',
-      content: reasoning 
-        ? 'You are a helpful assistant. Think through problems step by step and show your reasoning.'
-        : 'You are a helpful assistant.'
-    },
-    { role: 'user', content: message }
-  ];
-
+async function callOpenRouter(apiKey: string, model: string, message: string, reasoning: boolean) {
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://lovable.dev',
-      'X-Title': 'Student Library AI Chat',
     },
     body: JSON.stringify({
       model,
-      messages,
-      max_tokens: 2000,
+      messages: [
+        { 
+          role: 'system', 
+          content: reasoning 
+            ? 'You are a helpful AI assistant. Think step by step and provide detailed reasoning for your responses.'
+            : 'You are a helpful AI assistant.'
+        },
+        { role: 'user', content: message }
+      ],
       temperature: 0.7,
+      max_tokens: 1000,
     }),
   });
 
   if (!response.ok) {
-    throw new Error(`OpenRouter API error: ${response.status}`);
+    throw new Error(`OpenRouter API error: ${response.statusText}`);
   }
 
   const data = await response.json();
-  
-  return {
-    id: data.id || Math.random().toString(36).substr(2, 9),
-    content: data.choices[0].message.content,
-    createdAt: new Date().toISOString(),
-  };
+  return data.choices[0].message.content;
 }
