@@ -19,6 +19,8 @@ serve(async (req) => {
   try {
     const { message, provider, model, reasoning, userId } = await req.json();
 
+    console.log('Received request:', { provider, model, reasoning, userId });
+
     if (!userId) {
       throw new Error('User authentication required');
     }
@@ -33,6 +35,8 @@ serve(async (req) => {
       .eq('user_id', userId)
       .eq('provider', provider)
       .single();
+
+    console.log('API key query result:', { apiKeyData, apiKeyError });
 
     if (apiKeyError || !apiKeyData) {
       throw new Error(`No API key found for ${provider}. Please configure it in Settings.`);
@@ -56,6 +60,8 @@ serve(async (req) => {
       throw new Error(`Unsupported provider: ${provider}`);
     }
 
+    console.log('AI response received');
+
     return new Response(JSON.stringify({ content: response }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -69,6 +75,7 @@ serve(async (req) => {
 });
 
 async function callOpenAI(apiKey: string, model: string, message: string, reasoning: boolean) {
+  console.log('Calling OpenAI API');
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -101,6 +108,7 @@ async function callOpenAI(apiKey: string, model: string, message: string, reason
 }
 
 async function callAnthropic(apiKey: string, model: string, message: string, reasoning: boolean) {
+  console.log('Calling Anthropic API');
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -132,6 +140,7 @@ async function callAnthropic(apiKey: string, model: string, message: string, rea
 }
 
 async function callGoogle(apiKey: string, model: string, message: string, reasoning: boolean) {
+  console.log('Calling Google API');
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
     method: 'POST',
     headers: {
@@ -162,6 +171,7 @@ async function callGoogle(apiKey: string, model: string, message: string, reason
 }
 
 async function callDeepSeek(apiKey: string, model: string, message: string, reasoning: boolean) {
+  console.log('Calling DeepSeek API');
   const response = await fetch('https://api.deepseek.com/chat/completions', {
     method: 'POST',
     headers: {
@@ -194,6 +204,7 @@ async function callDeepSeek(apiKey: string, model: string, message: string, reas
 }
 
 async function callOpenRouter(apiKey: string, model: string, message: string, reasoning: boolean) {
+  console.log('Calling OpenRouter API');
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {

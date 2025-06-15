@@ -49,6 +49,8 @@ export const useAIChatMessages = () => {
     try {
       const { provider, model } = getStoredSettings();
       
+      console.log('Sending message to AI:', { provider, model, reasoning });
+      
       // Call our Supabase edge function
       const { data, error } = await supabase.functions.invoke('ai-chat', {
         body: {
@@ -60,11 +62,15 @@ export const useAIChatMessages = () => {
         }
       });
 
+      console.log('AI response:', { data, error });
+
       if (error) {
+        console.error('Supabase function error:', error);
         throw error;
       }
 
       if (data?.error) {
+        console.error('AI API error:', data.error);
         throw new Error(data.error);
       }
 
