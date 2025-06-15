@@ -64,7 +64,7 @@ export const useAIChatMessages = () => {
         throw error;
       }
 
-      if (data.error) {
+      if (data?.error) {
         throw new Error(data.error);
       }
 
@@ -72,7 +72,7 @@ export const useAIChatMessages = () => {
       const aiMessage: Message = {
         id: Math.random().toString(36).substr(2, 9),
         type: 'ai',
-        content: data.content,
+        content: data?.content || 'No response received',
         timestamp: new Date(),
       };
 

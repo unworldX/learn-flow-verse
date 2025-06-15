@@ -92,7 +92,8 @@ async function callOpenAI(apiKey: string, model: string, message: string, reason
   });
 
   if (!response.ok) {
-    throw new Error(`OpenAI API error: ${response.statusText}`);
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(`OpenAI API error: ${response.status} - ${errorData.error?.message || response.statusText}`);
   }
 
   const data = await response.json();
@@ -122,7 +123,8 @@ async function callAnthropic(apiKey: string, model: string, message: string, rea
   });
 
   if (!response.ok) {
-    throw new Error(`Anthropic API error: ${response.statusText}`);
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(`Anthropic API error: ${response.status} - ${errorData.error?.message || response.statusText}`);
   }
 
   const data = await response.json();
@@ -151,7 +153,8 @@ async function callGoogle(apiKey: string, model: string, message: string, reason
   });
 
   if (!response.ok) {
-    throw new Error(`Google API error: ${response.statusText}`);
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(`Google API error: ${response.status} - ${errorData.error?.message || response.statusText}`);
   }
 
   const data = await response.json();
@@ -182,7 +185,8 @@ async function callDeepSeek(apiKey: string, model: string, message: string, reas
   });
 
   if (!response.ok) {
-    throw new Error(`DeepSeek API error: ${response.statusText}`);
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(`DeepSeek API error: ${response.status} - ${errorData.error?.message || response.statusText}`);
   }
 
   const data = await response.json();
@@ -213,7 +217,8 @@ async function callOpenRouter(apiKey: string, model: string, message: string, re
   });
 
   if (!response.ok) {
-    throw new Error(`OpenRouter API error: ${response.statusText}`);
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(`OpenRouter API error: ${response.status} - ${errorData.error?.message || response.statusText}`);
   }
 
   const data = await response.json();
