@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { BookOpen, Eye, EyeOff } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
 
 const Signup = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -16,11 +17,23 @@ const Signup = () => {
     password: "",
     confirmPassword: "",
   });
+  const [loading, setLoading] = useState(false);
+  const { signUp } = useAuth();
 
-  const handleSignup = (e: React.FormEvent) => {
+  const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    // TODO: Implement Supabase authentication
+    
+    if (formData.password !== formData.confirmPassword) {
+      // Handle password mismatch
+      return;
+    }
+    
+    setLoading(true);
     console.log("Signup attempt:", formData);
+    
+    await signUp(formData.email, formData.password, formData.username);
+    
+    setLoading(false);
   };
 
   const handleChange = (field: string, value: string) => {
@@ -60,6 +73,7 @@ const Signup = () => {
                   onChange={(e) => handleChange("username", e.target.value)}
                   className="bg-white/50"
                   required
+                  disabled={loading}
                 />
               </div>
 
@@ -73,6 +87,7 @@ const Signup = () => {
                   onChange={(e) => handleChange("email", e.target.value)}
                   className="bg-white/50"
                   required
+                  disabled={loading}
                 />
               </div>
               
@@ -87,11 +102,13 @@ const Signup = () => {
                     onChange={(e) => handleChange("password", e.target.value)}
                     className="bg-white/50 pr-10"
                     required
+                    disabled={loading}
                   />
                   <button
                     type="button"
                     onClick={() => setShowPassword(!showPassword)}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    disabled={loading}
                   >
                     {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -109,11 +126,13 @@ const Signup = () => {
                     onChange={(e) => handleChange("confirmPassword", e.target.value)}
                     className="bg-white/50 pr-10"
                     required
+                    disabled={loading}
                   />
                   <button
                     type="button"
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    disabled={loading}
                   >
                     {showConfirmPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                   </button>
@@ -123,8 +142,9 @@ const Signup = () => {
               <Button
                 type="submit"
                 className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 text-white"
+                disabled={loading}
               >
-                Create Account
+                {loading ? "Creating Account..." : "Create Account"}
               </Button>
             </form>
 
