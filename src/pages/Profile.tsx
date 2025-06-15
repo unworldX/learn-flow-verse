@@ -8,8 +8,18 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Progress } from "@/components/ui/progress";
 import { Edit, Trophy, Target, BookOpen, Clock } from "lucide-react";
+import { useAuth } from "@/hooks/useAuth";
+import { useState } from "react";
 
 const Profile = () => {
+  const { user } = useAuth();
+  const [isEditing, setIsEditing] = useState(false);
+
+  // Get user initials for avatar fallback
+  const getInitials = (email: string) => {
+    return email.substring(0, 2).toUpperCase();
+  };
+
   const userStats = [
     {
       label: "Resources Uploaded",
@@ -64,13 +74,24 @@ const Profile = () => {
     }
   ];
 
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-[400px]">
+        <div className="text-lg">Loading profile...</div>
+      </div>
+    );
+  }
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">My Profile</h1>
-        <Button className="flex items-center gap-2">
+        <Button 
+          className="flex items-center gap-2"
+          onClick={() => setIsEditing(!isEditing)}
+        >
           <Edit className="w-4 h-4" />
-          Edit Profile
+          {isEditing ? 'Save Changes' : 'Edit Profile'}
         </Button>
       </div>
 
@@ -86,7 +107,7 @@ const Profile = () => {
               <Avatar className="w-24 h-24">
                 <AvatarImage src="" />
                 <AvatarFallback className="bg-gradient-to-r from-blue-500 to-purple-500 text-white text-2xl">
-                  AS
+                  {getInitials(user.email || 'U')}
                 </AvatarFallback>
               </Avatar>
               <div>
@@ -102,11 +123,20 @@ const Profile = () => {
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="username">Username</Label>
-                <Input id="username" defaultValue="alex_student" />
+                <Input 
+                  id="username" 
+                  defaultValue={user.user_metadata?.username || user.email?.split('@')[0] || ''} 
+                  disabled={!isEditing}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" defaultValue="alex@student.edu" />
+                <Input 
+                  id="email" 
+                  type="email" 
+                  defaultValue={user.email || ''} 
+                  disabled={!isEditing}
+                />
               </div>
             </div>
 
@@ -115,24 +145,41 @@ const Profile = () => {
               <Textarea
                 id="bio"
                 placeholder="Tell us about yourself..."
-                defaultValue="Computer Science student passionate about mathematics and programming. Love sharing knowledge and helping fellow students succeed."
+                defaultValue={user.user_metadata?.bio || ""}
+                disabled={!isEditing}
               />
             </div>
 
             <div className="grid md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="university">University</Label>
-                <Input id="university" defaultValue="University of Technology" />
+                <Input 
+                  id="university" 
+                  defaultValue={user.user_metadata?.university || ""} 
+                  disabled={!isEditing}
+                />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="major">Major</Label>
-                <Input id="major" defaultValue="Computer Science" />
+                <Input 
+                  id="major" 
+                  defaultValue={user.user_metadata?.major || ""} 
+                  disabled={!isEditing}
+                />
               </div>
             </div>
 
-            <Button className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
-              Save Changes
-            </Button>
+            <div className="text-sm text-gray-500 space-y-1">
+              <p>Account created: {new Date(user.created_at).toLocaleDateString()}</p>
+              <p>Last login: {new Date(user.last_sign_in_at || '').toLocaleDateString()}</p>
+              <p>Email verified: {user.email_confirmed_at ? '✅ Yes' : '❌ No'}</p>
+            </div>
+
+            {isEditing && (
+              <Button className="bg-gradient-to-r from-blue-600 to-purple-600 text-white">
+                Save Changes
+              </Button>
+            )}
           </CardContent>
         </Card>
 
