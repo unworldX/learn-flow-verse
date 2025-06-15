@@ -23,7 +23,6 @@ const Resources = () => {
   const [searchQuery, setSearchQuery] = useState("");
   const [selectedSubject, setSelectedSubject] = useState("all");
   const [selectedType, setSelectedType] = useState("all");
-  const [readFilter, setReadFilter] = useState("all");
   const [isUploadOpen, setIsUploadOpen] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
@@ -194,35 +193,37 @@ const Resources = () => {
                 Upload Resource
               </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-lg mx-4 rounded-2xl border-0 shadow-2xl">
+            <DialogContent className="max-w-2xl mx-4 rounded-2xl border-0 shadow-2xl max-h-[90vh] overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="text-xl font-semibold text-slate-800">Upload New Resource</DialogTitle>
                 <DialogDescription className="text-slate-600">Share your study materials with the community</DialogDescription>
               </DialogHeader>
-              <div className="space-y-4 mt-4">
-                <div>
-                  <Label htmlFor="title" className="text-sm font-medium text-slate-700">Resource Title *</Label>
-                  <Input
-                    id="title"
-                    value={uploadData.title}
-                    onChange={(e) => setUploadData(prev => ({ ...prev, title: e.target.value }))}
-                    placeholder="Enter resource title"
-                    className="mt-1 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl h-12"
-                  />
-                </div>
-                
-                <div>
-                  <Label htmlFor="author" className="text-sm font-medium text-slate-700">Author Name</Label>
-                  <Input
-                    id="author"
-                    value={uploadData.author}
-                    onChange={(e) => setUploadData(prev => ({ ...prev, author: e.target.value }))}
-                    placeholder="Enter author name"
-                    className="mt-1 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl h-12"
-                  />
+              <div className="grid gap-6 mt-6">
+                <div className="grid md:grid-cols-2 gap-4">
+                  <div>
+                    <Label htmlFor="title" className="text-sm font-medium text-slate-700">Resource Title *</Label>
+                    <Input
+                      id="title"
+                      value={uploadData.title}
+                      onChange={(e) => setUploadData(prev => ({ ...prev, title: e.target.value }))}
+                      placeholder="Enter resource title"
+                      className="mt-1 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl h-12"
+                    />
+                  </div>
+                  
+                  <div>
+                    <Label htmlFor="author" className="text-sm font-medium text-slate-700">Author Name</Label>
+                    <Input
+                      id="author"
+                      value={uploadData.author}
+                      onChange={(e) => setUploadData(prev => ({ ...prev, author: e.target.value }))}
+                      placeholder="Enter author name"
+                      className="mt-1 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl h-12"
+                    />
+                  </div>
                 </div>
 
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid md:grid-cols-2 gap-4">
                   <div>
                     <Label htmlFor="subject" className="text-sm font-medium text-slate-700">Subject</Label>
                     <Select onValueChange={(value) => setUploadData(prev => ({ ...prev, subject: value }))} value={uploadData.subject}>
@@ -275,7 +276,7 @@ const Resources = () => {
                     value={uploadData.description}
                     onChange={(e) => setUploadData(prev => ({ ...prev, description: e.target.value }))}
                     placeholder="Brief description of the resource"
-                    rows={3}
+                    rows={4}
                     className="mt-1 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl"
                   />
                 </div>
@@ -290,12 +291,14 @@ const Resources = () => {
                     disabled={isUploading}
                     className="mt-1 border-2 border-dashed border-slate-300 hover:border-blue-400 focus:border-blue-500 rounded-xl h-20 file:mr-4 file:py-3 file:px-6 file:rounded-lg file:border-0 file:bg-gradient-to-r file:from-blue-600 file:to-purple-600 file:text-white file:font-medium hover:file:from-blue-700 hover:file:to-purple-700 transition-all duration-300"
                   />
-                  {!uploadData.file && (
+                  {uploadData.file ? (
+                    <p className="text-sm text-green-600 mt-1">File selected: {uploadData.file.name}</p>
+                  ) : (
                     <p className="text-sm text-slate-500 mt-1">No file chosen</p>
                   )}
                 </div>
 
-                <div className="flex gap-3 pt-4">
+                <div className="flex flex-col sm:flex-row gap-3 pt-4">
                   <Button onClick={() => setIsUploadOpen(false)} variant="outline" className="flex-1 rounded-xl border-slate-200">
                     Cancel
                   </Button>
@@ -309,126 +312,147 @@ const Resources = () => {
           </Dialog>
         </div>
 
-        {/* Filters */}
-        <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm rounded-2xl">
-          <CardContent className="p-6 space-y-4">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="flex-1 relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
-                <Input
-                  placeholder="Search resources, authors, subjects..."
-                  className="pl-10 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl h-12"
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                />
-              </div>
-              
-              <Select value={selectedSubject} onValueChange={setSelectedSubject}>
-                <SelectTrigger className="w-full md:w-48 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl h-12">
-                  <SelectValue placeholder="Subject" />
-                </SelectTrigger>
-                <SelectContent className="rounded-xl border-0 shadow-2xl">
-                  <SelectItem value="all" className="rounded-lg">All Subjects</SelectItem>
-                  {subjects.map(subject => (
-                    <SelectItem key={subject} value={subject} className="rounded-lg">{subject}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            
-            <div className="space-y-3">
-              <div className="flex items-center gap-2">
-                <Filter className="w-4 h-4 text-slate-600" />
-                <Label className="text-sm font-medium text-slate-700">Resource Type</Label>
-              </div>
-              <ToggleGroup
-                type="single"
-                value={selectedType}
-                onValueChange={(value) => { if (value) setSelectedType(value) }}
-                className="justify-start flex-wrap"
-              >
-                <ToggleGroupItem value="all" aria-label="All types" className="rounded-xl">All</ToggleGroupItem>
-                {resourceTypes.map(type => (
-                  <ToggleGroupItem key={type.value} value={type.value} aria-label={type.label} className="rounded-xl">{type.label}</ToggleGroupItem>
-                ))}
-              </ToggleGroup>
-            </div>
+        <div className="grid lg:grid-cols-4 gap-6">
+          {/* Filters Sidebar */}
+          <div className="lg:col-span-1 space-y-6">
+            <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm rounded-2xl">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg text-slate-800">
+                  <Search className="w-5 h-5" />
+                  Search & Filters
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label className="text-sm font-medium text-slate-700">Search</Label>
+                  <Input
+                    placeholder="Search resources..."
+                    className="mt-1 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                  />
+                </div>
+                
+                <div>
+                  <Label className="text-sm font-medium text-slate-700">Subject</Label>
+                  <Select value={selectedSubject} onValueChange={setSelectedSubject}>
+                    <SelectTrigger className="mt-1 border-slate-200 focus:border-blue-500 focus:ring-blue-500 rounded-xl">
+                      <SelectValue placeholder="Subject" />
+                    </SelectTrigger>
+                    <SelectContent className="rounded-xl border-0 shadow-2xl">
+                      <SelectItem value="all" className="rounded-lg">All Subjects</SelectItem>
+                      {subjects.map(subject => (
+                        <SelectItem key={subject} value={subject} className="rounded-lg">{subject}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
 
-            <div className="space-y-3">
-              <Label className="text-sm font-medium text-slate-700">Read Status</Label>
-              <ToggleGroup
-                type="single"
-                value={readFilter}
-                onValueChange={(value) => { if (value) setReadFilter(value) }}
-                className="justify-start flex-wrap"
-              >
-                <ToggleGroupItem value="all" aria-label="All" className="rounded-xl">All</ToggleGroupItem>
-                <ToggleGroupItem value="read" aria-label="Read" className="rounded-xl">Read</ToggleGroupItem>
-                <ToggleGroupItem value="unread" aria-label="Unread" className="rounded-xl">Unread</ToggleGroupItem>
-              </ToggleGroup>
-            </div>
-          </CardContent>
-        </Card>
-        
-        {/* Resources Grid */}
-        {isLoading ? (
-          <div className="text-center p-12">
-            <Loader2 className="w-8 h-8 mx-auto animate-spin text-primary" />
-            <p className="mt-4 text-muted-foreground">Loading resources...</p>
-          </div>
-        ) : filteredResources.length > 0 ? (
-          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-            {filteredResources.map(resource => (
-              <Card key={resource.id} className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80 backdrop-blur-sm rounded-2xl group">
-                <CardHeader className="pb-3">
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
-                        {getResourceTypeIcon(resource.resource_type)}
-                      </div>
-                      <div className="flex-1">
-                        <CardTitle className="text-lg leading-tight text-slate-800">{resource.title}</CardTitle>
-                        {resource.author && <CardDescription className="text-slate-600">by {resource.author}</CardDescription>}
-                      </div>
-                    </div>
-                    <Badge variant="secondary" className="rounded-lg">{resource.resource_type}</Badge>
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-4">
-                  <p className="text-sm text-slate-600 line-clamp-3">{resource.description}</p>
-                  <div className="flex gap-2 flex-wrap">
-                    {resource.subject && <Badge variant="outline" className="rounded-lg">{resource.subject}</Badge>}
-                    {resource.class && <Badge variant="outline" className="rounded-lg">{resource.class}</Badge>}
-                  </div>
-                  <Button 
-                    className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-xl group-hover:shadow-lg transition-all duration-300" 
-                    onClick={() => handleDownload(resource.file_url, resource.title)}
+            {/* Download Panel */}
+            <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm rounded-2xl">
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2 text-lg text-slate-800">
+                  <Download className="w-5 h-5" />
+                  Download Panel
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <Label className="text-sm font-medium text-slate-700 mb-3 block">Resource Type</Label>
+                  <ToggleGroup
+                    type="single"
+                    value={selectedType}
+                    onValueChange={(value) => { if (value) setSelectedType(value) }}
+                    className="flex flex-col items-stretch gap-2"
                   >
-                    <Download className="w-4 h-4 mr-2" />
-                    Download
+                    <ToggleGroupItem value="all" aria-label="All types" className="rounded-xl justify-start">
+                      <Filter className="w-4 h-4 mr-2" />
+                      All
+                    </ToggleGroupItem>
+                    {resourceTypes.map(type => {
+                      const Icon = type.icon;
+                      return (
+                        <ToggleGroupItem key={type.value} value={type.value} aria-label={type.label} className="rounded-xl justify-start">
+                          <Icon className="w-4 h-4 mr-2" />
+                          {type.label}
+                        </ToggleGroupItem>
+                      );
+                    })}
+                  </ToggleGroup>
+                </div>
+                <div className="pt-2 border-t border-slate-200">
+                  <p className="text-xs text-slate-500">
+                    {filteredResources.length} resource{filteredResources.length !== 1 ? 's' : ''} found
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+          
+          {/* Resources Grid */}
+          <div className="lg:col-span-3">
+            {isLoading ? (
+              <div className="text-center p-12">
+                <Loader2 className="w-8 h-8 mx-auto animate-spin text-primary" />
+                <p className="mt-4 text-muted-foreground">Loading resources...</p>
+              </div>
+            ) : filteredResources.length > 0 ? (
+              <div className="grid gap-6 md:grid-cols-2 xl:grid-cols-3">
+                {filteredResources.map(resource => (
+                  <Card key={resource.id} className="border-0 shadow-lg hover:shadow-xl transition-all duration-300 bg-white/80 backdrop-blur-sm rounded-2xl group">
+                    <CardHeader className="pb-3">
+                      <div className="flex items-start justify-between">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center text-white">
+                            {getResourceTypeIcon(resource.resource_type)}
+                          </div>
+                          <div className="flex-1">
+                            <CardTitle className="text-lg leading-tight text-slate-800 line-clamp-2">{resource.title}</CardTitle>
+                            {resource.author && <CardDescription className="text-slate-600">by {resource.author}</CardDescription>}
+                          </div>
+                        </div>
+                        <Badge variant="secondary" className="rounded-lg shrink-0">{resource.resource_type}</Badge>
+                      </div>
+                    </CardHeader>
+                    <CardContent className="space-y-4">
+                      <p className="text-sm text-slate-600 line-clamp-3">{resource.description}</p>
+                      <div className="flex gap-2 flex-wrap">
+                        {resource.subject && <Badge variant="outline" className="rounded-lg text-xs">{resource.subject}</Badge>}
+                        {resource.class && <Badge variant="outline" className="rounded-lg text-xs">{resource.class}</Badge>}
+                      </div>
+                      <Button 
+                        className="w-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-xl group-hover:shadow-lg transition-all duration-300" 
+                        onClick={() => handleDownload(resource.file_url, resource.title)}
+                      >
+                        <Download className="w-4 h-4 mr-2" />
+                        Download
+                      </Button>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm rounded-2xl">
+                <CardContent className="p-12 text-center">
+                  <BookOpen className="w-16 h-16 text-slate-300 mx-auto mb-4" />
+                  <h3 className="text-xl font-semibold mb-2 text-slate-800">No resources found</h3>
+                  <p className="text-slate-600 mb-6">
+                    Try adjusting your search or filters, or be the first to share study materials.
+                  </p>
+                  <Button 
+                    onClick={() => setIsUploadOpen(true)}
+                    className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-xl"
+                  >
+                    <Upload className="w-4 h-4 mr-2" />
+                    Upload a Resource
                   </Button>
                 </CardContent>
               </Card>
-            ))}
+            )}
           </div>
-        ) : (
-          <Card className="border-0 shadow-xl bg-white/80 backdrop-blur-sm rounded-2xl">
-            <CardContent className="p-12 text-center">
-              <BookOpen className="w-16 h-16 text-slate-300 mx-auto mb-4" />
-              <h3 className="text-xl font-semibold mb-2 text-slate-800">No resources found</h3>
-              <p className="text-slate-600 mb-6">
-                Try adjusting your search or filters, or be the first to share study materials.
-              </p>
-              <Button 
-                onClick={() => setIsUploadOpen(true)}
-                className="bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 rounded-xl"
-              >
-                <Upload className="w-4 h-4 mr-2" />
-                Upload a Resource
-              </Button>
-            </CardContent>
-          </Card>
-        )}
+        </div>
       </div>
     </div>
   );
