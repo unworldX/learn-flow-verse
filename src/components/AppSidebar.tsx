@@ -28,6 +28,7 @@ import {
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
 import { useAuth } from "@/hooks/useAuth"
+import { Badge } from "@/components/ui/badge"
 
 const items = [
   {
@@ -75,7 +76,7 @@ const chatItems = [
   },
   {
     title: "Direct Messages",
-    url: "/chats",
+    url: null, // No URL means it's coming soon
     icon: MessageCircle,
   },
   {
@@ -130,12 +131,22 @@ export function AppSidebar() {
             <SidebarMenu>
               {chatItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild className="hover:bg-slate-100 rounded-lg mx-2 transition-all duration-200">
-                    <a href={item.url} className="flex items-center gap-3 px-3 py-2">
-                      <item.icon className="w-5 h-5" />
-                      <span className="font-medium">{item.title}</span>
-                    </a>
-                  </SidebarMenuButton>
+                  {item.url ? (
+                    <SidebarMenuButton asChild className="hover:bg-slate-100 rounded-lg mx-2 transition-all duration-200">
+                      <a href={item.url} className="flex items-center gap-3 px-3 py-2">
+                        <item.icon className="w-5 h-5" />
+                        <span className="font-medium">{item.title}</span>
+                      </a>
+                    </SidebarMenuButton>
+                  ) : (
+                    <div className="flex items-center justify-between gap-3 px-5 py-2 text-slate-500 cursor-not-allowed">
+                       <div className="flex items-center gap-3">
+                        <item.icon className="w-5 h-5" />
+                        <span className="font-medium">{item.title}</span>
+                      </div>
+                      <Badge variant="outline" className="text-xs">Coming Soon</Badge>
+                    </div>
+                  )}
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
