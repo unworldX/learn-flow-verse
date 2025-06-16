@@ -3,16 +3,10 @@ import { useState } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-
-interface Message {
-  id: string;
-  type: 'user' | 'ai';
-  content: string;
-  timestamp: Date;
-}
+import { AIMessage } from '@/types/ai';
 
 export const useAIChatMessages = () => {
-  const [messages, setMessages] = useState<Message[]>([]);
+  const [messages, setMessages] = useState<AIMessage[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const { user } = useAuth();
   const { toast } = useToast();
@@ -54,7 +48,6 @@ export const useAIChatMessages = () => {
 
     const { provider, model } = getStoredSettings();
     
-    // Check if API key exists for the selected provider
     const hasApiKey = await checkApiKeyExists(provider);
     if (!hasApiKey) {
       toast({
@@ -65,8 +58,7 @@ export const useAIChatMessages = () => {
       return;
     }
 
-    // Add user message immediately
-    const userMessage: Message = {
+    const userMessage: AIMessage = {
       id: Math.random().toString(36).substr(2, 9),
       type: 'user',
       content: content.trim(),
@@ -79,7 +71,6 @@ export const useAIChatMessages = () => {
     try {
       console.log('Sending message to AI:', { provider, model, reasoning });
       
-      // Call our Supabase edge function
       const { data, error } = await supabase.functions.invoke('ai-chat', {
         body: {
           message: content.trim(),
@@ -102,8 +93,7 @@ export const useAIChatMessages = () => {
         throw new Error(data.error);
       }
 
-      // Add AI response
-      const aiMessage: Message = {
+      const aiMessage: AIMessage = {
         id: Math.random().toString(36).substr(2, 9),
         type: 'ai',
         content: data?.content || 'No response received',
@@ -114,8 +104,7 @@ export const useAIChatMessages = () => {
     } catch (error: any) {
       console.error('Error sending message:', error);
       
-      // Add error message
-      const errorMessage: Message = {
+      const errorMessage: AIMessage = {
         id: Math.random().toString(36).substr(2, 9),
         type: 'ai',
         content: 'Sorry, I encountered an error while processing your message. Please make sure your API keys are configured in Settings.',
@@ -134,9 +123,14 @@ export const useAIChatMessages = () => {
     }
   };
 
+  const clearMessages = () => {
+    setMessages([]);
+  };
+
   return {
     messages,
     sendMessage,
+    clearMessages,
     isLoading
   };
 };

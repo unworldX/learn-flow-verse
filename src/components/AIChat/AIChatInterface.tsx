@@ -4,12 +4,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Send, Bot, User, Calculator, BookOpen, Lightbulb, Brain, Upload, Settings } from 'lucide-react';
+import { Send, Bot, Upload, Settings } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
 import { useAuth } from '@/hooks/useAuth';
 import { useAIChatMessages } from '@/hooks/useAIChatMessages';
 import { Link } from 'react-router-dom';
+import WelcomeScreen from './WelcomeScreen';
+import ChatMessage from './ChatMessage';
+import TypingIndicator from './TypingIndicator';
 
 const AIChatInterface = () => {
   const { user } = useAuth();
@@ -51,13 +53,6 @@ const AIChatInterface = () => {
     }
   };
 
-  const quickPrompts = [
-    { icon: Calculator, text: "Help me solve this math problem", color: "bg-blue-500" },
-    { icon: BookOpen, text: "Explain this concept to me", color: "bg-green-500" },
-    { icon: Lightbulb, text: "Give me study tips", color: "bg-yellow-500" },
-    { icon: Brain, text: "Create a study plan", color: "bg-purple-500" }
-  ];
-
   const handleQuickPrompt = (prompt: string) => {
     setInput(prompt);
     inputRef.current?.focus();
@@ -84,7 +79,7 @@ const AIChatInterface = () => {
 
   return (
     <div className="h-full bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col">
-      {/* Header - Mobile optimized */}
+      {/* Header */}
       <div className="bg-white/80 backdrop-blur-md border-b border-slate-200 p-3 md:p-4 shadow-sm">
         <div className="max-w-4xl mx-auto flex items-center justify-between">
           <div className="flex items-center gap-2 md:gap-3">
@@ -107,96 +102,20 @@ const AIChatInterface = () => {
         <ScrollArea className="h-full">
           <div className="max-w-4xl mx-auto p-3 md:p-6 space-y-3 md:space-y-4">
             {messages.length === 0 ? (
-              <div className="text-center py-6 md:py-12">
-                <div className="w-12 h-12 md:w-16 md:h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl flex items-center justify-center mx-auto mb-3 md:mb-4 shadow-xl">
-                  <Bot className="w-6 h-6 md:w-8 md:h-8 text-white" />
-                </div>
-                <h3 className="text-base md:text-lg font-semibold text-slate-800 mb-2">
-                  Welcome to your AI Study Assistant!
-                </h3>
-                <p className="text-xs md:text-sm text-slate-600 mb-4 md:mb-6 max-w-md mx-auto px-4">
-                  I'm here to help you learn, solve problems, and achieve your academic goals. Ask me anything!
-                </p>
-                <div className="grid grid-cols-1 gap-2 md:gap-3 max-w-lg mx-auto px-4">
-                  {quickPrompts.map((prompt, index) => (
-                    <Button
-                      key={index}
-                      variant="outline"
-                      onClick={() => handleQuickPrompt(prompt.text)}
-                      className="p-2 md:p-3 h-auto text-left border-2 border-slate-200 hover:border-blue-300 hover:bg-blue-50 rounded-xl transition-all duration-300 group"
-                    >
-                      <div className="flex items-center gap-2 md:gap-3">
-                        <div className={`w-6 h-6 md:w-8 md:h-8 ${prompt.color} rounded-lg flex items-center justify-center text-white group-hover:scale-110 transition-transform duration-300`}>
-                          <prompt.icon className="w-3 h-3 md:w-4 md:h-4" />
-                        </div>
-                        <span className="font-medium text-slate-800 text-xs md:text-sm">{prompt.text}</span>
-                      </div>
-                    </Button>
-                  ))}
-                </div>
-              </div>
+              <WelcomeScreen onPromptClick={handleQuickPrompt} />
             ) : (
               messages.map((message, index) => (
-                <div key={index} className={`flex gap-2 md:gap-3 ${message.type === 'user' ? 'justify-end' : 'justify-start'}`}>
-                  {message.type === 'ai' && (
-                    <Avatar className="w-6 h-6 md:w-8 md:h-8 border-2 border-white shadow-lg flex-shrink-0">
-                      <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white">
-                        <Bot className="w-3 h-3 md:w-4 md:h-4" />
-                      </AvatarFallback>
-                    </Avatar>
-                  )}
-                  <div className={`max-w-[90%] md:max-w-[75%] ${
-                    message.type === 'user' 
-                      ? 'bg-gradient-to-br from-blue-500 to-purple-600 text-white' 
-                      : 'bg-white border border-slate-200 shadow-lg'
-                  } rounded-xl p-3 md:p-4`}>
-                    <div className={`prose max-w-none ${message.type === 'user' ? 'prose-invert' : ''}`}>
-                      <p className="mb-0 text-xs md:text-sm leading-relaxed whitespace-pre-wrap">
-                        {message.content}
-                      </p>
-                    </div>
-                    <div className={`text-xs mt-1 md:mt-2 ${
-                      message.type === 'user' ? 'text-blue-100' : 'text-slate-500'
-                    }`}>
-                      {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </div>
-                  </div>
-                  {message.type === 'user' && (
-                    <Avatar className="w-6 h-6 md:w-8 md:h-8 border-2 border-white shadow-lg flex-shrink-0">
-                      <AvatarFallback className="bg-gradient-to-br from-slate-600 to-slate-700 text-white">
-                        <User className="w-3 h-3 md:w-4 md:h-4" />
-                      </AvatarFallback>
-                    </Avatar>
-                  )}
-                </div>
+                <ChatMessage key={index} message={message} />
               ))
             )}
 
-            {isLoading && (
-              <div className="flex gap-2 md:gap-3 justify-start">
-                <Avatar className="w-6 h-6 md:w-8 md:h-8 border-2 border-white shadow-lg">
-                  <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white">
-                    <Bot className="w-3 h-3 md:w-4 md:h-4" />
-                  </AvatarFallback>
-                </Avatar>
-                <div className="bg-white border border-slate-200 shadow-lg rounded-xl p-3 md:p-4 max-w-[70%]">
-                  <div className="flex items-center gap-2">
-                    <div className="flex space-x-1">
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce"></div>
-                      <div className="w-2 h-2 bg-purple-500 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                      <div className="w-2 h-2 bg-blue-500 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                    </div>
-                    <span className="text-xs md:text-sm text-slate-600">AI is thinking...</span>
-                  </div>
-                </div>
-              </div>
-            )}
+            {isLoading && <TypingIndicator />}
             <div ref={messagesEndRef} />
           </div>
         </ScrollArea>
       </div>
 
-      {/* Input Area - Mobile optimized */}
+      {/* Input Area */}
       <div className="bg-white/80 backdrop-blur-md border-t border-slate-200 p-3 md:p-4 shadow-lg">
         <div className="max-w-4xl mx-auto">
           <div className="flex flex-col gap-2">

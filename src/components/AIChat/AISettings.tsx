@@ -1,73 +1,35 @@
-import React, { useState, useEffect } from 'react';
+
+import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
-import { Bot, Key, Shield, Trash2, Save, RefreshCw, Loader2, Edit } from 'lucide-react';
-import { useToast } from '@/hooks/use-toast';
+import { Bot, Shield, Trash2, Save, RefreshCw } from 'lucide-react';
 import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
+import { useAISettings } from '@/hooks/useAISettings';
+import { AI_PROVIDERS, PROVIDER_KEYS } from '@/config/aiProviders';
 import SecureKeyManager from './SecureKeyManager';
-
-const AI_PROVIDERS = {
-  openai: {
-    name: 'OpenAI',
-    models: ['gpt-4o-mini', 'gpt-4o'],
-    description: 'GPT models and advanced AI capabilities',
-    keyName: 'openai_api_key',
-    website: 'https://platform.openai.com/',
-    placeholder: 'sk-...',
-    fetchModels: false
-  },
-  anthropic: {
-    name: 'Anthropic',
-    models: ['claude-opus-4-20250514', 'claude-sonnet-4-20250514'],
-    description: 'Claude models for thoughtful AI conversations',
-    keyName: 'anthropic_api_key',
-    website: 'https://console.anthropic.com/',
-    placeholder: 'sk-ant-...',
-    fetchModels: false
-  },
-  google: {
-    name: 'Google AI',
-    models: ['gemini-1.5-flash', 'gemini-1.5-pro'],
-    description: 'Gemini models and Google AI services',
-    keyName: 'google_api_key',
-    website: 'https://makersuite.google.com/',
-    placeholder: 'AIza...',
-    fetchModels: false
-  },
-  deepseek: {
-    name: 'DeepSeek',
-    models: ['deepseek-chat', 'deepseek-coder'],
-    description: 'Advanced reasoning and coding models',
-    keyName: 'deepseek_api_key',
-    website: 'https://platform.deepseek.com/',
-    placeholder: 'sk-...',
-    fetchModels: false
-  },
-  openrouter: {
-    name: 'OpenRouter',
-    models: [], // Will be fetched dynamically
-    description: 'Access to multiple AI models through OpenRouter',
-    keyName: 'openrouter_api_key',
-    website: 'https://openrouter.ai/',
-    placeholder: 'sk-or-...',
-    fetchModels: true
-  }
-};
-
-const ALL_PROVIDER_KEYS = Object.keys(AI_PROVIDERS);
+import ProviderCard from './ProviderCard';
+import ModelSelector from './ModelSelector';
 
 const AISettings = () => {
-  const { toast } = useToast();
   const { user } = useAuth();
-  const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
-  const [savedModels, setSavedModels] = useState<Record<string, string>>({});
-  const [isLoading, setIsLoading] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [fetchingModels, setFetchingModels] = useState<Record<string, boolean>>({});
-  const [dynamicModels, setDynamicModels] = useState<Record<string, string[]>>({});
+  const {
+    apiKeys,
+    savedModels,
+    dynamicModels,
+    isLoading,
+    fetchingModels,
+    provider,
+    model,
+    setProvider,
+    setModel,
+    saveApiKey,
+    fetchOpenRouterModels,
+    getCurrentModels,
+    clearAllApiKeys,
+    saveSettings
+  } = useAISettings();
+
   const [secureKeyManager, setSecureKeyManager] = useState<{
     isOpen: boolean;
     provider: string;
@@ -80,244 +42,31 @@ const AISettings = () => {
     currentKey: ''
   });
 
-  // Provider/model selection
-  const [provider, setProvider] = useState(() =>
-    localStorage.getItem('ai-provider') || ALL_PROVIDER_KEYS[0]
-  );
-  const [model, setModel] = useState(() =>
-    localStorage.getItem('ai-model') ||
-    AI_PROVIDERS[localStorage.getItem('ai-provider') as keyof typeof AI_PROVIDERS]?.models[0] ||
-    AI_PROVIDERS[ALL_PROVIDER_KEYS[0]].models[0]
-  );
-
-  // Load API keys and models for the current user
-  useEffect(() => {
-    if (user) {
-      loadUserApiKeys();
-    }
-  }, [user]);
-
-  const loadUserApiKeys = async () => {
-    if (!user) return;
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('user_api_keys')
-        .select('provider, encrypted_key, model')
-        .eq('user_id', user.id);
-
-      if (error) throw error;
-
-      const keys: Record<string, string> = {};
-      const models: Record<string, string> = {};
-      data?.forEach((item: any) => {
-        keys[item.provider + '_api_key'] = item.encrypted_key || '';
-        if (item.model) {
-          models[item.provider] = item.model;
-        }
-      });
-      setApiKeys(keys);
-      setSavedModels(models);
-
-      // Update current model if we have a saved one for the current provider
-      if (models[provider]) {
-        setModel(models[provider]);
-        localStorage.setItem('ai-model', models[provider]);
-      }
-    } catch (error) {
-      console.error('Error loading API keys:', error);
-      toast({
-        title: "Error loading API keys",
-        description: "Failed to load your saved API keys.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const fetchOpenRouterModels = async (apiKey: string) => {
-    setFetchingModels(prev => ({ ...prev, openrouter: true }));
-    try {
-      const response = await fetch('https://openrouter.ai/api/v1/models', {
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-        },
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch models');
-      }
-
-      const data = await response.json();
-      const modelIds = data.data?.map((model: any) => model.id) || [];
-      
-      setDynamicModels(prev => ({ ...prev, openrouter: modelIds }));
-      
-      toast({
-        title: "Models loaded",
-        description: `Fetched ${modelIds.length} OpenRouter models`,
-      });
-    } catch (error) {
-      console.error('Error fetching OpenRouter models:', error);
-      toast({
-        title: "Error fetching models",
-        description: "Failed to load OpenRouter models. Check your API key.",
-        variant: "destructive"
-      });
-    } finally {
-      setFetchingModels(prev => ({ ...prev, openrouter: false }));
-    }
-  };
-
-  const getCurrentModels = (providerKey: string) => {
-    if (AI_PROVIDERS[providerKey].fetchModels && dynamicModels[providerKey]) {
-      return dynamicModels[providerKey];
-    }
-    return AI_PROVIDERS[providerKey].models;
-  };
+  const [isSaving, setIsSaving] = useState(false);
 
   const openSecureKeyManager = (providerKey: string) => {
-    const provider = AI_PROVIDERS[providerKey];
+    const providerConfig = AI_PROVIDERS[providerKey];
     setSecureKeyManager({
       isOpen: true,
       provider: providerKey,
-      providerName: provider.name,
-      currentKey: apiKeys[provider.keyName] || ''
+      providerName: providerConfig.name,
+      currentKey: apiKeys[providerConfig.keyName] || ''
     });
   };
 
   const handleKeySaved = async (providerKey: string, newKey: string) => {
-    const keyName = AI_PROVIDERS[providerKey].keyName;
-    setApiKeys(prev => ({ ...prev, [keyName]: newKey }));
+    await saveApiKey(providerKey, newKey);
     
-    // Save the current model for this provider when API key is saved
-    await saveModelForProvider(providerKey, savedModels[providerKey] || getCurrentModels(providerKey)[0]);
-    
-    // Auto-fetch models for OpenRouter when API key is saved
     if (providerKey === 'openrouter' && newKey.trim()) {
       fetchOpenRouterModels(newKey.trim());
     }
   };
 
-  const saveModelForProvider = async (providerKey: string, modelToSave: string) => {
-    if (!user) return;
-
-    try {
-      // First check if a record exists for this provider
-      const { data: existingData, error: selectError } = await supabase
-        .from('user_api_keys')
-        .select('id')
-        .eq('user_id', user.id)
-        .eq('provider', providerKey)
-        .maybeSingle();
-
-      if (selectError) throw selectError;
-
-      if (existingData) {
-        // Update existing record
-        const { error } = await supabase
-          .from('user_api_keys')
-          .update({ model: modelToSave })
-          .eq('user_id', user.id)
-          .eq('provider', providerKey);
-
-        if (error) throw error;
-      } else {
-        // Create new record with empty encrypted_key for model-only save
-        const { error } = await supabase
-          .from('user_api_keys')
-          .insert({
-            user_id: user.id,
-            provider: providerKey,
-            encrypted_key: '',
-            model: modelToSave
-          });
-
-        if (error) throw error;
-      }
-
-      setSavedModels(prev => ({ ...prev, [providerKey]: modelToSave }));
-    } catch (error) {
-      console.error('Error saving model:', error);
-      toast({
-        title: "Error saving model",
-        description: "Failed to save model selection.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  const saveSettings = async () => {
-    if (!user) {
-      toast({
-        title: "Authentication required",
-        description: "Please sign in to save settings.",
-        variant: "destructive"
-      });
-      return;
-    }
-
+  const handleSaveSettings = async () => {
     setIsSaving(true);
-    try {
-      localStorage.setItem('ai-provider', provider);
-      localStorage.setItem('ai-model', model);
-
-      // Save the model for the current provider in the database
-      await saveModelForProvider(provider, model);
-
-      toast({
-        title: "Settings saved",
-        description: "Your AI provider and model settings have been saved."
-      });
-    } catch (error) {
-      console.error('Error saving settings:', error);
-      toast({
-        title: "Error saving settings",
-        description: "Failed to save your settings. Please try again.",
-        variant: "destructive"
-      });
-    } finally {
-      setIsSaving(false);
-    }
+    await saveSettings();
+    setIsSaving(false);
   };
-
-  const clearAllApiKeys = async () => {
-    if (!user) return;
-    try {
-      await supabase
-        .from('user_api_keys')
-        .delete()
-        .eq('user_id', user.id);
-
-      setApiKeys({});
-      setSavedModels({});
-      setDynamicModels({});
-      toast({
-        title: "API Keys Cleared",
-        description: "All API keys have been removed."
-      });
-    } catch (error) {
-      console.error('Error clearing API keys:', error);
-      toast({
-        title: "Error clearing API keys",
-        description: "Failed to clear API keys. Please try again.",
-        variant: "destructive"
-      });
-    }
-  };
-
-  // Update models when provider changes
-  useEffect(() => {
-    const currentModels = getCurrentModels(provider);
-    
-    // Check if we have a saved model for this provider
-    if (savedModels[provider]) {
-      setModel(savedModels[provider]);
-    } else if (!currentModels.includes(model)) {
-      setModel(currentModels[0] || '');
-    }
-  }, [provider, dynamicModels, savedModels]);
 
   if (!user) {
     return (
@@ -363,10 +112,9 @@ const AISettings = () => {
             </div>
           </div>
 
-          {/* Provider Settings */}
           <Tabs value={provider} onValueChange={setProvider}>
             <TabsList className="grid grid-cols-5 w-full mb-6">
-              {ALL_PROVIDER_KEYS.map(p => (
+              {PROVIDER_KEYS.map(p => (
                 <TabsTrigger 
                   key={p}
                   value={p}
@@ -376,121 +124,31 @@ const AISettings = () => {
                 </TabsTrigger>
               ))}
             </TabsList>
-            {ALL_PROVIDER_KEYS.map((p) => (
+            
+            {PROVIDER_KEYS.map((p) => (
               <TabsContent value={p} key={p}>
                 <div className="space-y-4">
-                  <Card className="border-gray-200 hover:border-gray-300 transition-all duration-200 hover:shadow-md">
-                    <CardHeader className="pb-3">
-                      <div className="flex items-center justify-between">
-                        <div>
-                          <CardTitle className="text-base font-semibold text-gray-800 flex items-center gap-2">
-                            {AI_PROVIDERS[p].name}
-                            {AI_PROVIDERS[p].fetchModels && (
-                              <Badge variant="secondary" className="text-xs">Real-time Models</Badge>
-                            )}
-                          </CardTitle>
-                          <CardDescription className="text-sm text-gray-600 mt-1">
-                            {AI_PROVIDERS[p].description}
-                          </CardDescription>
-                        </div>
-                        <Button
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => window.open(AI_PROVIDERS[p].website, '_blank')}
-                          className="text-blue-600 hover:text-blue-700 hover:bg-blue-50"
-                        >Get API Key</Button>
-                      </div>
-                    </CardHeader>
-                    <CardContent className="pt-0">
-                      <div className="flex items-center gap-2">
-                        {apiKeys[AI_PROVIDERS[p].keyName] ? (
-                          <>
-                            <div className="flex-1 px-3 py-2 bg-green-50 border border-green-200 rounded-lg">
-                              <div className="flex items-center gap-2">
-                                <Key className="w-4 h-4 text-green-600" />
-                                <span className="text-sm text-green-700 font-medium">API Key Configured</span>
-                              </div>
-                            </div>
-                            <Button
-                              variant="outline"
-                              size="sm"
-                              onClick={() => openSecureKeyManager(p)}
-                              className="text-blue-600 hover:text-blue-700"
-                            >
-                              <Edit className="w-4 h-4 mr-1" />
-                              Edit
-                            </Button>
-                          </>
-                        ) : (
-                          <Button
-                            onClick={() => openSecureKeyManager(p)}
-                            className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-                          >
-                            <Key className="w-4 h-4 mr-2" />
-                            Add API Key
-                          </Button>
-                        )}
-                      </div>
-                      {AI_PROVIDERS[p].fetchModels && apiKeys[AI_PROVIDERS[p].keyName] && (
-                        <div className="mt-2 flex items-center gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => fetchOpenRouterModels(apiKeys[AI_PROVIDERS[p].keyName])}
-                            disabled={fetchingModels[p]}
-                            className="text-xs"
-                          >
-                            {fetchingModels[p] ? (
-                              <>
-                                <Loader2 className="w-3 h-3 mr-1 animate-spin" />
-                                Fetching...
-                              </>
-                            ) : (
-                              <>
-                                <RefreshCw className="w-3 h-3 mr-1" />
-                                Refresh Models
-                              </>
-                            )}
-                          </Button>
-                          {dynamicModels[p] && (
-                            <span className="text-xs text-gray-600">
-                              {dynamicModels[p].length} models available
-                            </span>
-                          )}
-                        </div>
-                      )}
-                    </CardContent>
-                  </Card>
-                  {/* Model select */}
-                  <div>
-                    <label className="text-sm font-medium text-slate-800 mb-2 block">
-                      Default Model
-                      {savedModels[p] && (
-                        <Badge variant="secondary" className="ml-2 text-xs">
-                          Saved: {savedModels[p]}
-                        </Badge>
-                      )}
-                    </label>
-                    <select
-                      value={provider === p ? model : (savedModels[p] || getCurrentModels(p)[0])}
-                      onChange={e => {
-                        if (provider === p) {
-                          setModel(e.target.value);
-                        }
-                      }}
-                      className="w-full border-slate-200 rounded-xl h-11 px-3 text-base bg-white"
-                      disabled={provider !== p}
-                    >
-                      {getCurrentModels(p).map(m => (
-                        <option key={m} value={m}>{m}</option>
-                      ))}
-                    </select>
-                    {AI_PROVIDERS[p].fetchModels && !dynamicModels[p] && apiKeys[AI_PROVIDERS[p].keyName] && (
-                      <p className="text-xs text-gray-500 mt-1">
-                        Click "Refresh Models" to load available models
-                      </p>
-                    )}
-                  </div>
+                  <ProviderCard
+                    provider={AI_PROVIDERS[p]}
+                    hasApiKey={!!apiKeys[AI_PROVIDERS[p].keyName]}
+                    onEditKey={() => openSecureKeyManager(p)}
+                    onRefreshModels={p === 'openrouter' ? () => fetchOpenRouterModels(apiKeys[AI_PROVIDERS[p].keyName]) : undefined}
+                    isRefreshing={fetchingModels[p]}
+                    modelCount={dynamicModels[p]?.length}
+                  />
+                  
+                  <ModelSelector
+                    models={getCurrentModels(p)}
+                    selectedModel={provider === p ? model : (savedModels[p] || getCurrentModels(p)[0])}
+                    savedModel={savedModels[p]}
+                    onModelChange={(newModel) => {
+                      if (provider === p) {
+                        setModel(newModel);
+                      }
+                    }}
+                    disabled={provider !== p}
+                    providerName={AI_PROVIDERS[p].name}
+                  />
                 </div>
               </TabsContent>
             ))}
@@ -507,7 +165,7 @@ const AISettings = () => {
             </Button>
             
             <Button 
-              onClick={saveSettings}
+              onClick={handleSaveSettings}
               disabled={isSaving || isLoading}
               className="gap-2 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg hover:shadow-xl transition-all duration-300"
             >
@@ -519,6 +177,7 @@ const AISettings = () => {
               {isSaving ? 'Saving...' : 'Save Settings'}
             </Button>
           </div>
+          
           <div className="text-xs text-gray-500 text-center pt-4 border-t border-gray-100">
             API keys are encrypted and securely stored. Authentication required to edit keys.
           </div>
