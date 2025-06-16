@@ -37,7 +37,7 @@ export const useAISettings = () => {
     try {
       const { data, error } = await supabase
         .from('user_api_keys')
-        .select('provider, encrypted_key, model')
+        .select('id, provider, encrypted_key, model')
         .eq('user_id', user.id);
 
       if (error) throw error;
