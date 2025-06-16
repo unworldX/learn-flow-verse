@@ -192,7 +192,7 @@ const AISettings = () => {
     setApiKeys(prev => ({ ...prev, [keyName]: newKey }));
     
     // Save the current model for this provider when API key is saved
-    await saveModelForProvider(providerKey, model);
+    await saveModelForProvider(providerKey, savedModels[providerKey] || getCurrentModels(providerKey)[0]);
     
     // Auto-fetch models for OpenRouter when API key is saved
     if (providerKey === 'openrouter' && newKey.trim()) {
@@ -204,17 +204,47 @@ const AISettings = () => {
     if (!user) return;
 
     try {
-      const { error } = await supabase
+      // First check if a record exists for this provider
+      const { data: existingData, error: selectError } = await supabase
         .from('user_api_keys')
-        .update({ model: modelToSave })
+        .select('id')
         .eq('user_id', user.id)
-        .eq('provider', providerKey);
+        .eq('provider', providerKey)
+        .maybeSingle();
 
-      if (error) throw error;
+      if (selectError) throw selectError;
+
+      if (existingData) {
+        // Update existing record
+        const { error } = await supabase
+          .from('user_api_keys')
+          .update({ model: modelToSave })
+          .eq('user_id', user.id)
+          .eq('provider', providerKey);
+
+        if (error) throw error;
+      } else {
+        // Create new record with empty encrypted_key for model-only save
+        const { error } = await supabase
+          .from('user_api_keys')
+          .insert({
+            user_id: user.id,
+            provider: providerKey,
+            encrypted_key: '',
+            model: modelToSave
+          });
+
+        if (error) throw error;
+      }
 
       setSavedModels(prev => ({ ...prev, [providerKey]: modelToSave }));
     } catch (error) {
       console.error('Error saving model:', error);
+      toast({
+        title: "Error saving model",
+        description: "Failed to save model selection.",
+        variant: "destructive"
+      });
     }
   };
 
