@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -12,6 +11,7 @@ import ProviderCard from './ProviderCard';
 import ModelSelector from './ModelSelector';
 import ProviderHealthCheck from './ProviderHealthCheck';
 import SmartDefaults from './SmartDefaults';
+import DebugPanel from './DebugPanel';
 
 const AISettings = () => {
   const { user } = useAuth();
@@ -72,6 +72,7 @@ const AISettings = () => {
   };
 
   const handleProviderChange = (newProvider: string) => {
+    console.log('Provider changed from', provider, 'to', newProvider);
     setProvider(newProvider);
     // Auto-select the best available model for this provider
     const availableModels = getCurrentModels(newProvider);
@@ -103,6 +104,8 @@ const AISettings = () => {
 
   return (
     <div className="space-y-6">
+      <DebugPanel />
+      
       <SmartDefaults 
         onProviderChange={setProvider}
         onModelChange={setModel}

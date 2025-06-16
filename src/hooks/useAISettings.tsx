@@ -59,12 +59,22 @@ export const useAISettings = () => {
       const keys: Record<string, string> = {};
       const models: Record<string, string> = {};
       
+      console.log('Loaded API keys from database:', data?.map(item => ({ 
+        provider: item.provider, 
+        hasKey: !!item.encrypted_key,
+        model: item.model 
+      })));
+      
       data?.forEach((item: UserAPIKey) => {
         if (item.encrypted_key && item.encrypted_key.trim()) {
-          keys[item.provider + '_api_key'] = item.encrypted_key;
+          // Normalize provider name for consistency
+          const normalizedProvider = item.provider.toLowerCase().trim();
+          const keyName = AI_PROVIDERS[normalizedProvider]?.keyName || `${normalizedProvider}_api_key`;
+          keys[keyName] = item.encrypted_key;
         }
         if (item.model) {
-          models[item.provider] = item.model;
+          const normalizedProvider = item.provider.toLowerCase().trim();
+          models[normalizedProvider] = item.model;
         }
       });
       
@@ -73,15 +83,17 @@ export const useAISettings = () => {
 
       // Auto-fetch models for providers that support it
       data?.forEach((item: UserAPIKey) => {
-        if (item.provider === 'openrouter' && item.encrypted_key) {
+        const normalizedProvider = item.provider.toLowerCase().trim();
+        if (normalizedProvider === 'openrouter' && item.encrypted_key) {
           fetchOpenRouterModels(item.encrypted_key);
         }
       });
 
       // Set default model if available and valid
-      if (models[provider] && getCurrentModels(provider).includes(models[provider])) {
-        setModel(models[provider]);
-        localStorage.setItem('ai-model', models[provider]);
+      const normalizedCurrentProvider = provider.toLowerCase().trim();
+      if (models[normalizedCurrentProvider] && getCurrentModels(provider).includes(models[normalizedCurrentProvider])) {
+        setModel(models[normalizedCurrentProvider]);
+        localStorage.setItem('ai-model', models[normalizedCurrentProvider]);
       }
     } catch (error) {
       console.error('Error loading API keys:', error);
@@ -99,8 +111,9 @@ export const useAISettings = () => {
     if (!key || key.trim().length === 0) return false;
     
     const trimmedKey = key.trim();
+    const normalizedProvider = provider.toLowerCase().trim();
     
-    switch (provider) {
+    switch (normalizedProvider) {
       case 'openai':
         return trimmedKey.startsWith('sk-') && trimmedKey.length > 20;
       case 'anthropic':
@@ -127,8 +140,9 @@ export const useAISettings = () => {
     }
 
     const trimmedKey = newKey.trim();
+    const normalizedProvider = providerKey.toLowerCase().trim();
     
-    if (!validateApiKey(providerKey, trimmedKey)) {
+    if (!validateApiKey(normalizedProvider, trimmedKey)) {
       toast({
         title: "Invalid API key",
         description: `Please enter a valid ${AI_PROVIDERS[providerKey].name} API key.`,
@@ -138,28 +152,31 @@ export const useAISettings = () => {
     }
 
     try {
-      // Delete existing key for this provider
+      console.log('Saving API key for provider:', { original: providerKey, normalized: normalizedProvider });
+      
+      // Delete existing key for this provider (case-insensitive)
       await supabase
         .from('user_api_keys')
         .delete()
         .eq('user_id', user.id)
-        .eq('provider', providerKey);
+        .ilike('provider', normalizedProvider);
 
-      // Insert new key
+      // Insert new key with normalized provider name
       const { error } = await supabase
         .from('user_api_keys')
         .insert({
           user_id: user.id,
-          provider: providerKey,
+          provider: normalizedProvider,
           encrypted_key: trimmedKey
         });
 
       if (error) throw error;
 
-      setApiKeys(prev => ({ ...prev, [AI_PROVIDERS[providerKey].keyName]: trimmedKey }));
+      const keyName = AI_PROVIDERS[providerKey]?.keyName || `${normalizedProvider}_api_key`;
+      setApiKeys(prev => ({ ...prev, [keyName]: trimmedKey }));
       
       // Auto-fetch models for OpenRouter
-      if (providerKey === 'openrouter') {
+      if (normalizedProvider === 'openrouter') {
         fetchOpenRouterModels(trimmedKey);
       }
       
@@ -180,12 +197,14 @@ export const useAISettings = () => {
   const saveModel = async (providerKey: string, modelToSave: string) => {
     if (!user) return;
 
+    const normalizedProvider = providerKey.toLowerCase().trim();
+
     try {
       const { data: existingData, error: selectError } = await supabase
         .from('user_api_keys')
         .select('id')
         .eq('user_id', user.id)
-        .eq('provider', providerKey)
+        .ilike('provider', normalizedProvider)
         .maybeSingle();
 
       if (selectError) throw selectError;
@@ -195,7 +214,7 @@ export const useAISettings = () => {
           .from('user_api_keys')
           .update({ model: modelToSave })
           .eq('user_id', user.id)
-          .eq('provider', providerKey);
+          .ilike('provider', normalizedProvider);
 
         if (error) throw error;
       } else {
@@ -203,7 +222,7 @@ export const useAISettings = () => {
           .from('user_api_keys')
           .insert({
             user_id: user.id,
-            provider: providerKey,
+            provider: normalizedProvider,
             encrypted_key: '',
             model: modelToSave
           });
@@ -211,7 +230,7 @@ export const useAISettings = () => {
         if (error) throw error;
       }
 
-      setSavedModels(prev => ({ ...prev, [providerKey]: modelToSave }));
+      setSavedModels(prev => ({ ...prev, [normalizedProvider]: modelToSave }));
     } catch (error) {
       console.error('Error saving model:', error);
       toast({
@@ -255,15 +274,17 @@ export const useAISettings = () => {
   };
 
   const getCurrentModels = (providerKey: string) => {
-    if (AI_PROVIDERS[providerKey].fetchModels && dynamicModels[providerKey]?.length > 0) {
-      return dynamicModels[providerKey];
+    const normalizedProvider = providerKey.toLowerCase().trim();
+    if (AI_PROVIDERS[providerKey]?.fetchModels && dynamicModels[normalizedProvider]?.length > 0) {
+      return dynamicModels[normalizedProvider];
     }
-    return AI_PROVIDERS[providerKey].models;
+    return AI_PROVIDERS[providerKey]?.models || [];
   };
 
   const getDefaultModel = (providerKey: string) => {
+    const normalizedProvider = providerKey.toLowerCase().trim();
     const currentModels = getCurrentModels(providerKey);
-    return savedModels[providerKey] || currentModels[0] || '';
+    return savedModels[normalizedProvider] || currentModels[0] || '';
   };
 
   const clearAllApiKeys = async () => {

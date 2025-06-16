@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -19,7 +18,15 @@ serve(async (req) => {
   try {
     const { message, provider, model, reasoning, userId } = await req.json();
 
-    console.log('Received request:', { provider, model, reasoning, userId, messageLength: message?.length });
+    console.log('Received request:', { 
+      provider, 
+      model, 
+      reasoning, 
+      userId, 
+      messageLength: message?.length,
+      providerType: typeof provider,
+      providerValue: JSON.stringify(provider)
+    });
 
     if (!userId) {
       throw new Error('User authentication required');
@@ -29,18 +36,32 @@ serve(async (req) => {
       throw new Error('Message cannot be empty');
     }
 
+    if (!provider || typeof provider !== 'string') {
+      throw new Error(`Invalid provider: ${JSON.stringify(provider)}`);
+    }
+
     // Initialize Supabase client
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get user's API key for the provider - FIXED: Use maybeSingle() instead of single()
+    // Normalize provider name to lowercase for consistent lookup
+    const normalizedProvider = provider.toLowerCase().trim();
+    
+    console.log('Normalized provider:', normalizedProvider);
+
+    // Get user's API key for the provider with case-insensitive lookup
     const { data: apiKeyData, error: apiKeyError } = await supabase
       .from('user_api_keys')
-      .select('encrypted_key')
+      .select('encrypted_key, provider')
       .eq('user_id', userId)
-      .eq('provider', provider)
+      .ilike('provider', normalizedProvider) // Case-insensitive match
       .maybeSingle();
 
-    console.log('API key query result:', { hasApiKey: !!apiKeyData, error: apiKeyError });
+    console.log('API key query result:', { 
+      hasApiKey: !!apiKeyData, 
+      error: apiKeyError,
+      foundProvider: apiKeyData?.provider,
+      queryProvider: normalizedProvider
+    });
 
     if (apiKeyError) {
       console.error('Database error:', apiKeyError);
@@ -48,7 +69,25 @@ serve(async (req) => {
     }
 
     if (!apiKeyData || !apiKeyData.encrypted_key) {
-      throw new Error(`No API key found for ${provider}. Please configure it in Settings.`);
+      // Try exact match as fallback
+      const { data: fallbackData } = await supabase
+        .from('user_api_keys')
+        .select('encrypted_key, provider')
+        .eq('user_id', userId)
+        .eq('provider', provider)
+        .maybeSingle();
+      
+      if (!fallbackData) {
+        console.error('No API key found. Available keys for user:', userId);
+        const { data: allKeys } = await supabase
+          .from('user_api_keys')
+          .select('provider')
+          .eq('user_id', userId);
+        console.log('Available providers:', allKeys?.map(k => k.provider));
+        throw new Error(`No API key found for ${provider}. Please configure it in Settings.`);
+      }
+      
+      apiKeyData.encrypted_key = fallbackData.encrypted_key;
     }
 
     const apiKey = apiKeyData.encrypted_key.trim();
@@ -57,25 +96,30 @@ serve(async (req) => {
       throw new Error(`Empty API key for ${provider}. Please reconfigure it in Settings.`);
     }
 
+    // Validate API key format
+    if (!validateApiKeyFormat(normalizedProvider, apiKey)) {
+      throw new Error(`Invalid API key format for ${provider}. Please check your API key.`);
+    }
+
     // Validate provider-model combination
-    const isValidCombination = validateProviderModel(provider, model);
+    const isValidCombination = validateProviderModel(normalizedProvider, model);
     if (!isValidCombination) {
       throw new Error(`Invalid model "${model}" for provider "${provider}". Please check your settings.`);
     }
 
     // Call the appropriate AI API
     let response;
-    console.log(`Calling ${provider} API with model: ${model}`);
+    console.log(`Calling ${normalizedProvider} API with model: ${model}`);
     
-    if (provider === 'openai') {
+    if (normalizedProvider === 'openai') {
       response = await callOpenAI(apiKey, model, message, reasoning);
-    } else if (provider === 'anthropic') {
+    } else if (normalizedProvider === 'anthropic') {
       response = await callAnthropic(apiKey, model, message, reasoning);
-    } else if (provider === 'google') {
+    } else if (normalizedProvider === 'google') {
       response = await callGoogle(apiKey, model, message, reasoning);
-    } else if (provider === 'deepseek') {
+    } else if (normalizedProvider === 'deepseek') {
       response = await callDeepSeek(apiKey, model, message, reasoning);
-    } else if (provider === 'openrouter') {
+    } else if (normalizedProvider === 'openrouter') {
       response = await callOpenRouter(apiKey, model, message, reasoning);
     } else {
       throw new Error(`Unsupported provider: ${provider}`);
@@ -97,6 +141,28 @@ serve(async (req) => {
     });
   }
 });
+
+// Validate API key format
+function validateApiKeyFormat(provider: string, apiKey: string): boolean {
+  if (!apiKey || apiKey.trim().length === 0) return false;
+  
+  const trimmedKey = apiKey.trim();
+  
+  switch (provider) {
+    case 'openai':
+      return trimmedKey.startsWith('sk-') && trimmedKey.length > 20;
+    case 'anthropic':
+      return trimmedKey.startsWith('sk-ant-') && trimmedKey.length > 20;
+    case 'google':
+      return trimmedKey.startsWith('AIza') && trimmedKey.length > 20;
+    case 'deepseek':
+      return trimmedKey.startsWith('sk-') && trimmedKey.length > 20;
+    case 'openrouter':
+      return trimmedKey.startsWith('sk-or-') && trimmedKey.length > 20;
+    default:
+      return trimmedKey.length > 10;
+  }
+}
 
 // Validate provider-model combinations
 function validateProviderModel(provider: string, model: string): boolean {

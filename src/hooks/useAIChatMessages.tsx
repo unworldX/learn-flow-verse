@@ -14,19 +14,45 @@ export const useAIChatMessages = () => {
   const getStoredSettings = () => {
     const provider = localStorage.getItem('ai-provider') || 'openai';
     const model = localStorage.getItem('ai-model') || 'gpt-4o-mini';
-    return { provider, model };
+    
+    // Normalize provider name for consistency
+    const normalizedProvider = provider.toLowerCase().trim();
+    
+    console.log('Stored settings:', { 
+      originalProvider: provider, 
+      normalizedProvider, 
+      model,
+      localStorage: {
+        provider: localStorage.getItem('ai-provider'),
+        model: localStorage.getItem('ai-model')
+      }
+    });
+    
+    return { provider: normalizedProvider, model };
   };
 
   const checkApiKeyExists = async (provider: string) => {
     if (!user) return false;
     
     try {
+      const normalizedProvider = provider.toLowerCase().trim();
+      
+      console.log('Checking API key for provider:', { original: provider, normalized: normalizedProvider });
+      
+      // Try case-insensitive lookup first
       const { data, error } = await supabase
         .from('user_api_keys')
-        .select('id, encrypted_key')
+        .select('id, encrypted_key, provider')
         .eq('user_id', user.id)
-        .eq('provider', provider)
+        .ilike('provider', normalizedProvider)
         .maybeSingle();
+      
+      console.log('API key check result:', { 
+        hasData: !!data, 
+        hasKey: data && data.encrypted_key && data.encrypted_key.trim().length > 0,
+        foundProvider: data?.provider,
+        error 
+      });
       
       if (error) {
         console.error('Error checking API key:', error);
@@ -83,12 +109,19 @@ export const useAIChatMessages = () => {
     setIsLoading(true);
 
     try {
-      console.log('Sending message to AI:', { provider, model, reasoning, contentLength: content.length });
+      console.log('Sending message to AI:', { 
+        provider, 
+        model, 
+        reasoning, 
+        contentLength: content.length,
+        userId: user.id,
+        providerType: typeof provider
+      });
       
       const { data, error } = await supabase.functions.invoke('ai-chat', {
         body: {
           message: content.trim(),
-          provider,
+          provider: provider, // Send normalized provider
           model,
           reasoning,
           userId: user.id
