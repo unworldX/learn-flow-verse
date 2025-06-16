@@ -11,12 +11,17 @@ export const useAIChatMessages = () => {
   const { user } = useAuth();
   const { toast } = useToast();
 
+  // Normalize provider name consistently
+  const normalizeProvider = (providerName: string): string => {
+    return providerName.toLowerCase().trim();
+  };
+
   const getStoredSettings = () => {
     const provider = localStorage.getItem('ai-provider') || 'openai';
     const model = localStorage.getItem('ai-model') || 'gpt-4o-mini';
     
     // Normalize provider name for consistency
-    const normalizedProvider = provider.toLowerCase().trim();
+    const normalizedProvider = normalizeProvider(provider);
     
     console.log('Stored settings:', { 
       originalProvider: provider, 
@@ -35,16 +40,16 @@ export const useAIChatMessages = () => {
     if (!user) return false;
     
     try {
-      const normalizedProvider = provider.toLowerCase().trim();
+      const normalizedProvider = normalizeProvider(provider);
       
       console.log('Checking API key for provider:', { original: provider, normalized: normalizedProvider });
       
-      // Try case-insensitive lookup first
+      // Try exact match first
       const { data, error } = await supabase
         .from('user_api_keys')
         .select('id, encrypted_key, provider')
         .eq('user_id', user.id)
-        .ilike('provider', normalizedProvider)
+        .eq('provider', normalizedProvider)
         .maybeSingle();
       
       console.log('API key check result:', { 
@@ -114,14 +119,13 @@ export const useAIChatMessages = () => {
         model, 
         reasoning, 
         contentLength: content.length,
-        userId: user.id,
-        providerType: typeof provider
+        userId: user.id
       });
       
       const { data, error } = await supabase.functions.invoke('ai-chat', {
         body: {
           message: content.trim(),
-          provider: provider, // Send normalized provider
+          provider: provider,
           model,
           reasoning,
           userId: user.id

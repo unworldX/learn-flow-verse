@@ -18,16 +18,16 @@ serve(async (req) => {
   try {
     const { message, provider, model, reasoning, userId } = await req.json();
 
-    console.log('Received request:', { 
+    console.log('=== AI CHAT REQUEST START ===');
+    console.log('Request payload:', JSON.stringify({ 
       provider, 
       model, 
       reasoning, 
       userId, 
-      messageLength: message?.length,
-      providerType: typeof provider,
-      providerValue: JSON.stringify(provider)
-    });
+      messageLength: message?.length 
+    }, null, 2));
 
+    // Validate inputs
     if (!userId) {
       throw new Error('User authentication required');
     }
@@ -43,98 +43,153 @@ serve(async (req) => {
     // Initialize Supabase client
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Normalize provider name to lowercase for consistent lookup
+    // Normalize provider name consistently
     const normalizedProvider = provider.toLowerCase().trim();
-    
-    console.log('Normalized provider:', normalizedProvider);
+    console.log('Provider normalization:', { original: provider, normalized: normalizedProvider });
 
-    // Get user's API key for the provider with case-insensitive lookup
-    const { data: apiKeyData, error: apiKeyError } = await supabase
+    // Get user's API key - try multiple query strategies
+    console.log('=== DATABASE QUERY START ===');
+    
+    // First, let's see what keys exist for this user
+    const { data: allUserKeys, error: allKeysError } = await supabase
+      .from('user_api_keys')
+      .select('id, provider, encrypted_key')
+      .eq('user_id', userId);
+
+    console.log('All user keys:', allUserKeys?.map(k => ({ 
+      id: k.id, 
+      provider: k.provider, 
+      hasKey: !!k.encrypted_key 
+    })));
+
+    if (allKeysError) {
+      console.error('Error fetching all keys:', allKeysError);
+    }
+
+    // Try exact match first
+    let { data: apiKeyData, error: apiKeyError } = await supabase
       .from('user_api_keys')
       .select('encrypted_key, provider')
       .eq('user_id', userId)
-      .ilike('provider', normalizedProvider) // Case-insensitive match
+      .eq('provider', normalizedProvider)
       .maybeSingle();
 
-    console.log('API key query result:', { 
-      hasApiKey: !!apiKeyData, 
+    console.log('Exact match result:', { 
+      found: !!apiKeyData, 
       error: apiKeyError,
-      foundProvider: apiKeyData?.provider,
-      queryProvider: normalizedProvider
+      queryProvider: normalizedProvider 
     });
 
+    // If exact match fails, try case-insensitive
+    if (!apiKeyData && !apiKeyError) {
+      const { data: caseInsensitiveData, error: caseInsensitiveError } = await supabase
+        .from('user_api_keys')
+        .select('encrypted_key, provider')
+        .eq('user_id', userId)
+        .ilike('provider', normalizedProvider)
+        .maybeSingle();
+
+      apiKeyData = caseInsensitiveData;
+      apiKeyError = caseInsensitiveError;
+
+      console.log('Case-insensitive match result:', { 
+        found: !!apiKeyData, 
+        error: apiKeyError,
+        foundProvider: apiKeyData?.provider 
+      });
+    }
+
+    // If still no match, try finding by partial match
+    if (!apiKeyData && !apiKeyError) {
+      const { data: partialMatchData, error: partialMatchError } = await supabase
+        .from('user_api_keys')
+        .select('encrypted_key, provider')
+        .eq('user_id', userId)
+        .like('provider', `%${normalizedProvider}%`)
+        .maybeSingle();
+
+      apiKeyData = partialMatchData;
+      apiKeyError = partialMatchError;
+
+      console.log('Partial match result:', { 
+        found: !!apiKeyData, 
+        error: apiKeyError,
+        foundProvider: apiKeyData?.provider 
+      });
+    }
+
+    console.log('=== DATABASE QUERY END ===');
+
     if (apiKeyError) {
-      console.error('Database error:', apiKeyError);
+      console.error('Database query error:', apiKeyError);
       throw new Error(`Database error: ${apiKeyError.message}`);
     }
 
     if (!apiKeyData || !apiKeyData.encrypted_key) {
-      // Try exact match as fallback
-      const { data: fallbackData } = await supabase
-        .from('user_api_keys')
-        .select('encrypted_key, provider')
-        .eq('user_id', userId)
-        .eq('provider', provider)
-        .maybeSingle();
-      
-      if (!fallbackData) {
-        console.error('No API key found. Available keys for user:', userId);
-        const { data: allKeys } = await supabase
-          .from('user_api_keys')
-          .select('provider')
-          .eq('user_id', userId);
-        console.log('Available providers:', allKeys?.map(k => k.provider));
-        throw new Error(`No API key found for ${provider}. Please configure it in Settings.`);
-      }
-      
-      apiKeyData.encrypted_key = fallbackData.encrypted_key;
+      console.error('No API key found after all attempts');
+      console.log('Available providers for user:', allUserKeys?.map(k => k.provider));
+      throw new Error(`No API key configured for ${provider}. Please add your API key in Settings.`);
     }
 
     const apiKey = apiKeyData.encrypted_key.trim();
-    
-    if (!apiKey) {
-      throw new Error(`Empty API key for ${provider}. Please reconfigure it in Settings.`);
-    }
+    console.log('API key found:', { 
+      provider: apiKeyData.provider, 
+      keyLength: apiKey.length,
+      keyPrefix: apiKey.substring(0, 10) + '...' 
+    });
 
     // Validate API key format
     if (!validateApiKeyFormat(normalizedProvider, apiKey)) {
-      throw new Error(`Invalid API key format for ${provider}. Please check your API key.`);
+      throw new Error(`Invalid API key format for ${provider}. Please check your API key in Settings.`);
     }
 
     // Validate provider-model combination
-    const isValidCombination = validateProviderModel(normalizedProvider, model);
-    if (!isValidCombination) {
-      throw new Error(`Invalid model "${model}" for provider "${provider}". Please check your settings.`);
+    if (!validateProviderModel(normalizedProvider, model)) {
+      throw new Error(`Invalid model "${model}" for provider "${provider}".`);
     }
 
-    // Call the appropriate AI API
-    let response;
+    // Call appropriate AI API
+    console.log('=== AI API CALL START ===');
     console.log(`Calling ${normalizedProvider} API with model: ${model}`);
     
-    if (normalizedProvider === 'openai') {
-      response = await callOpenAI(apiKey, model, message, reasoning);
-    } else if (normalizedProvider === 'anthropic') {
-      response = await callAnthropic(apiKey, model, message, reasoning);
-    } else if (normalizedProvider === 'google') {
-      response = await callGoogle(apiKey, model, message, reasoning);
-    } else if (normalizedProvider === 'deepseek') {
-      response = await callDeepSeek(apiKey, model, message, reasoning);
-    } else if (normalizedProvider === 'openrouter') {
-      response = await callOpenRouter(apiKey, model, message, reasoning);
-    } else {
-      throw new Error(`Unsupported provider: ${provider}`);
+    let response;
+    switch (normalizedProvider) {
+      case 'openai':
+        response = await callOpenAI(apiKey, model, message, reasoning);
+        break;
+      case 'anthropic':
+        response = await callAnthropic(apiKey, model, message, reasoning);
+        break;
+      case 'google':
+        response = await callGoogle(apiKey, model, message, reasoning);
+        break;
+      case 'deepseek':
+        response = await callDeepSeek(apiKey, model, message, reasoning);
+        break;
+      case 'openrouter':
+        response = await callOpenRouter(apiKey, model, message, reasoning);
+        break;
+      default:
+        throw new Error(`Unsupported provider: ${provider}`);
     }
 
-    console.log('AI response received successfully');
+    console.log('=== AI API CALL SUCCESS ===');
 
     return new Response(JSON.stringify({ content: response }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
+
   } catch (error) {
-    console.error('Error in ai-chat function:', error);
+    console.error('=== ERROR IN AI-CHAT FUNCTION ===');
+    console.error('Error details:', {
+      message: error.message,
+      stack: error.stack,
+      name: error.name
+    });
+    
     return new Response(JSON.stringify({ 
       error: error.message,
-      details: error.stack 
+      details: 'Check function logs for more information'
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

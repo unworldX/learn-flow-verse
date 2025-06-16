@@ -25,17 +25,21 @@ export const useAISettings = () => {
     return savedModel || AI_PROVIDERS[currentProvider].models[0] || '';
   });
 
+  // Normalize provider name consistently
+  const normalizeProvider = (providerName: string): string => {
+    return providerName.toLowerCase().trim();
+  };
+
   useEffect(() => {
     if (user) {
       loadUserApiKeys();
     }
   }, [user]);
 
-  // Update model when provider changes
   useEffect(() => {
     const availableModels = getCurrentModels(provider);
     if (availableModels.length > 0) {
-      const preferredModel = savedModels[provider] || availableModels[0];
+      const preferredModel = savedModels[normalizeProvider(provider)] || availableModels[0];
       setModel(preferredModel);
       localStorage.setItem('ai-model', preferredModel);
     }
@@ -67,13 +71,12 @@ export const useAISettings = () => {
       
       data?.forEach((item: UserAPIKey) => {
         if (item.encrypted_key && item.encrypted_key.trim()) {
-          // Normalize provider name for consistency
-          const normalizedProvider = item.provider.toLowerCase().trim();
+          const normalizedProvider = normalizeProvider(item.provider);
           const keyName = AI_PROVIDERS[normalizedProvider]?.keyName || `${normalizedProvider}_api_key`;
           keys[keyName] = item.encrypted_key;
         }
         if (item.model) {
-          const normalizedProvider = item.provider.toLowerCase().trim();
+          const normalizedProvider = normalizeProvider(item.provider);
           models[normalizedProvider] = item.model;
         }
       });
@@ -83,14 +86,14 @@ export const useAISettings = () => {
 
       // Auto-fetch models for providers that support it
       data?.forEach((item: UserAPIKey) => {
-        const normalizedProvider = item.provider.toLowerCase().trim();
+        const normalizedProvider = normalizeProvider(item.provider);
         if (normalizedProvider === 'openrouter' && item.encrypted_key) {
           fetchOpenRouterModels(item.encrypted_key);
         }
       });
 
       // Set default model if available and valid
-      const normalizedCurrentProvider = provider.toLowerCase().trim();
+      const normalizedCurrentProvider = normalizeProvider(provider);
       if (models[normalizedCurrentProvider] && getCurrentModels(provider).includes(models[normalizedCurrentProvider])) {
         setModel(models[normalizedCurrentProvider]);
         localStorage.setItem('ai-model', models[normalizedCurrentProvider]);
@@ -107,28 +110,6 @@ export const useAISettings = () => {
     }
   };
 
-  const validateApiKey = (provider: string, key: string): boolean => {
-    if (!key || key.trim().length === 0) return false;
-    
-    const trimmedKey = key.trim();
-    const normalizedProvider = provider.toLowerCase().trim();
-    
-    switch (normalizedProvider) {
-      case 'openai':
-        return trimmedKey.startsWith('sk-') && trimmedKey.length > 20;
-      case 'anthropic':
-        return trimmedKey.startsWith('sk-ant-') && trimmedKey.length > 20;
-      case 'google':
-        return trimmedKey.startsWith('AIza') && trimmedKey.length > 20;
-      case 'deepseek':
-        return trimmedKey.startsWith('sk-') && trimmedKey.length > 20;
-      case 'openrouter':
-        return trimmedKey.startsWith('sk-or-') && trimmedKey.length > 20;
-      default:
-        return trimmedKey.length > 10;
-    }
-  };
-
   const saveApiKey = async (providerKey: string, newKey: string) => {
     if (!user) {
       toast({
@@ -140,7 +121,7 @@ export const useAISettings = () => {
     }
 
     const trimmedKey = newKey.trim();
-    const normalizedProvider = providerKey.toLowerCase().trim();
+    const normalizedProvider = normalizeProvider(providerKey);
     
     if (!validateApiKey(normalizedProvider, trimmedKey)) {
       toast({
@@ -154,12 +135,12 @@ export const useAISettings = () => {
     try {
       console.log('Saving API key for provider:', { original: providerKey, normalized: normalizedProvider });
       
-      // Delete existing key for this provider (case-insensitive)
+      // Delete existing key for this provider using exact match
       await supabase
         .from('user_api_keys')
         .delete()
         .eq('user_id', user.id)
-        .ilike('provider', normalizedProvider);
+        .eq('provider', normalizedProvider);
 
       // Insert new key with normalized provider name
       const { error } = await supabase
@@ -191,6 +172,28 @@ export const useAISettings = () => {
         description: "Failed to save your API key. Please try again.",
         variant: "destructive"
       });
+    }
+  };
+
+  const validateApiKey = (provider: string, key: string): boolean => {
+    if (!key || key.trim().length === 0) return false;
+    
+    const trimmedKey = key.trim();
+    const normalizedProvider = normalizeProvider(provider);
+    
+    switch (normalizedProvider) {
+      case 'openai':
+        return trimmedKey.startsWith('sk-') && trimmedKey.length > 20;
+      case 'anthropic':
+        return trimmedKey.startsWith('sk-ant-') && trimmedKey.length > 20;
+      case 'google':
+        return trimmedKey.startsWith('AIza') && trimmedKey.length > 20;
+      case 'deepseek':
+        return trimmedKey.startsWith('sk-') && trimmedKey.length > 20;
+      case 'openrouter':
+        return trimmedKey.startsWith('sk-or-') && trimmedKey.length > 20;
+      default:
+        return trimmedKey.length > 10;
     }
   };
 
@@ -332,17 +335,19 @@ export const useAISettings = () => {
       return;
     }
 
-    // Validate current model exists in available models
+    // Ensure provider is normalized before saving
+    const normalizedProvider = normalizeProvider(provider);
+    
     const availableModels = getCurrentModels(provider);
     if (!availableModels.includes(model)) {
       const defaultModel = availableModels[0];
       setModel(defaultModel);
       localStorage.setItem('ai-model', defaultModel);
-      await saveModel(provider, defaultModel);
+      await saveModel(normalizedProvider, defaultModel);
     } else {
-      localStorage.setItem('ai-provider', provider);
+      localStorage.setItem('ai-provider', normalizedProvider);
       localStorage.setItem('ai-model', model);
-      await saveModel(provider, model);
+      await saveModel(normalizedProvider, model);
     }
 
     toast({
