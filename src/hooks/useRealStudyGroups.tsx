@@ -28,16 +28,31 @@ export const useRealStudyGroups = () => {
     
     setIsLoading(true);
     try {
-      // Fetch all study groups with member counts
+      // Fetch all study groups first
       const { data: groups, error: groupsError } = await supabase
         .from('study_groups')
-        .select(`
-          *,
-          study_group_members(count)
-        `)
+        .select('*')
         .order('created_at', { ascending: false });
 
       if (groupsError) throw groupsError;
+
+      // Fetch member counts separately
+      const { data: memberCounts, error: countsError } = await supabase
+        .from('study_group_members')
+        .select('group_id')
+        .then(result => {
+          if (result.error) throw result.error;
+          
+          // Count members per group
+          const counts: Record<string, number> = {};
+          result.data?.forEach(member => {
+            counts[member.group_id] = (counts[member.group_id] || 0) + 1;
+          });
+          
+          return { data: counts, error: null };
+        });
+
+      if (countsError) throw countsError;
 
       // Fetch user's group memberships
       const { data: memberships, error: membershipsError } = await supabase
@@ -51,9 +66,7 @@ export const useRealStudyGroups = () => {
 
       const processedGroups = groups?.map(group => ({
         ...group,
-        member_count: Array.isArray(group.study_group_members) 
-          ? group.study_group_members.length 
-          : group.study_group_members?.count || 0,
+        member_count: memberCounts?.[group.id] || 0,
         is_member: memberGroupIds.has(group.id)
       })) || [];
 
