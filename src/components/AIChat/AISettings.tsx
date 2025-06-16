@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -64,6 +63,7 @@ const AISettings = () => {
   const { toast } = useToast();
   const { user } = useAuth();
   const [apiKeys, setApiKeys] = useState<Record<string, string>>({});
+  const [savedModels, setSavedModels] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [fetchingModels, setFetchingModels] = useState<Record<string, boolean>>({});
@@ -90,7 +90,7 @@ const AISettings = () => {
     AI_PROVIDERS[ALL_PROVIDER_KEYS[0]].models[0]
   );
 
-  // Load API keys for the current user
+  // Load API keys and models for the current user
   useEffect(() => {
     if (user) {
       loadUserApiKeys();
@@ -103,16 +103,27 @@ const AISettings = () => {
     try {
       const { data, error } = await supabase
         .from('user_api_keys')
-        .select('provider, encrypted_key')
+        .select('provider, encrypted_key, model')
         .eq('user_id', user.id);
 
       if (error) throw error;
 
       const keys: Record<string, string> = {};
+      const models: Record<string, string> = {};
       data?.forEach((item: any) => {
         keys[item.provider + '_api_key'] = item.encrypted_key || '';
+        if (item.model) {
+          models[item.provider] = item.model;
+        }
       });
       setApiKeys(keys);
+      setSavedModels(models);
+
+      // Update current model if we have a saved one for the current provider
+      if (models[provider]) {
+        setModel(models[provider]);
+        localStorage.setItem('ai-model', models[provider]);
+      }
     } catch (error) {
       console.error('Error loading API keys:', error);
       toast({
@@ -176,13 +187,34 @@ const AISettings = () => {
     });
   };
 
-  const handleKeySaved = (providerKey: string, newKey: string) => {
+  const handleKeySaved = async (providerKey: string, newKey: string) => {
     const keyName = AI_PROVIDERS[providerKey].keyName;
     setApiKeys(prev => ({ ...prev, [keyName]: newKey }));
+    
+    // Save the current model for this provider when API key is saved
+    await saveModelForProvider(providerKey, model);
     
     // Auto-fetch models for OpenRouter when API key is saved
     if (providerKey === 'openrouter' && newKey.trim()) {
       fetchOpenRouterModels(newKey.trim());
+    }
+  };
+
+  const saveModelForProvider = async (providerKey: string, modelToSave: string) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('user_api_keys')
+        .update({ model: modelToSave })
+        .eq('user_id', user.id)
+        .eq('provider', providerKey);
+
+      if (error) throw error;
+
+      setSavedModels(prev => ({ ...prev, [providerKey]: modelToSave }));
+    } catch (error) {
+      console.error('Error saving model:', error);
     }
   };
 
@@ -200,6 +232,9 @@ const AISettings = () => {
     try {
       localStorage.setItem('ai-provider', provider);
       localStorage.setItem('ai-model', model);
+
+      // Save the model for the current provider in the database
+      await saveModelForProvider(provider, model);
 
       toast({
         title: "Settings saved",
@@ -226,6 +261,7 @@ const AISettings = () => {
         .eq('user_id', user.id);
 
       setApiKeys({});
+      setSavedModels({});
       setDynamicModels({});
       toast({
         title: "API Keys Cleared",
@@ -244,10 +280,14 @@ const AISettings = () => {
   // Update models when provider changes
   useEffect(() => {
     const currentModels = getCurrentModels(provider);
-    if (!currentModels.includes(model)) {
+    
+    // Check if we have a saved model for this provider
+    if (savedModels[provider]) {
+      setModel(savedModels[provider]);
+    } else if (!currentModels.includes(model)) {
       setModel(currentModels[0] || '');
     }
-  }, [provider, dynamicModels]);
+  }, [provider, dynamicModels, savedModels]);
 
   if (!user) {
     return (
@@ -393,10 +433,21 @@ const AISettings = () => {
                   </Card>
                   {/* Model select */}
                   <div>
-                    <label className="text-sm font-medium text-slate-800 mb-2 block">Default Model</label>
+                    <label className="text-sm font-medium text-slate-800 mb-2 block">
+                      Default Model
+                      {savedModels[p] && (
+                        <Badge variant="secondary" className="ml-2 text-xs">
+                          Saved: {savedModels[p]}
+                        </Badge>
+                      )}
+                    </label>
                     <select
-                      value={provider === p ? model : getCurrentModels(p)[0]}
-                      onChange={e => setModel(e.target.value)}
+                      value={provider === p ? model : (savedModels[p] || getCurrentModels(p)[0])}
+                      onChange={e => {
+                        if (provider === p) {
+                          setModel(e.target.value);
+                        }
+                      }}
                       className="w-full border-slate-200 rounded-xl h-11 px-3 text-base bg-white"
                       disabled={provider !== p}
                     >
