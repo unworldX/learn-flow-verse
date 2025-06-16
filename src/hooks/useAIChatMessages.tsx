@@ -23,19 +23,32 @@ export const useAIChatMessages = () => {
     try {
       const { data, error } = await supabase
         .from('user_api_keys')
-        .select('id')
+        .select('id, encrypted_key')
         .eq('user_id', user.id)
         .eq('provider', provider)
-        .single();
+        .maybeSingle();
       
-      return !error && data;
-    } catch {
+      if (error) {
+        console.error('Error checking API key:', error);
+        return false;
+      }
+      
+      return data && data.encrypted_key && data.encrypted_key.trim().length > 0;
+    } catch (error) {
+      console.error('Exception checking API key:', error);
       return false;
     }
   };
 
   const sendMessage = async (content: string, reasoning: boolean = false) => {
-    if (!content.trim()) return;
+    if (!content.trim()) {
+      toast({
+        title: "Empty message",
+        description: "Please enter a message before sending.",
+        variant: "destructive"
+      });
+      return;
+    }
 
     if (!user) {
       toast({
@@ -48,6 +61,7 @@ export const useAIChatMessages = () => {
 
     const { provider, model } = getStoredSettings();
     
+    // Check if API key exists before proceeding
     const hasApiKey = await checkApiKeyExists(provider);
     if (!hasApiKey) {
       toast({
@@ -69,7 +83,7 @@ export const useAIChatMessages = () => {
     setIsLoading(true);
 
     try {
-      console.log('Sending message to AI:', { provider, model, reasoning });
+      console.log('Sending message to AI:', { provider, model, reasoning, contentLength: content.length });
       
       const { data, error } = await supabase.functions.invoke('ai-chat', {
         body: {
@@ -81,11 +95,11 @@ export const useAIChatMessages = () => {
         }
       });
 
-      console.log('AI response:', { data, error });
+      console.log('AI response received:', { hasData: !!data, error });
 
       if (error) {
         console.error('Supabase function error:', error);
-        throw error;
+        throw new Error(error.message || 'Failed to call AI service');
       }
 
       if (data?.error) {
@@ -93,21 +107,30 @@ export const useAIChatMessages = () => {
         throw new Error(data.error);
       }
 
+      if (!data?.content) {
+        throw new Error('Empty response from AI service');
+      }
+
       const aiMessage: AIMessage = {
         id: Math.random().toString(36).substr(2, 9),
         type: 'ai',
-        content: data?.content || 'No response received',
+        content: data.content,
         timestamp: new Date(),
       };
 
       setMessages(prev => [...prev, aiMessage]);
+      
+      toast({
+        title: "Message sent",
+        description: "AI response received successfully.",
+      });
     } catch (error: any) {
       console.error('Error sending message:', error);
       
       const errorMessage: AIMessage = {
         id: Math.random().toString(36).substr(2, 9),
         type: 'ai',
-        content: 'Sorry, I encountered an error while processing your message. Please make sure your API keys are configured in Settings.',
+        content: `Sorry, I encountered an error: ${error.message}. Please check your API keys in Settings and try again.`,
         timestamp: new Date(),
       };
 
@@ -115,7 +138,7 @@ export const useAIChatMessages = () => {
       
       toast({
         title: "AI Error",
-        description: "Failed to get AI response. Check your API keys in Settings.",
+        description: error.message || "Failed to get AI response. Check your settings.",
         variant: "destructive"
       });
     } finally {

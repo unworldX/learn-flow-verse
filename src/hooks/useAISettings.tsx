@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -52,13 +51,18 @@ export const useAISettings = () => {
         .select('id, provider, encrypted_key, model')
         .eq('user_id', user.id);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Error loading API keys:', error);
+        throw error;
+      }
 
       const keys: Record<string, string> = {};
       const models: Record<string, string> = {};
       
       data?.forEach((item: UserAPIKey) => {
-        keys[item.provider + '_api_key'] = item.encrypted_key || '';
+        if (item.encrypted_key && item.encrypted_key.trim()) {
+          keys[item.provider + '_api_key'] = item.encrypted_key;
+        }
         if (item.model) {
           models[item.provider] = item.model;
         }
@@ -74,8 +78,8 @@ export const useAISettings = () => {
         }
       });
 
-      // Set default model if available
-      if (models[provider]) {
+      // Set default model if available and valid
+      if (models[provider] && getCurrentModels(provider).includes(models[provider])) {
         setModel(models[provider]);
         localStorage.setItem('ai-model', models[provider]);
       }
@@ -91,31 +95,72 @@ export const useAISettings = () => {
     }
   };
 
+  const validateApiKey = (provider: string, key: string): boolean => {
+    if (!key || key.trim().length === 0) return false;
+    
+    const trimmedKey = key.trim();
+    
+    switch (provider) {
+      case 'openai':
+        return trimmedKey.startsWith('sk-') && trimmedKey.length > 20;
+      case 'anthropic':
+        return trimmedKey.startsWith('sk-ant-') && trimmedKey.length > 20;
+      case 'google':
+        return trimmedKey.startsWith('AIza') && trimmedKey.length > 20;
+      case 'deepseek':
+        return trimmedKey.startsWith('sk-') && trimmedKey.length > 20;
+      case 'openrouter':
+        return trimmedKey.startsWith('sk-or-') && trimmedKey.length > 20;
+      default:
+        return trimmedKey.length > 10;
+    }
+  };
+
   const saveApiKey = async (providerKey: string, newKey: string) => {
-    if (!user) return;
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please sign in to save API keys.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    const trimmedKey = newKey.trim();
+    
+    if (!validateApiKey(providerKey, trimmedKey)) {
+      toast({
+        title: "Invalid API key",
+        description: `Please enter a valid ${AI_PROVIDERS[providerKey].name} API key.`,
+        variant: "destructive"
+      });
+      return;
+    }
 
     try {
+      // Delete existing key for this provider
       await supabase
         .from('user_api_keys')
         .delete()
         .eq('user_id', user.id)
         .eq('provider', providerKey);
 
+      // Insert new key
       const { error } = await supabase
         .from('user_api_keys')
         .insert({
           user_id: user.id,
           provider: providerKey,
-          encrypted_key: newKey.trim()
+          encrypted_key: trimmedKey
         });
 
       if (error) throw error;
 
-      setApiKeys(prev => ({ ...prev, [AI_PROVIDERS[providerKey].keyName]: newKey }));
+      setApiKeys(prev => ({ ...prev, [AI_PROVIDERS[providerKey].keyName]: trimmedKey }));
       
       // Auto-fetch models for OpenRouter
-      if (providerKey === 'openrouter' && newKey.trim()) {
-        fetchOpenRouterModels(newKey.trim());
+      if (providerKey === 'openrouter') {
+        fetchOpenRouterModels(trimmedKey);
       }
       
       toast({
@@ -266,9 +311,18 @@ export const useAISettings = () => {
       return;
     }
 
-    localStorage.setItem('ai-provider', provider);
-    localStorage.setItem('ai-model', model);
-    await saveModel(provider, model);
+    // Validate current model exists in available models
+    const availableModels = getCurrentModels(provider);
+    if (!availableModels.includes(model)) {
+      const defaultModel = availableModels[0];
+      setModel(defaultModel);
+      localStorage.setItem('ai-model', defaultModel);
+      await saveModel(provider, defaultModel);
+    } else {
+      localStorage.setItem('ai-provider', provider);
+      localStorage.setItem('ai-model', model);
+      await saveModel(provider, model);
+    }
 
     toast({
       title: "Settings saved",

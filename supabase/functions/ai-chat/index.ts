@@ -19,33 +19,54 @@ serve(async (req) => {
   try {
     const { message, provider, model, reasoning, userId } = await req.json();
 
-    console.log('Received request:', { provider, model, reasoning, userId });
+    console.log('Received request:', { provider, model, reasoning, userId, messageLength: message?.length });
 
     if (!userId) {
       throw new Error('User authentication required');
     }
 
+    if (!message?.trim()) {
+      throw new Error('Message cannot be empty');
+    }
+
     // Initialize Supabase client
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Get user's API key for the provider
+    // Get user's API key for the provider - FIXED: Use maybeSingle() instead of single()
     const { data: apiKeyData, error: apiKeyError } = await supabase
       .from('user_api_keys')
       .select('encrypted_key')
       .eq('user_id', userId)
       .eq('provider', provider)
-      .single();
+      .maybeSingle();
 
-    console.log('API key query result:', { apiKeyData, apiKeyError });
+    console.log('API key query result:', { hasApiKey: !!apiKeyData, error: apiKeyError });
 
-    if (apiKeyError || !apiKeyData) {
+    if (apiKeyError) {
+      console.error('Database error:', apiKeyError);
+      throw new Error(`Database error: ${apiKeyError.message}`);
+    }
+
+    if (!apiKeyData || !apiKeyData.encrypted_key) {
       throw new Error(`No API key found for ${provider}. Please configure it in Settings.`);
     }
 
-    const apiKey = apiKeyData.encrypted_key;
+    const apiKey = apiKeyData.encrypted_key.trim();
+    
+    if (!apiKey) {
+      throw new Error(`Empty API key for ${provider}. Please reconfigure it in Settings.`);
+    }
+
+    // Validate provider-model combination
+    const isValidCombination = validateProviderModel(provider, model);
+    if (!isValidCombination) {
+      throw new Error(`Invalid model "${model}" for provider "${provider}". Please check your settings.`);
+    }
 
     // Call the appropriate AI API
     let response;
+    console.log(`Calling ${provider} API with model: ${model}`);
+    
     if (provider === 'openai') {
       response = await callOpenAI(apiKey, model, message, reasoning);
     } else if (provider === 'anthropic') {
@@ -60,22 +81,45 @@ serve(async (req) => {
       throw new Error(`Unsupported provider: ${provider}`);
     }
 
-    console.log('AI response received');
+    console.log('AI response received successfully');
 
     return new Response(JSON.stringify({ content: response }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   } catch (error) {
     console.error('Error in ai-chat function:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ 
+      error: error.message,
+      details: error.stack 
+    }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
   }
 });
 
+// Validate provider-model combinations
+function validateProviderModel(provider: string, model: string): boolean {
+  const validCombinations: Record<string, string[]> = {
+    openai: ['gpt-4o', 'gpt-4o-mini', 'gpt-4-turbo', 'gpt-3.5-turbo'],
+    anthropic: ['claude-3-5-sonnet-20241022', 'claude-3-haiku-20240307', 'claude-3-opus-20240229'],
+    google: ['gemini-1.5-pro', 'gemini-1.5-flash', 'gemini-1.0-pro'],
+    deepseek: ['deepseek-chat', 'deepseek-coder'],
+    openrouter: [] // OpenRouter supports dynamic models
+  };
+
+  const validModels = validCombinations[provider];
+  if (!validModels) return false;
+  
+  // OpenRouter allows any model since they're fetched dynamically
+  if (provider === 'openrouter') return true;
+  
+  return validModels.includes(model);
+}
+
 async function callOpenAI(apiKey: string, model: string, message: string, reasoning: boolean) {
   console.log('Calling OpenAI API');
+  
   const response = await fetch('https://api.openai.com/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -94,13 +138,14 @@ async function callOpenAI(apiKey: string, model: string, message: string, reason
         { role: 'user', content: message }
       ],
       temperature: 0.7,
-      max_tokens: 1000,
+      max_tokens: 2000,
     }),
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(`OpenAI API error: ${response.status} - ${errorData.error?.message || response.statusText}`);
+    const errorText = await response.text();
+    console.error('OpenAI API error:', response.status, errorText);
+    throw new Error(`OpenAI API error (${response.status}): ${errorText}`);
   }
 
   const data = await response.json();
@@ -109,6 +154,7 @@ async function callOpenAI(apiKey: string, model: string, message: string, reason
 
 async function callAnthropic(apiKey: string, model: string, message: string, reasoning: boolean) {
   console.log('Calling Anthropic API');
+  
   const response = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -118,7 +164,7 @@ async function callAnthropic(apiKey: string, model: string, message: string, rea
     },
     body: JSON.stringify({
       model,
-      max_tokens: 1000,
+      max_tokens: 2000,
       messages: [
         { 
           role: 'user', 
@@ -131,8 +177,9 @@ async function callAnthropic(apiKey: string, model: string, message: string, rea
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(`Anthropic API error: ${response.status} - ${errorData.error?.message || response.statusText}`);
+    const errorText = await response.text();
+    console.error('Anthropic API error:', response.status, errorText);
+    throw new Error(`Anthropic API error (${response.status}): ${errorText}`);
   }
 
   const data = await response.json();
@@ -141,6 +188,7 @@ async function callAnthropic(apiKey: string, model: string, message: string, rea
 
 async function callGoogle(apiKey: string, model: string, message: string, reasoning: boolean) {
   console.log('Calling Google API');
+  
   const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
     method: 'POST',
     headers: {
@@ -156,22 +204,29 @@ async function callGoogle(apiKey: string, model: string, message: string, reason
       }],
       generationConfig: {
         temperature: 0.7,
-        maxOutputTokens: 1000,
+        maxOutputTokens: 2000,
       },
     }),
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(`Google API error: ${response.status} - ${errorData.error?.message || response.statusText}`);
+    const errorText = await response.text();
+    console.error('Google API error:', response.status, errorText);
+    throw new Error(`Google API error (${response.status}): ${errorText}`);
   }
 
   const data = await response.json();
+  
+  if (!data.candidates || !data.candidates[0] || !data.candidates[0].content) {
+    throw new Error('Invalid response from Google API');
+  }
+  
   return data.candidates[0].content.parts[0].text;
 }
 
 async function callDeepSeek(apiKey: string, model: string, message: string, reasoning: boolean) {
   console.log('Calling DeepSeek API');
+  
   const response = await fetch('https://api.deepseek.com/chat/completions', {
     method: 'POST',
     headers: {
@@ -190,13 +245,14 @@ async function callDeepSeek(apiKey: string, model: string, message: string, reas
         { role: 'user', content: message }
       ],
       temperature: 0.7,
-      max_tokens: 1000,
+      max_tokens: 2000,
     }),
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(`DeepSeek API error: ${response.status} - ${errorData.error?.message || response.statusText}`);
+    const errorText = await response.text();
+    console.error('DeepSeek API error:', response.status, errorText);
+    throw new Error(`DeepSeek API error (${response.status}): ${errorText}`);
   }
 
   const data = await response.json();
@@ -205,11 +261,14 @@ async function callDeepSeek(apiKey: string, model: string, message: string, reas
 
 async function callOpenRouter(apiKey: string, model: string, message: string, reasoning: boolean) {
   console.log('Calling OpenRouter API');
+  
   const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
     method: 'POST',
     headers: {
       'Authorization': `Bearer ${apiKey}`,
       'Content-Type': 'application/json',
+      'HTTP-Referer': 'https://your-app.com',
+      'X-Title': 'AI Study Assistant'
     },
     body: JSON.stringify({
       model,
@@ -223,13 +282,14 @@ async function callOpenRouter(apiKey: string, model: string, message: string, re
         { role: 'user', content: message }
       ],
       temperature: 0.7,
-      max_tokens: 1000,
+      max_tokens: 2000,
     }),
   });
 
   if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(`OpenRouter API error: ${response.status} - ${errorData.error?.message || response.statusText}`);
+    const errorText = await response.text();
+    console.error('OpenRouter API error:', response.status, errorText);
+    throw new Error(`OpenRouter API error (${response.status}): ${errorText}`);
   }
 
   const data = await response.json();

@@ -10,6 +10,8 @@ import { AI_PROVIDERS, PROVIDER_KEYS } from '@/config/aiProviders';
 import SecureKeyManager from './SecureKeyManager';
 import ProviderCard from './ProviderCard';
 import ModelSelector from './ModelSelector';
+import ProviderHealthCheck from './ProviderHealthCheck';
+import SmartDefaults from './SmartDefaults';
 
 const AISettings = () => {
   const { user } = useAuth();
@@ -101,6 +103,12 @@ const AISettings = () => {
 
   return (
     <div className="space-y-6">
+      <SmartDefaults 
+        onProviderChange={setProvider}
+        onModelChange={setModel}
+        apiKeys={apiKeys}
+      />
+      
       <Card className="border-blue-200 bg-gradient-to-br from-blue-50 to-indigo-50">
         <CardHeader>
           <CardTitle className="flex items-center gap-2 text-blue-800">
@@ -133,9 +141,9 @@ const AISettings = () => {
                 <span className="text-slate-600">Active Provider:</span>
                 <span className="ml-2 font-medium text-slate-800">{AI_PROVIDERS[provider]?.name || 'None'}</span>
               </div>
-              <div>
-                <span className="text-slate-600">Active Model:</span>
-                <span className="ml-2 font-medium text-slate-800">{model || 'None'}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-slate-600">Status:</span>
+                <ProviderHealthCheck provider={provider} model={model} />
               </div>
             </div>
           </div>
