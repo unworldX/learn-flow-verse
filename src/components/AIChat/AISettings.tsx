@@ -26,6 +26,7 @@ const AISettings = () => {
     saveApiKey,
     fetchOpenRouterModels,
     getCurrentModels,
+    getDefaultModel,
     clearAllApiKeys,
     saveSettings
   } = useAISettings();
@@ -68,6 +69,18 @@ const AISettings = () => {
     setIsSaving(false);
   };
 
+  const handleProviderChange = (newProvider: string) => {
+    setProvider(newProvider);
+    // Auto-select the best available model for this provider
+    const availableModels = getCurrentModels(newProvider);
+    const bestModel = getDefaultModel(newProvider);
+    if (bestModel && availableModels.includes(bestModel)) {
+      setModel(bestModel);
+    } else if (availableModels.length > 0) {
+      setModel(availableModels[0]);
+    }
+  };
+
   if (!user) {
     return (
       <div className="space-y-6">
@@ -78,7 +91,7 @@ const AISettings = () => {
               Authentication Required
             </CardTitle>
             <CardDescription className="text-amber-700">
-              Please sign in to manage your API keys securely.
+              Please sign in to manage your AI keys securely.
             </CardDescription>
           </CardHeader>
         </Card>
@@ -112,7 +125,22 @@ const AISettings = () => {
             </div>
           </div>
 
-          <Tabs value={provider} onValueChange={setProvider}>
+          {/* Current Settings Summary */}
+          <div className="p-4 bg-slate-50 rounded-xl border border-slate-200">
+            <h4 className="font-semibold text-slate-800 mb-2">Current Configuration</h4>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-slate-600">Active Provider:</span>
+                <span className="ml-2 font-medium text-slate-800">{AI_PROVIDERS[provider]?.name || 'None'}</span>
+              </div>
+              <div>
+                <span className="text-slate-600">Active Model:</span>
+                <span className="ml-2 font-medium text-slate-800">{model || 'None'}</span>
+              </div>
+            </div>
+          </div>
+
+          <Tabs value={provider} onValueChange={handleProviderChange}>
             <TabsList className="grid grid-cols-5 w-full mb-6">
               {PROVIDER_KEYS.map(p => (
                 <TabsTrigger 
@@ -139,7 +167,7 @@ const AISettings = () => {
                   
                   <ModelSelector
                     models={getCurrentModels(p)}
-                    selectedModel={provider === p ? model : (savedModels[p] || getCurrentModels(p)[0])}
+                    selectedModel={provider === p ? model : getDefaultModel(p)}
                     savedModel={savedModels[p]}
                     onModelChange={(newModel) => {
                       if (provider === p) {

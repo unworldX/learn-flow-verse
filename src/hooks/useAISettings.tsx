@@ -20,15 +20,27 @@ export const useAISettings = () => {
     localStorage.getItem('ai-provider') || PROVIDER_KEYS[0]
   );
   
-  const [model, setModel] = useState(() =>
-    localStorage.getItem('ai-model') || AI_PROVIDERS[PROVIDER_KEYS[0]].models[0]
-  );
+  const [model, setModel] = useState(() => {
+    const savedModel = localStorage.getItem('ai-model');
+    const currentProvider = localStorage.getItem('ai-provider') || PROVIDER_KEYS[0];
+    return savedModel || AI_PROVIDERS[currentProvider].models[0] || '';
+  });
 
   useEffect(() => {
     if (user) {
       loadUserApiKeys();
     }
   }, [user]);
+
+  // Update model when provider changes
+  useEffect(() => {
+    const availableModels = getCurrentModels(provider);
+    if (availableModels.length > 0) {
+      const preferredModel = savedModels[provider] || availableModels[0];
+      setModel(preferredModel);
+      localStorage.setItem('ai-model', preferredModel);
+    }
+  }, [provider, savedModels, dynamicModels]);
 
   const loadUserApiKeys = async () => {
     if (!user) return;
@@ -55,6 +67,14 @@ export const useAISettings = () => {
       setApiKeys(keys);
       setSavedModels(models);
 
+      // Auto-fetch models for providers that support it
+      data?.forEach((item: UserAPIKey) => {
+        if (item.provider === 'openrouter' && item.encrypted_key) {
+          fetchOpenRouterModels(item.encrypted_key);
+        }
+      });
+
+      // Set default model if available
       if (models[provider]) {
         setModel(models[provider]);
         localStorage.setItem('ai-model', models[provider]);
@@ -92,6 +112,11 @@ export const useAISettings = () => {
       if (error) throw error;
 
       setApiKeys(prev => ({ ...prev, [AI_PROVIDERS[providerKey].keyName]: newKey }));
+      
+      // Auto-fetch models for OpenRouter
+      if (providerKey === 'openrouter' && newKey.trim()) {
+        fetchOpenRouterModels(newKey.trim());
+      }
       
       toast({
         title: "API key saved",
@@ -185,10 +210,15 @@ export const useAISettings = () => {
   };
 
   const getCurrentModels = (providerKey: string) => {
-    if (AI_PROVIDERS[providerKey].fetchModels && dynamicModels[providerKey]) {
+    if (AI_PROVIDERS[providerKey].fetchModels && dynamicModels[providerKey]?.length > 0) {
       return dynamicModels[providerKey];
     }
     return AI_PROVIDERS[providerKey].models;
+  };
+
+  const getDefaultModel = (providerKey: string) => {
+    const currentModels = getCurrentModels(providerKey);
+    return savedModels[providerKey] || currentModels[0] || '';
   };
 
   const clearAllApiKeys = async () => {
@@ -203,6 +233,14 @@ export const useAISettings = () => {
       setApiKeys({});
       setSavedModels({});
       setDynamicModels({});
+      
+      // Reset to default values
+      const defaultProvider = PROVIDER_KEYS[0];
+      const defaultModel = AI_PROVIDERS[defaultProvider].models[0];
+      setProvider(defaultProvider);
+      setModel(defaultModel);
+      localStorage.setItem('ai-provider', defaultProvider);
+      localStorage.setItem('ai-model', defaultModel);
       
       toast({
         title: "API Keys Cleared",
@@ -253,6 +291,7 @@ export const useAISettings = () => {
     saveModel,
     fetchOpenRouterModels,
     getCurrentModels,
+    getDefaultModel,
     clearAllApiKeys,
     saveSettings
   };

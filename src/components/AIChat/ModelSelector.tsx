@@ -33,16 +33,28 @@ const ModelSelector = ({
       <select
         value={selectedModel}
         onChange={(e) => onModelChange(e.target.value)}
-        className="w-full border-slate-200 rounded-xl h-11 px-3 text-base bg-white"
+        className="w-full border-slate-200 rounded-xl h-11 px-3 text-base bg-white disabled:bg-gray-100 disabled:text-gray-500"
         disabled={disabled}
       >
-        {models.map(model => (
-          <option key={model} value={model}>{model}</option>
-        ))}
+        {models.length > 0 ? (
+          models.map(model => (
+            <option key={model} value={model}>{model}</option>
+          ))
+        ) : (
+          <option value="">No models available</option>
+        )}
       </select>
       {models.length === 0 && (
         <p className="text-xs text-gray-500 mt-1">
-          Click "Refresh Models" to load available models for {providerName}
+          {providerName === 'OpenRouter' 
+            ? 'Add API key and click "Refresh Models" to load available models' 
+            : `No models configured for ${providerName}`
+          }
+        </p>
+      )}
+      {models.length > 0 && (
+        <p className="text-xs text-gray-600 mt-1">
+          {models.length} model{models.length !== 1 ? 's' : ''} available
         </p>
       )}
     </div>
