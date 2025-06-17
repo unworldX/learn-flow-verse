@@ -47,30 +47,42 @@ export const useDirectMessages = () => {
       // Get all users who have exchanged messages with current user
       const { data: messageData, error } = await supabase
         .from('direct_messages')
-        .select(`
-          *,
-          sender:users!sender_id(id, email, full_name),
-          receiver:users!receiver_id(id, email, full_name)
-        `)
+        .select('*')
         .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
         .order('created_at', { ascending: false });
 
       if (error) throw error;
 
+      // Get unique user IDs from messages
+      const userIds = new Set<string>();
+      messageData?.forEach(msg => {
+        if (msg.sender_id !== user.id) userIds.add(msg.sender_id);
+        if (msg.receiver_id !== user.id) userIds.add(msg.receiver_id);
+      });
+
+      // Fetch user details
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('id, email, full_name')
+        .in('id', Array.from(userIds));
+
+      if (usersError) throw usersError;
+
       // Process chat users
       const userMap = new Map<string, ChatUser>();
       
-      messageData?.forEach(msg => {
-        const otherUser = msg.sender_id === user.id ? msg.receiver : msg.sender;
-        if (otherUser && !userMap.has(otherUser.id)) {
-          userMap.set(otherUser.id, {
-            id: otherUser.id,
-            email: otherUser.email,
-            full_name: otherUser.full_name,
-            last_message: msg,
-            unread_count: 0
-          });
-        }
+      usersData?.forEach(userData => {
+        const lastMessage = messageData?.find(msg => 
+          msg.sender_id === userData.id || msg.receiver_id === userData.id
+        );
+        
+        userMap.set(userData.id, {
+          id: userData.id,
+          email: userData.email,
+          full_name: userData.full_name,
+          last_message: lastMessage as DirectMessage,
+          unread_count: 0
+        });
       });
 
       setChatUsers(Array.from(userMap.values()));
@@ -86,16 +98,34 @@ export const useDirectMessages = () => {
     try {
       const { data, error } = await supabase
         .from('direct_messages')
-        .select(`
-          *,
-          sender:users!sender_id(full_name, email),
-          receiver:users!receiver_id(full_name, email)
-        `)
+        .select('*')
         .or(`and(sender_id.eq.${user.id},receiver_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},receiver_id.eq.${user.id})`)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      setMessages(data || []);
+
+      // Get user details for sender and receiver
+      const userIds = new Set<string>();
+      data?.forEach(msg => {
+        userIds.add(msg.sender_id);
+        userIds.add(msg.receiver_id);
+      });
+
+      const { data: usersData, error: usersError } = await supabase
+        .from('users')
+        .select('id, email, full_name')
+        .in('id', Array.from(userIds));
+
+      if (usersError) throw usersError;
+
+      // Map messages with user details
+      const messagesWithUsers = data?.map(msg => ({
+        ...msg,
+        sender: usersData?.find(u => u.id === msg.sender_id),
+        receiver: usersData?.find(u => u.id === msg.receiver_id)
+      })) || [];
+
+      setMessages(messagesWithUsers as DirectMessage[]);
     } catch (error) {
       console.error('Error fetching messages:', error);
       toast({

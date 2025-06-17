@@ -53,9 +53,14 @@ export const useSubscription = () => {
           .single();
           
         if (createError) throw createError;
-        setSubscription(newSub);
+        setSubscription(newSub as Subscription);
       } else {
-        setSubscription(data);
+        // Ensure subscription_tier is properly typed
+        const typedSubscription = {
+          ...data,
+          subscription_tier: data.subscription_tier as 'basic' | 'premium' | 'enterprise' | null
+        };
+        setSubscription(typedSubscription as Subscription);
       }
     } catch (error) {
       console.error('Error fetching subscription:', error);
