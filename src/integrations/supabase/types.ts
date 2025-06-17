@@ -9,6 +9,33 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      app_cache: {
+        Row: {
+          cache_key: string
+          cache_value: Json
+          created_at: string | null
+          expires_at: string
+          id: string
+          updated_at: string | null
+        }
+        Insert: {
+          cache_key: string
+          cache_value: Json
+          created_at?: string | null
+          expires_at: string
+          id?: string
+          updated_at?: string | null
+        }
+        Update: {
+          cache_key?: string
+          cache_value?: Json
+          created_at?: string | null
+          expires_at?: string
+          id?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       collaborative_notes: {
         Row: {
           content: string | null
@@ -981,6 +1008,84 @@ export type Database = {
           },
         ]
       }
+      user_sessions: {
+        Row: {
+          created_at: string | null
+          id: string
+          last_activity: string | null
+          session_data: Json | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          last_activity?: string | null
+          session_data?: Json | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          last_activity?: string | null
+          session_data?: Json | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_settings: {
+        Row: {
+          activity_status: boolean | null
+          ai_autocomplete: boolean | null
+          ai_suggestions: boolean | null
+          created_at: string | null
+          data_collection: boolean | null
+          email_notifications: boolean | null
+          font_size: string | null
+          id: string
+          new_messages: boolean | null
+          profile_visibility: boolean | null
+          push_notifications: boolean | null
+          study_reminders: boolean | null
+          theme: string | null
+          updated_at: string | null
+          user_id: string
+        }
+        Insert: {
+          activity_status?: boolean | null
+          ai_autocomplete?: boolean | null
+          ai_suggestions?: boolean | null
+          created_at?: string | null
+          data_collection?: boolean | null
+          email_notifications?: boolean | null
+          font_size?: string | null
+          id?: string
+          new_messages?: boolean | null
+          profile_visibility?: boolean | null
+          push_notifications?: boolean | null
+          study_reminders?: boolean | null
+          theme?: string | null
+          updated_at?: string | null
+          user_id: string
+        }
+        Update: {
+          activity_status?: boolean | null
+          ai_autocomplete?: boolean | null
+          ai_suggestions?: boolean | null
+          created_at?: string | null
+          data_collection?: boolean | null
+          email_notifications?: boolean | null
+          font_size?: string | null
+          id?: string
+          new_messages?: boolean | null
+          profile_visibility?: boolean | null
+          push_notifications?: boolean | null
+          study_reminders?: boolean | null
+          theme?: string | null
+          updated_at?: string | null
+          user_id?: string
+        }
+        Relationships: []
+      }
       users: {
         Row: {
           avatar_url: string | null
@@ -1017,6 +1122,22 @@ export type Database = {
       check_group_limit: {
         Args: { user_uuid: string }
         Returns: boolean
+      }
+      cleanup_expired_cache: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
+      get_cache: {
+        Args: { cache_key_param: string }
+        Returns: Json
+      }
+      set_cache: {
+        Args: {
+          cache_key_param: string
+          cache_value_param: Json
+          ttl_minutes?: number
+        }
+        Returns: undefined
       }
     }
     Enums: {

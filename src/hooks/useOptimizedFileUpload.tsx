@@ -1,11 +1,11 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { cacheService } from '@/lib/cacheService';
 
-export interface FileUpload {
+export interface OptimizedFileUpload {
   id: string;
   user_id: string;
   file_name: string;
@@ -16,22 +16,22 @@ export interface FileUpload {
   is_processed: boolean;
 }
 
-export const useFileUpload = () => {
+export const useOptimizedFileUpload = () => {
   const { user } = useAuth();
   const { toast } = useToast();
-  const [uploads, setUploads] = useState<FileUpload[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [uploads, setUploads] = useState<OptimizedFileUpload[]>([]);
+  const [isLoading, setIsLoading] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
 
-  const fetchUploads = async () => {
+  const fetchUploads = useCallback(async () => {
     if (!user) return;
     
     setIsLoading(true);
     try {
       const cacheKey = `file_uploads_${user.id}`;
       
-      // Try cache first for better performance
-      let cachedUploads = await cacheService.get<FileUpload[]>(cacheKey);
+      // Try cache first
+      let cachedUploads = await cacheService.get<OptimizedFileUpload[]>(cacheKey);
       if (cachedUploads) {
         setUploads(cachedUploads);
         setIsLoading(false);
@@ -49,8 +49,8 @@ export const useFileUpload = () => {
       const uploadsData = data || [];
       setUploads(uploadsData);
       
-      // Cache for 15 minutes
-      await cacheService.set(cacheKey, uploadsData, { ttlMinutes: 15 });
+      // Cache for 10 minutes
+      await cacheService.set(cacheKey, uploadsData, { ttlMinutes: 10 });
     } catch (error) {
       console.error('Error fetching uploads:', error);
       toast({
@@ -61,36 +61,39 @@ export const useFileUpload = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user, toast]);
 
-  const uploadFile = async (file: File, metadata?: {
-    title?: string;
-    description?: string;
-    author?: string;
-    subject?: string;
-    class?: string;
-    resourceType?: string;
-  }) => {
-    if (!user) return;
+  const uploadFile = useCallback(async (
+    file: File, 
+    metadata?: {
+      title?: string;
+      description?: string;
+      author?: string;
+      subject?: string;
+      class?: string;
+      resourceType?: string;
+    }
+  ) => {
+    if (!user) return null;
 
     setIsUploading(true);
     try {
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
 
-      // Upload file to Supabase Storage
+      // Upload to Supabase Storage
       const { error: uploadError } = await supabase.storage
         .from('uploads')
         .upload(fileName, file);
 
       if (uploadError) throw uploadError;
 
-      // Get the public URL for the uploaded file
+      // Get public URL
       const { data: urlData } = supabase.storage
         .from('uploads')
         .getPublicUrl(fileName);
 
-      // Create file record in database
+      // Create file record
       const { data: fileRecord, error: dbError } = await supabase
         .from('file_uploads')
         .insert({
@@ -105,7 +108,7 @@ export const useFileUpload = () => {
 
       if (dbError) throw dbError;
 
-      // Also create a resource entry if metadata is provided with better integration
+      // Create resource entry with better integration
       if (metadata && (metadata.title || metadata.description)) {
         const { error: resourceError } = await supabase
           .from('resources')
@@ -122,22 +125,22 @@ export const useFileUpload = () => {
 
         if (resourceError) {
           console.error('Error creating resource:', resourceError);
-          // Don't throw here, file upload was successful
-        } else {
-          // Invalidate resources cache when new resource is created
-          await cacheService.invalidate(`resources_`);
         }
       }
 
-      // Invalidate relevant caches
+      // Invalidate caches to ensure fresh data
       await cacheService.invalidate(`file_uploads_${user.id}`);
+      await cacheService.invalidate(`resources_${user.id}`);
 
       toast({
         title: "File uploaded",
         description: `${file.name} has been uploaded successfully`
       });
 
-      fetchUploads();
+      // Refresh uploads
+      await fetchUploads();
+      
+      return fileRecord;
     } catch (error) {
       console.error('Error uploading file:', error);
       toast({
@@ -145,12 +148,15 @@ export const useFileUpload = () => {
         description: "Failed to upload file",
         variant: "destructive"
       });
+      return null;
     } finally {
       setIsUploading(false);
     }
-  };
+  }, [user, toast, fetchUploads]);
 
-  const deleteFile = async (id: string, filePath: string) => {
+  const deleteFile = useCallback(async (id: string, filePath: string) => {
+    if (!user) return;
+
     try {
       // Delete from storage
       const { error: storageError } = await supabase.storage
@@ -168,17 +174,15 @@ export const useFileUpload = () => {
       if (dbError) throw dbError;
 
       // Invalidate caches
-      if (user) {
-        await cacheService.invalidate(`file_uploads_${user.id}`);
-        await cacheService.invalidate(`resources_`);
-      }
+      await cacheService.invalidate(`file_uploads_${user.id}`);
+      await cacheService.invalidate(`resources_${user.id}`);
 
       toast({
         title: "File deleted",
         description: "File has been deleted successfully"
       });
 
-      fetchUploads();
+      await fetchUploads();
     } catch (error) {
       console.error('Error deleting file:', error);
       toast({
@@ -187,13 +191,7 @@ export const useFileUpload = () => {
         variant: "destructive"
       });
     }
-  };
-
-  useEffect(() => {
-    if (user) {
-      fetchUploads();
-    }
-  }, [user]);
+  }, [user, toast, fetchUploads]);
 
   return {
     uploads,
