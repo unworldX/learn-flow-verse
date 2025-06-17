@@ -38,15 +38,16 @@ export const useNotes = () => {
       }
 
       const { data, error } = await supabase
-        .from('notes' as any)
+        .from('notes')
         .select('*')
         .eq('user_id', user.id)
         .order('updated_at', { ascending: false });
 
       if (error) throw error;
 
-      setNotes(data as Note[] || []);
-      await cacheService.set(cacheKey, data || [], { ttlMinutes: 30 });
+      const notesData = (data || []) as Note[];
+      setNotes(notesData);
+      await cacheService.set(cacheKey, notesData, { ttlMinutes: 30 });
     } catch (error) {
       console.error('Error fetching notes:', error);
       toast({
@@ -64,7 +65,7 @@ export const useNotes = () => {
 
     try {
       const { error } = await supabase
-        .from('notes' as any)
+        .from('notes')
         .insert({
           user_id: user.id,
           title: title.trim(),
@@ -97,7 +98,7 @@ export const useNotes = () => {
 
     try {
       const { error } = await supabase
-        .from('notes' as any)
+        .from('notes')
         .update({ ...updates, updated_at: new Date().toISOString() })
         .eq('id', noteId)
         .eq('user_id', user.id);
@@ -127,7 +128,7 @@ export const useNotes = () => {
 
     try {
       const { error } = await supabase
-        .from('notes' as any)
+        .from('notes')
         .delete()
         .eq('id', noteId)
         .eq('user_id', user.id);
