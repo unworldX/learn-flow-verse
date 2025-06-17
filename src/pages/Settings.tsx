@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -39,8 +38,7 @@ const Settings = () => {
 
   const handleClearCache = async () => {
     try {
-      cacheService.clearMemoryCache();
-      await cacheService.invalidate('');
+      await cacheService.clear();
       toast({
         title: "Cache cleared",
         description: "All cached data has been cleared successfully."
