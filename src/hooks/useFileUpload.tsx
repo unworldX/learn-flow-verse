@@ -47,7 +47,14 @@ export const useFileUpload = () => {
     }
   };
 
-  const uploadFile = async (file: File) => {
+  const uploadFile = async (file: File, metadata?: {
+    title?: string;
+    description?: string;
+    author?: string;
+    subject?: string;
+    class?: string;
+    resourceType?: string;
+  }) => {
     if (!user) return;
 
     setIsUploading(true);
@@ -62,8 +69,13 @@ export const useFileUpload = () => {
 
       if (uploadError) throw uploadError;
 
+      // Get the public URL for the uploaded file
+      const { data: urlData } = supabase.storage
+        .from('uploads')
+        .getPublicUrl(fileName);
+
       // Create file record in database
-      const { error: dbError } = await supabase
+      const { data: fileRecord, error: dbError } = await supabase
         .from('file_uploads')
         .insert({
           user_id: user.id,
@@ -71,9 +83,32 @@ export const useFileUpload = () => {
           file_type: file.type,
           file_size: file.size,
           file_path: fileName
-        });
+        })
+        .select()
+        .single();
 
       if (dbError) throw dbError;
+
+      // Also create a resource entry if metadata is provided
+      if (metadata && (metadata.title || metadata.description)) {
+        const { error: resourceError } = await supabase
+          .from('resources')
+          .insert({
+            title: metadata.title || file.name,
+            description: metadata.description || `Uploaded file: ${file.name}`,
+            author: metadata.author || user.email,
+            subject: metadata.subject || 'General',
+            class: metadata.class || 'Unspecified',
+            resource_type: metadata.resourceType || file.type?.split('/')[0] || 'Document',
+            file_url: urlData.publicUrl,
+            uploader_id: user.id
+          });
+
+        if (resourceError) {
+          console.error('Error creating resource:', resourceError);
+          // Don't throw here, file upload was successful
+        }
+      }
 
       toast({
         title: "File uploaded",

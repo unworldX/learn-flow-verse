@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -33,7 +32,14 @@ const Upload = () => {
     e.preventDefault();
     if (!formData.file) return;
 
-    await uploadFile(formData.file);
+    await uploadFile(formData.file, {
+      title: formData.title,
+      description: formData.description,
+      author: formData.author,
+      subject: formData.subject,
+      class: formData.class,
+      resourceType: formData.resourceType
+    });
     
     // Reset form
     setFormData({

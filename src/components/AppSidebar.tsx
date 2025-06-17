@@ -76,7 +76,7 @@ const chatItems = [
   },
   {
     title: "Direct Messages",
-    url: null, // No URL means it's coming soon
+    url: "/chats",
     icon: MessageCircle,
   },
   {
@@ -131,22 +131,12 @@ export function AppSidebar() {
             <SidebarMenu>
               {chatItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  {item.url ? (
-                    <SidebarMenuButton asChild className="hover:bg-slate-100 rounded-lg mx-2 transition-all duration-200">
-                      <a href={item.url} className="flex items-center gap-3 px-3 py-2">
-                        <item.icon className="w-5 h-5" />
-                        <span className="font-medium">{item.title}</span>
-                      </a>
-                    </SidebarMenuButton>
-                  ) : (
-                    <div className="flex items-center justify-between gap-3 px-5 py-2 text-slate-500 cursor-not-allowed">
-                       <div className="flex items-center gap-3">
-                        <item.icon className="w-5 h-5" />
-                        <span className="font-medium">{item.title}</span>
-                      </div>
-                      <Badge variant="outline" className="text-xs">Coming Soon</Badge>
-                    </div>
-                  )}
+                  <SidebarMenuButton asChild className="hover:bg-slate-100 rounded-lg mx-2 transition-all duration-200">
+                    <a href={item.url} className="flex items-center gap-3 px-3 py-2">
+                      <item.icon className="w-5 h-5" />
+                      <span className="font-medium">{item.title}</span>
+                    </a>
+                  </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
             </SidebarMenu>
