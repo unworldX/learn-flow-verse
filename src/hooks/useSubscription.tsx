@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { cacheService } from '@/lib/cacheService';
 
 export interface Subscription {
   id: string;
@@ -31,6 +32,16 @@ export const useSubscription = () => {
     
     setIsLoading(true);
     try {
+      const cacheKey = `subscription_${user.id}`;
+      
+      // Try cache first
+      let cachedSubscription = await cacheService.get<Subscription>(cacheKey);
+      if (cachedSubscription) {
+        setSubscription(cachedSubscription);
+        setIsLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('subscribers')
         .select('*')
@@ -60,6 +71,7 @@ export const useSubscription = () => {
           subscription_tier: newSub.subscription_tier as 'basic' | 'premium' | 'enterprise' | null
         };
         setSubscription(typedNewSub as Subscription);
+        await cacheService.set(cacheKey, typedNewSub, { ttlMinutes: 15 });
       } else {
         // Ensure subscription_tier is properly typed
         const typedSubscription = {
@@ -67,6 +79,7 @@ export const useSubscription = () => {
           subscription_tier: data.subscription_tier as 'basic' | 'premium' | 'enterprise' | null
         };
         setSubscription(typedSubscription as Subscription);
+        await cacheService.set(cacheKey, typedSubscription, { ttlMinutes: 15 });
       }
     } catch (error) {
       console.error('Error fetching subscription:', error);
@@ -109,6 +122,11 @@ export const useSubscription = () => {
       if (error) throw error;
       
       setSubscription(prev => prev ? { ...prev, ...updates } : null);
+      
+      // Update cache
+      const cacheKey = `subscription_${user.id}`;
+      const updatedSub = { ...subscription, ...updates };
+      await cacheService.set(cacheKey, updatedSub, { ttlMinutes: 15 });
     } catch (error) {
       console.error('Error updating usage:', error);
     }

@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { cacheService } from '@/lib/cacheService';
 
 export interface DirectMessage {
   id: string;
@@ -44,6 +45,15 @@ export const useDirectMessages = () => {
     if (!user) return;
 
     try {
+      const cacheKey = `chat_users_${user.id}`;
+      
+      // Try cache first
+      let cachedUsers = await cacheService.get<ChatUser[]>(cacheKey);
+      if (cachedUsers) {
+        setChatUsers(cachedUsers);
+        return;
+      }
+
       // Get all users who have exchanged messages with current user
       const { data: messageData, error } = await supabase
         .from('direct_messages')
@@ -95,7 +105,11 @@ export const useDirectMessages = () => {
         }
       });
 
-      setChatUsers(Array.from(userMap.values()));
+      const finalUsers = Array.from(userMap.values());
+      setChatUsers(finalUsers);
+      
+      // Cache the results
+      await cacheService.set(cacheKey, finalUsers, { ttlMinutes: 2 });
     } catch (error) {
       console.error('Error fetching chat users:', error);
     }
@@ -106,6 +120,16 @@ export const useDirectMessages = () => {
 
     setIsLoading(true);
     try {
+      const cacheKey = `messages_${user.id}_${otherUserId}`;
+      
+      // Try cache first
+      let cachedMessages = await cacheService.get<DirectMessage[]>(cacheKey);
+      if (cachedMessages) {
+        setMessages(cachedMessages);
+        setIsLoading(false);
+        return;
+      }
+
       const { data, error } = await supabase
         .from('direct_messages')
         .select('*')
@@ -137,6 +161,9 @@ export const useDirectMessages = () => {
       })) || [];
 
       setMessages(messagesWithUsers as DirectMessage[]);
+      
+      // Cache the results
+      await cacheService.set(cacheKey, messagesWithUsers, { ttlMinutes: 1 });
     } catch (error) {
       console.error('Error fetching messages:', error);
       toast({
@@ -171,7 +198,11 @@ export const useDirectMessages = () => {
         description: "Your message has been sent successfully"
       });
 
+      // Invalidate caches and refetch
+      await cacheService.invalidate(`messages_${user.id}_${receiverId}`);
+      await cacheService.invalidate(`chat_users_${user.id}`);
       fetchMessages(receiverId);
+      fetchChatUsers();
     } catch (error) {
       console.error('Error sending message:', error);
       toast({

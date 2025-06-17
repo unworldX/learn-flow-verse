@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
+import { cacheService } from '@/lib/cacheService';
 
 export interface Resource {
   id: string;
@@ -36,6 +37,16 @@ export const useRealResources = () => {
   const fetchResources = async () => {
     setIsLoading(true);
     try {
+      const cacheKey = `resources_${JSON.stringify(filters)}`;
+      
+      // Try cache first
+      let cachedResources = await cacheService.get<Resource[]>(cacheKey);
+      if (cachedResources) {
+        setResources(cachedResources);
+        setIsLoading(false);
+        return;
+      }
+
       let query = supabase
         .from('resources')
         .select('*')
@@ -57,6 +68,7 @@ export const useRealResources = () => {
       if (error) throw error;
 
       setResources(data || []);
+      await cacheService.set(cacheKey, data || [], { ttlMinutes: 10 });
     } catch (error) {
       console.error('Error fetching resources:', error);
       toast({
@@ -129,6 +141,9 @@ export const useRealResources = () => {
         title: "Download started",
         description: "Your download has started successfully"
       });
+
+      // Invalidate cache
+      await cacheService.invalidate('resources_');
     } catch (error) {
       console.error('Error downloading resource:', error);
       toast({

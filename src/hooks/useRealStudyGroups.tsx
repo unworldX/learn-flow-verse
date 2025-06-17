@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { useSubscription } from '@/hooks/useSubscription';
+import { cacheService } from '@/lib/cacheService';
 
 export interface StudyGroup {
   id: string;
@@ -30,6 +31,17 @@ export const useRealStudyGroups = () => {
     
     setIsLoading(true);
     try {
+      const cacheKey = `study_groups_${user.id}`;
+      
+      // Try cache first
+      let cachedData = await cacheService.get<{groups: StudyGroup[], myGroups: StudyGroup[]}>(cacheKey);
+      if (cachedData) {
+        setStudyGroups(cachedData.groups);
+        setMyGroups(cachedData.myGroups);
+        setIsLoading(false);
+        return;
+      }
+
       // Fetch all study groups first
       const { data: groups, error: groupsError } = await supabase
         .from('study_groups')
@@ -73,7 +85,14 @@ export const useRealStudyGroups = () => {
       })) || [];
 
       setStudyGroups(processedGroups);
-      setMyGroups(processedGroups.filter(group => group.is_member));
+      const userGroups = processedGroups.filter(group => group.is_member);
+      setMyGroups(userGroups);
+
+      // Cache the results
+      await cacheService.set(cacheKey, {
+        groups: processedGroups,
+        myGroups: userGroups
+      }, { ttlMinutes: 5 });
       
     } catch (error) {
       console.error('Error fetching study groups:', error);
@@ -120,6 +139,8 @@ export const useRealStudyGroups = () => {
         description: "You have successfully joined the study group"
       });
 
+      // Invalidate cache and refetch
+      await cacheService.invalidate(`study_groups_${user.id}`);
       fetchStudyGroups();
     } catch (error) {
       console.error('Error joining group:', error);
@@ -151,6 +172,8 @@ export const useRealStudyGroups = () => {
         description: "You have left the study group"
       });
 
+      // Invalidate cache and refetch
+      await cacheService.invalidate(`study_groups_${user.id}`);
       fetchStudyGroups();
     } catch (error) {
       console.error('Error leaving group:', error);
@@ -196,6 +219,8 @@ export const useRealStudyGroups = () => {
         description: "Your study group has been created successfully"
       });
 
+      // Invalidate cache and refetch
+      await cacheService.invalidate(`study_groups_${user.id}`);
       fetchStudyGroups();
       return data;
     } catch (error) {
