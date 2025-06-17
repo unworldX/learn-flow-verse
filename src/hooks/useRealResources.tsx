@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { useSubscription } from '@/hooks/useSubscription';
 
 export interface Resource {
   id: string;
@@ -16,11 +17,14 @@ export interface Resource {
   upload_date: string;
   uploader_id: string;
   offline_access: boolean;
+  download_count: number;
+  premium_content: boolean;
 }
 
 export const useRealResources = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { subscription, checkDownloadLimit, updateUsage } = useSubscription();
   const [resources, setResources] = useState<Resource[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [filters, setFilters] = useState({
@@ -62,6 +66,76 @@ export const useRealResources = () => {
       });
     } finally {
       setIsLoading(false);
+    }
+  };
+
+  const downloadResource = async (resource: Resource) => {
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "Please login to download resources",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Check if premium content requires subscription
+    if (resource.premium_content && !subscription?.subscribed) {
+      toast({
+        title: "Premium content",
+        description: "This is premium content. Please upgrade your subscription.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    // Check download limit
+    const canDownload = await checkDownloadLimit();
+    if (!canDownload) {
+      toast({
+        title: "Download limit reached",
+        description: "You have reached your download limit. Please upgrade your subscription.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    try {
+      // Record the download
+      const { error } = await supabase
+        .from('user_downloads')
+        .insert({
+          user_id: user.id,
+          resource_id: resource.id
+        });
+
+      if (error && error.code !== '23505') throw error; // Ignore duplicate downloads
+
+      // Update usage count
+      await updateUsage('download');
+
+      // Update resource download count
+      await supabase
+        .from('resources')
+        .update({ download_count: resource.download_count + 1 })
+        .eq('id', resource.id);
+
+      // Simulate download
+      if (resource.file_url) {
+        window.open(resource.file_url, '_blank');
+      }
+
+      toast({
+        title: "Download started",
+        description: "Your download has started successfully"
+      });
+    } catch (error) {
+      console.error('Error downloading resource:', error);
+      toast({
+        title: "Download failed",
+        description: "Failed to download resource",
+        variant: "destructive"
+      });
     }
   };
 
@@ -117,6 +191,7 @@ export const useRealResources = () => {
     isLoading,
     filters,
     setFilters,
+    downloadResource,
     addToFavorites,
     updateProgress,
     refetch: fetchResources

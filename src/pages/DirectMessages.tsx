@@ -1,773 +1,160 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { useAuth } from '@/hooks/useAuth';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Upload, Send, Search, MoreVertical, Phone, VideoIcon, Plus, MessageSquare, ArrowLeft, Paperclip, Smile, Mic } from 'lucide-react';
-import { encryptText, decryptText } from '@/lib/encryption';
-import { useIsMobile } from '@/hooks/use-mobile';
-import ChatList from '@/components/chat/ChatList';
-import ChatHeader from '@/components/chat/ChatHeader';
-import MessageInput from '@/components/chat/MessageInput';
-import TypingIndicator from '@/components/chat/TypingIndicator';
-import MessageBubble from '@/components/chat/MessageBubble';
-import Reactions from '@/components/chat/Reactions';
 
-interface User {
-  id: string;
-  email: string;
-  full_name?: string;
-}
-
-interface DirectMessage {
-  id: string;
-  sender_id: string;
-  receiver_id: string;
-  encrypted_content?: string;
-  message_type: 'text' | 'image' | 'video' | 'file';
-  file_url?: string;
-  file_name?: string;
-  file_size?: number;
-  created_at: string;
-  is_read: boolean;
-  decrypted_content?: string;
-}
-
-interface Chat {
-  user: User;
-  lastMessage?: DirectMessage;
-  unreadCount: number;
-}
+import { useState } from 'react';
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ScrollArea } from "@/components/ui/scroll-area";
+import { Separator } from "@/components/ui/separator";
+import { Send, User } from "lucide-react";
+import { useDirectMessages } from "@/hooks/useDirectMessages";
 
 const DirectMessages = () => {
-  const { user } = useAuth();
-  const { toast } = useToast();
-  const isMobile = useIsMobile();
-
-  // All useState and useEffect hooks at the TOP, before any returns!
-  const [chats, setChats] = useState<Chat[]>([]);
-  const [selectedChat, setSelectedChat] = useState<User | null>(null);
-  const [messages, setMessages] = useState<DirectMessage[]>([]);
+  const { messages, chatUsers, isLoading, fetchMessages, sendMessage } = useDirectMessages();
+  const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState('');
-  const [users, setUsers] = useState<User[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [loading, setLoading] = useState(false);
-  const [showNewChatDialog, setShowNewChatDialog] = useState(false);
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  // New: Desktop state, for filters/groups etc
-  const [groups, setGroups] = useState<any[]>([]);
-  const [view, setView] = useState<'all'|'direct'|'group'>('all');
-  const [filters, setFilters] = useState({ showPinned: false, showUnread: false });
-
-  useEffect(() => {
-    if (user) {
-      fetchUsers();
-      fetchChats();
-    }
-  }, [user]);
-  useEffect(() => {
-    if (selectedChat && user) {
-      fetchMessages();
-      markMessagesAsRead();
-    }
-  }, [selectedChat, user]);
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-  useEffect(() => {
-    if (!user) return;
-    const channel = supabase
-      .channel('direct-messages')
-      .on('postgres_changes', {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'direct_messages',
-          filter: `receiver_id=eq.${user.id}`
-        }, (payload) => {
-          const newMessage = payload.new as DirectMessage;
-          if (selectedChat && newMessage.sender_id === selectedChat.id) {
-            setMessages(prev => [...prev, newMessage]);
-            markMessagesAsRead();
-          }
-          fetchChats();
-        })
-      .subscribe();
-    return () => {
-      supabase.removeChannel(channel);
-    };
-  }, [user, selectedChat]);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  const handleUserSelect = (userId: string) => {
+    setSelectedUser(userId);
+    fetchMessages(userId);
   };
 
-  const fetchUsers = async () => {
-    try {
-      const { data, error } = await supabase
-        .from('users')
-        .select('id, email, full_name')
-        .neq('id', user?.id);
-
-      if (error) throw error;
-      setUsers(data || []);
-    } catch (error) {
-      console.error('Error fetching users:', error);
-    }
-  };
-
-  const fetchChats = async () => {
-    if (!user) return;
-
-    try {
-      // Fetch messages with sender and receiver information
-      const { data: messagesData, error } = await supabase
-        .from('direct_messages')
-        .select(`
-          id,
-          sender_id,
-          receiver_id,
-          encrypted_content,
-          message_type,
-          file_url,
-          file_name,
-          file_size,
-          created_at,
-          is_read,
-          deleted_by_sender,
-          deleted_by_receiver
-        `)
-        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-
-      // Get unique user IDs to fetch user details
-      const userIds = new Set<string>();
-      messagesData?.forEach(message => {
-        userIds.add(message.sender_id);
-        userIds.add(message.receiver_id);
-      });
-
-      // Fetch user details
-      const { data: usersData, error: usersError } = await supabase
-        .from('users')
-        .select('id, email, full_name')
-        .in('id', Array.from(userIds));
-
-      if (usersError) throw usersError;
-
-      const usersMap = new Map(usersData?.map(u => [u.id, u]) || []);
-
-      // Group messages by chat partner
-      const chatMap = new Map<string, Chat>();
-      
-      for (const message of messagesData || []) {
-        const partnerId = message.sender_id === user.id ? message.receiver_id : message.sender_id;
-        const partner = usersMap.get(partnerId);
-        
-        if (partner && !chatMap.has(partnerId)) {
-          chatMap.set(partnerId, {
-            user: partner,
-            lastMessage: {
-              ...message,
-              message_type: message.message_type as 'text' | 'image' | 'video' | 'file'
-            },
-            unreadCount: 0
-          });
-        }
-
-        // Count unread messages
-        if (message.receiver_id === user.id && !message.is_read) {
-          const chat = chatMap.get(partnerId);
-          if (chat) {
-            chat.unreadCount++;
-          }
-        }
-      }
-
-      setChats(Array.from(chatMap.values()));
-    } catch (error) {
-      console.error('Error fetching chats:', error);
-    }
-  };
-
-  const fetchMessages = async () => {
-    if (!selectedChat || !user) return;
-
-    try {
-      const { data, error } = await supabase
-        .from('direct_messages')
-        .select('*')
-        .or(`and(sender_id.eq.${user.id},receiver_id.eq.${selectedChat.id}),and(sender_id.eq.${selectedChat.id},receiver_id.eq.${user.id})`)
-        .order('created_at', { ascending: true });
-
-      if (error) throw error;
-
-      // Decrypt text messages and fix types
-      const decryptedMessages = await Promise.all(
-        (data || []).map(async (message) => {
-          const typedMessage: DirectMessage = {
-            ...message,
-            message_type: message.message_type as 'text' | 'image' | 'video' | 'file'
-          };
-
-          if (message.message_type === 'text' && message.encrypted_content) {
-            return {
-              ...typedMessage,
-              decrypted_content: await decryptText(message.encrypted_content)
-            };
-          }
-          return typedMessage;
-        })
-      );
-
-      setMessages(decryptedMessages);
-    } catch (error) {
-      console.error('Error fetching messages:', error);
-    }
-  };
-
-  const markMessagesAsRead = async () => {
-    if (!selectedChat || !user) return;
-
-    try {
-      await supabase
-        .from('direct_messages')
-        .update({ is_read: true })
-        .eq('sender_id', selectedChat.id)
-        .eq('receiver_id', user.id)
-        .eq('is_read', false);
-    } catch (error) {
-      console.error('Error marking messages as read:', error);
-    }
-  };
-
-  const sendTextMessage = async () => {
-    if (!newMessage.trim() || !selectedChat || !user) return;
-
-    setLoading(true);
-    try {
-      const encryptedContent = await encryptText(newMessage);
-      
-      const { error } = await supabase
-        .from('direct_messages')
-        .insert({
-          sender_id: user.id,
-          receiver_id: selectedChat.id,
-          encrypted_content: encryptedContent,
-          message_type: 'text'
-        });
-
-      if (error) throw error;
-
-      setNewMessage('');
-      await fetchMessages();
-      await fetchChats();
-    } catch (error) {
-      console.error('Error sending message:', error);
-      toast({
-        title: "Error",
-        description: "Failed to send message",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleFileUpload = async (file: File) => {
-    if (!selectedChat || !user) return;
-
-    setLoading(true);
-    try {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
-      
-      const { error: uploadError } = await supabase.storage
-        .from('chat-media')
-        .upload(fileName, file);
-
-      if (uploadError) throw uploadError;
-
-      const { data: urlData } = supabase.storage
-        .from('chat-media')
-        .getPublicUrl(fileName);
-
-      let messageType: 'image' | 'video' | 'file' = 'file';
-      if (file.type.startsWith('image/')) messageType = 'image';
-      else if (file.type.startsWith('video/')) messageType = 'video';
-
-      const { error } = await supabase
-        .from('direct_messages')
-        .insert({
-          sender_id: user.id,
-          receiver_id: selectedChat.id,
-          message_type: messageType,
-          file_url: urlData.publicUrl,
-          file_name: file.name,
-          file_size: file.size
-        });
-
-      if (error) throw error;
-
-      await fetchMessages();
-      await fetchChats();
-    } catch (error) {
-      console.error('Error uploading file:', error);
-      toast({
-        title: "Error",
-        description: "Failed to upload file",
-        variant: "destructive"
-      });
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const startNewChat = (selectedUser: User) => {
-    setSelectedChat(selectedUser);
-    setMessages([]);
-    setShowNewChatDialog(false);
-    setSearchQuery(''); // Clear search when starting new chat
-  };
-
-  // Improved search: match on username or any part of full name, and support multi-word queries
-  const filteredUsers = users.filter(u => {
-    const query = searchQuery.toLowerCase().trim();
-    if (!query) return true;
-    const keywords = query.split(/\s+/).filter(Boolean);
-
-    // check email/username
-    const email = (u.email || '').toLowerCase();
-    // check all full name parts (split by space)
-    const fullName = (u.full_name || '').toLowerCase();
-    const nameParts = fullName.split(/\s+/);
-
-    // If any keyword is in email OR any name part matches any keyword
-    return (
-      email.includes(query) ||
-      keywords.some(keyword =>
-        nameParts.some(name => name.includes(keyword))
-      ) ||
-      // Also, allow matching whole full_name string
-      fullName.includes(query)
-    );
-  });
-
-  const renderMessage = (message: DirectMessage) => {
-    const isOwn = message.sender_id === user?.id;
-    const messageTime = new Date(message.created_at);
-    const isToday = messageTime.toDateString() === new Date().toDateString();
-    const timeDisplay = isToday 
-      ? messageTime.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-      : messageTime.toLocaleDateString([], { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+  const handleSendMessage = async () => {
+    if (!selectedUser || !newMessage.trim()) return;
     
-    return (
-      <div key={message.id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'} mb-2 group px-4`}>
-        {!isOwn && (
-          <Avatar className="w-8 h-8 mr-3 mt-1 flex-shrink-0">
-            <AvatarFallback className="text-xs bg-gradient-to-br from-blue-500 to-purple-600 text-white font-medium">
-              {selectedChat?.full_name?.[0] || selectedChat?.email[0].toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
-        )}
-        <div className={`max-w-xs lg:max-w-md ${isOwn ? 'ml-12' : 'mr-12'}`}>
-          <div className={`px-4 py-2 rounded-2xl shadow-sm relative ${
-            isOwn 
-              ? 'bg-blue-500 text-white ml-auto' 
-              : 'bg-white border border-gray-200 text-gray-900'
-          } ${isOwn ? 'rounded-br-md' : 'rounded-bl-md'}`}>
-            {message.message_type === 'text' ? (
-              <p className="text-sm leading-relaxed break-words">{message.decrypted_content || message.encrypted_content}</p>
-            ) : (
-              <div className="space-y-2">
-                {message.message_type === 'image' && (
-                  <img src={message.file_url} alt={message.file_name} className="max-w-full rounded-lg" />
-                )}
-                {message.message_type === 'video' && (
-                  <video controls className="max-w-full rounded-lg">
-                    <source src={message.file_url} />
-                  </video>
-                )}
-                {message.message_type === 'file' && (
-                  <div className="flex items-center gap-2">
-                    <Paperclip className="w-4 h-4" />
-                    <a href={message.file_url} download={message.file_name} className="underline text-sm">
-                      {message.file_name}
-                    </a>
-                  </div>
-                )}
-                <p className="text-xs opacity-75">{message.file_name}</p>
-              </div>
-            )}
-          </div>
-          <div className={`flex items-center gap-1 mt-1 px-1 ${isOwn ? 'justify-end' : 'justify-start'}`}>
-            <span className="text-xs text-gray-500">{timeDisplay}</span>
-            {isOwn && (
-              <span className={`text-xs ${message.is_read ? 'text-blue-500' : 'text-gray-400'}`}>
-                {message.is_read ? '✓✓' : '✓'}
-              </span>
-            )}
-          </div>
-        </div>
-      </div>
-    );
+    await sendMessage(selectedUser, newMessage);
+    setNewMessage('');
   };
 
-  if (isMobile) {
+  const handleKeyPress = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter') {
+      handleSendMessage();
+    }
+  };
+
+  if (isLoading) {
     return (
-      <div className="h-full flex flex-col bg-gray-50">
-        {!selectedChat ? (
-          <>
-            {/* Mobile Header */}
-            <div className="bg-white border-b border-gray-200 p-4 shadow-sm">
-              <div className="flex items-center justify-between mb-4">
-                <h1 className="text-2xl font-bold text-gray-800">Messages</h1>
-                <Dialog open={showNewChatDialog} onOpenChange={setShowNewChatDialog}>
-                  <DialogTrigger asChild>
-                    <Button className="bg-blue-500 hover:bg-blue-600 rounded-full w-10 h-10 p-0">
-                      <Plus className="w-5 h-5" />
-                    </Button>
-                  </DialogTrigger>
-                  <DialogContent className="sm:max-w-md">
-                    <DialogHeader>
-                      <DialogTitle>Start New Chat</DialogTitle>
-                    </DialogHeader>
-                    <div className="space-y-4">
-                      <div className="relative">
-                        <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                        <Input
-                          placeholder="Search by name or email..."
-                          value={searchQuery}
-                          onChange={(e) => setSearchQuery(e.target.value)}
-                          className="pl-10"
-                        />
-                      </div>
-                      <ScrollArea className="h-64">
-                        <div className="space-y-1">
-                          {filteredUsers.length === 0 ? (
-                            <div className="p-4 text-center text-gray-500">
-                              {searchQuery ? 'No users found' : 'No users available'}
-                            </div>
-                          ) : (
-                            filteredUsers.map((user) => (
-                              <div
-                                key={user.id}
-                                onClick={() => startNewChat(user)}
-                                className="p-3 cursor-pointer hover:bg-gray-50 rounded-lg flex items-center gap-3 transition-colors"
-                              >
-                                <Avatar className="w-10 h-10">
-                                  <AvatarFallback className="bg-gradient-to-br from-green-500 to-blue-600 text-white font-medium">
-                                    {user.full_name?.[0] || user.email[0].toUpperCase()}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div className="flex-1 min-w-0">
-                                  <p className="font-medium text-gray-900 truncate">{user.full_name || user.email}</p>
-                                  <p className="text-sm text-gray-500 truncate">{user.email}</p>
-                                </div>
-                              </div>
-                            ))
-                          )}
-                        </div>
-                      </ScrollArea>
-                    </div>
-                  </DialogContent>
-                </Dialog>
-              </div>
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                <Input
-                  placeholder="Search conversations..."
-                  className="pl-10 bg-gray-50 border-gray-200 focus:bg-white"
-                />
-              </div>
-            </div>
-
-            {/* Chat List */}
-            <ScrollArea className="flex-1">
-              {chats.map((chat) => (
-                <div
-                  key={chat.user.id}
-                  onClick={() => setSelectedChat(chat.user)}
-                  className="p-4 cursor-pointer hover:bg-gray-50 border-b border-gray-100 transition-all duration-200 bg-white active:bg-gray-100"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="relative">
-                      <Avatar className="w-14 h-14">
-                        <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-medium text-lg">
-                          {chat.user.full_name?.[0] || chat.user.email[0].toUpperCase()}
-                        </AvatarFallback>
-                      </Avatar>
-                      <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white rounded-full"></div>
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between mb-1">
-                        <p className="font-semibold text-gray-900 truncate text-lg">
-                          {chat.user.full_name || chat.user.email}
-                        </p>
-                        {chat.unreadCount > 0 && (
-                          <Badge className="bg-blue-500 text-white text-xs px-2 py-1 rounded-full ml-2">
-                            {chat.unreadCount}
-                          </Badge>
-                        )}
-                      </div>
-                      <p className="text-sm text-gray-500 truncate">
-                        {chat.lastMessage?.message_type === 'text' ? '💬 Text message' : 
-                         chat.lastMessage?.message_type === 'image' ? '📷 Photo' :
-                         chat.lastMessage?.message_type === 'video' ? '🎥 Video' : '📎 File'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </ScrollArea>
-          </>
-        ) : (
-          /* Chat View for Mobile */
-          <>
-            {/* Chat Header */}
-            <div className="p-4 bg-white border-b border-gray-200 flex items-center justify-between shadow-sm">
-              <div className="flex items-center gap-3 flex-1">
-                <Button variant="ghost" size="icon" onClick={() => setSelectedChat(null)} className="flex-shrink-0">
-                  <ArrowLeft className="w-5 h-5" />
-                </Button>
-                <Avatar className="w-10 h-10 flex-shrink-0">
-                  <AvatarFallback className="bg-gradient-to-br from-blue-500 to-purple-600 text-white font-medium">
-                    {selectedChat.full_name?.[0] || selectedChat.email[0].toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-                <div className="min-w-0 flex-1">
-                  <h3 className="font-semibold text-gray-900 truncate">{selectedChat.full_name || selectedChat.email}</h3>
-                  <p className="text-sm text-green-500">● Online</p>
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <Button variant="ghost" size="icon" className="rounded-full">
-                  <Phone className="w-4 h-4" />
-                </Button>
-                <Button variant="ghost" size="icon" className="rounded-full">
-                  <VideoIcon className="w-4 h-4" />
-                </Button>
-              </div>
-            </div>
-
-            {/* Messages */}
-            <ScrollArea className="flex-1 bg-gradient-to-b from-gray-50 to-white">
-              <div className="py-2">
-                {messages.map(renderMessage)}
-              </div>
-              <div ref={messagesEndRef} />
-            </ScrollArea>
-
-            {/* Message Input */}
-            <div className="p-4 bg-white border-t border-gray-200">
-              <div className="flex gap-2 items-end">
-                <div className="flex-1 relative">
-                  <Input
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    placeholder="Type a message..."
-                    onKeyPress={(e) => e.key === 'Enter' && !e.shiftKey && sendTextMessage()}
-                    className="pr-20 py-3 rounded-full border-gray-300 focus:border-blue-500 bg-gray-50"
-                  />
-                  <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex gap-1">
-                    <input
-                      ref={fileInputRef}
-                      type="file"
-                      className="hidden"
-                      onChange={(e) => {
-                        const file = e.target.files?.[0];
-                        if (file) handleFileUpload(file);
-                      }}
-                    />
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={loading}
-                      className="rounded-full w-8 h-8"
-                    >
-                      <Paperclip className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="icon"
-                      className="rounded-full w-8 h-8"
-                    >
-                      <Smile className="w-4 h-4" />
-                    </Button>
-                  </div>
-                </div>
-                <Button 
-                  onClick={sendTextMessage} 
-                  disabled={loading || !newMessage.trim()}
-                  className="rounded-full w-12 h-12 bg-blue-500 hover:bg-blue-600 p-0"
-                >
-                  {newMessage.trim() ? <Send className="w-5 h-5" /> : <Mic className="w-5 h-5" />}
-                </Button>
-              </div>
-            </div>
-          </>
-        )}
+      <div className="container mx-auto px-4 py-8">
+        <div className="flex items-center justify-center h-64">
+          <div className="text-lg">Loading messages...</div>
+        </div>
       </div>
     );
   }
 
-  // Desktop Layout
-  const handleSelectChat = (id: string, type: "direct" | "group") => {
-    if (type === "direct") {
-      const found = chats.find((chat) => chat.user.id === id);
-      if (found) {
-        setSelectedChat(found.user);
-        setMessages([]);
-      }
-    }
-    // You may expand this later for group chat selection logic
-  };
-
   return (
-    <div className="h-full flex bg-gray-50">
-      {/* Chat List */}
-      <div className="w-1/3 bg-white border-r border-gray-200 flex flex-col">
-        <div className="p-4 bg-white border-b border-gray-100 shadow-sm">
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-xl font-bold text-gray-800">Messages</h2>
-            <Dialog open={showNewChatDialog} onOpenChange={setShowNewChatDialog}>
-              <DialogTrigger asChild>
-                <Button className="bg-blue-500 hover:bg-blue-600 rounded-full w-10 h-10 p-0">
-                  <Plus className="w-5 h-5" />
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="sm:max-w-md">
-                <DialogHeader>
-                  <DialogTitle>Start New Chat</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-                    <Input
-                      placeholder="Search by name or email..."
-                      value={searchQuery}
-                      onChange={(e) => setSearchQuery(e.target.value)}
-                      className="pl-10"
-                    />
-                  </div>
-                  <ScrollArea className="h-64">
-                    <div className="space-y-1">
-                      {filteredUsers.length === 0 ? (
-                        <div className="p-4 text-center text-gray-500">
-                          {searchQuery ? 'No users found' : 'No users available'}
-                        </div>
-                      ) : (
-                        filteredUsers.map((user) => (
-                          <div
-                            key={user.id}
-                            onClick={() => startNewChat(user)}
-                            className="p-3 cursor-pointer hover:bg-gray-50 rounded-lg flex items-center gap-3 transition-colors"
-                          >
-                            <Avatar className="w-10 h-10">
-                              <AvatarFallback className="bg-gradient-to-br from-green-500 to-blue-600 text-white font-medium">
-                                {user.full_name?.[0] || user.email[0].toUpperCase()}
-                              </AvatarFallback>
-                            </Avatar>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-medium text-gray-900 truncate">{user.full_name || user.email}</p>
-                              <p className="text-sm text-gray-500 truncate">{user.email}</p>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </ScrollArea>
+    <div className="container mx-auto px-4 py-8">
+      <h1 className="text-3xl font-bold mb-8">Direct Messages</h1>
+      
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[600px]">
+        {/* Chat Users List */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Conversations</CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            <ScrollArea className="h-[500px]">
+              {chatUsers.length === 0 ? (
+                <div className="p-4 text-center text-gray-500">
+                  No conversations yet
                 </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-          <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-gray-400" />
-            <Input
-              placeholder="Search conversations..."
-              className="pl-10 bg-gray-50 border-gray-200 focus:bg-white"
-            />
-          </div>
-        </div>
-
-        <ScrollArea className="flex-1">
-          <div className="p-4 flex items-center">
-            {/* Add filter/switch view */}
-            <button onClick={()=>setView('all')}>All</button>
-            <button onClick={()=>setView('direct')}>Direct</button>
-            <button onClick={()=>setView('group')}>Group</button>
-            <button onClick={()=>setFilters(f=>({...f,showPinned:!f.showPinned}))}>Pinned</button>
-            <button onClick={()=>setFilters(f=>({...f,showUnread:!f.showUnread}))}>Unread</button>
-          </div>
-          <ChatList
-            chats={chats} groups={groups}
-            selectedChatId={selectedChat?.id ?? null}
-            filters={filters}
-            onSelectChat={handleSelectChat}
-            view={view}
-          />
-        </ScrollArea>
-      </div>
-
-      {/* Chat Area */}
-      <div className="flex-1 flex flex-col bg-white">
-        {selectedChat ? (
-          <>
-            {/* Chat Header */}
-            <ChatHeader
-              title={selectedChat.full_name || selectedChat.email}
-              subtitle="● Online"
-              isGroup={false}
-              onBack={()=>setSelectedChat(null)}
-              avatar={<div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-500 to-purple-600 flex items-center justify-center text-white font-medium">
-                {selectedChat.full_name?.[0] || selectedChat.email[0]}</div>}
-            />
-            {/* Real-time typing indicator */}
-            <TypingIndicator users={[]} />
-            <div className="flex-1 overflow-y-auto">
-              {messages.map((msg, idx) =>
-                <MessageBubble key={msg.id} message={msg} isOwn={msg.sender_id === user?.id}
-                  onReply={()=>{}} onForward={()=>{}} onReact={()=>{}} showThread={false}
-                />
+              ) : (
+                chatUsers.map((user) => (
+                  <div
+                    key={user.id}
+                    className={`p-4 cursor-pointer hover:bg-gray-50 border-l-4 ${
+                      selectedUser === user.id ? 'border-blue-500 bg-blue-50' : 'border-transparent'
+                    }`}
+                    onClick={() => handleUserSelect(user.id)}
+                  >
+                    <div className="flex items-center space-x-3">
+                      <div className="bg-gray-200 rounded-full p-2">
+                        <User className="h-5 w-5" />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">
+                          {user.full_name || user.email.split('@')[0]}
+                        </p>
+                        <p className="text-xs text-gray-500 truncate">
+                          {user.email}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))
               )}
-            </div>
-            <div className="p-4 bg-white border-t">
-              <MessageInput
-                value={newMessage}
-                onChange={setNewMessage}
-                onSend={sendTextMessage}
-                disabled={loading}
-                onPickEmoji={emoji => setNewMessage(prev => prev + emoji)}
-                onUpload={handleFileUpload}
-                showEmoji={false}
-                setShowEmoji={()=>{}}
-              />
-            </div>
-          </>
-        ) : (
-          <div className="flex-1 flex items-center justify-center bg-gradient-to-br from-blue-50 to-purple-50">
-            <div className="text-center max-w-md mx-auto p-8">
-              <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-600 rounded-full flex items-center justify-center mx-auto mb-6">
-                <MessageSquare className="w-10 h-10 text-white" />
+            </ScrollArea>
+          </CardContent>
+        </Card>
+
+        {/* Messages Area */}
+        <Card className="lg:col-span-2">
+          <CardHeader>
+            <CardTitle>
+              {selectedUser 
+                ? chatUsers.find(u => u.id === selectedUser)?.full_name || 'Chat'
+                : 'Select a conversation'
+              }
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="p-0">
+            {selectedUser ? (
+              <div className="h-[500px] flex flex-col">
+                <ScrollArea className="flex-1 p-4">
+                  {messages.length === 0 ? (
+                    <div className="text-center text-gray-500 py-8">
+                      No messages yet. Start a conversation!
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {messages.map((message) => (
+                        <div
+                          key={message.id}
+                          className={`flex ${
+                            message.sender_id === selectedUser ? 'justify-start' : 'justify-end'
+                          }`}
+                        >
+                          <div
+                            className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
+                              message.sender_id === selectedUser
+                                ? 'bg-gray-200 text-gray-800'
+                                : 'bg-blue-500 text-white'
+                            }`}
+                          >
+                            <p className="text-sm">{message.encrypted_content}</p>
+                            <p className="text-xs opacity-70 mt-1">
+                              {new Date(message.created_at).toLocaleTimeString()}
+                            </p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </ScrollArea>
+                
+                <Separator />
+                
+                <div className="p-4">
+                  <div className="flex space-x-2">
+                    <Input
+                      placeholder="Type a message..."
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      onKeyPress={handleKeyPress}
+                      className="flex-1"
+                    />
+                    <Button onClick={handleSendMessage} disabled={!newMessage.trim()}>
+                      <Send className="h-4 w-4" />
+                    </Button>
+                  </div>
+                </div>
               </div>
-              <h3 className="text-xl font-semibold text-gray-900 mb-3">Select a conversation</h3>
-              <p className="text-gray-500 leading-relaxed">
-                Choose from your existing conversations or start a new chat
-              </p>
-            </div>
-          </div>
-        )}
+            ) : (
+              <div className="h-[500px] flex items-center justify-center text-gray-500">
+                Select a conversation to start messaging
+              </div>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

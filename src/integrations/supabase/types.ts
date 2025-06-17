@@ -529,9 +529,11 @@ export type Database = {
           author: string | null
           class: string | null
           description: string | null
+          download_count: number | null
           file_url: string | null
           id: string
           offline_access: boolean | null
+          premium_content: boolean | null
           resource_type: string
           subject: string | null
           title: string
@@ -542,9 +544,11 @@ export type Database = {
           author?: string | null
           class?: string | null
           description?: string | null
+          download_count?: number | null
           file_url?: string | null
           id?: string
           offline_access?: boolean | null
+          premium_content?: boolean | null
           resource_type: string
           subject?: string | null
           title: string
@@ -555,9 +559,11 @@ export type Database = {
           author?: string | null
           class?: string | null
           description?: string | null
+          download_count?: number | null
           file_url?: string | null
           id?: string
           offline_access?: boolean | null
+          premium_content?: boolean | null
           resource_type?: string
           subject?: string | null
           title?: string
@@ -754,6 +760,54 @@ export type Database = {
           },
         ]
       }
+      subscribers: {
+        Row: {
+          created_at: string
+          download_limit: number | null
+          downloads_used: number | null
+          email: string
+          group_limit: number | null
+          groups_joined: number | null
+          id: string
+          stripe_customer_id: string | null
+          subscribed: boolean
+          subscription_end: string | null
+          subscription_tier: string | null
+          updated_at: string
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          download_limit?: number | null
+          downloads_used?: number | null
+          email: string
+          group_limit?: number | null
+          groups_joined?: number | null
+          id?: string
+          stripe_customer_id?: string | null
+          subscribed?: boolean
+          subscription_end?: string | null
+          subscription_tier?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          download_limit?: number | null
+          downloads_used?: number | null
+          email?: string
+          group_limit?: number | null
+          groups_joined?: number | null
+          id?: string
+          stripe_customer_id?: string | null
+          subscribed?: boolean
+          subscription_end?: string | null
+          subscription_tier?: string | null
+          updated_at?: string
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       typing_status: {
         Row: {
           chat_id: string
@@ -810,6 +864,35 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      user_downloads: {
+        Row: {
+          downloaded_at: string | null
+          id: string
+          resource_id: string | null
+          user_id: string
+        }
+        Insert: {
+          downloaded_at?: string | null
+          id?: string
+          resource_id?: string | null
+          user_id: string
+        }
+        Update: {
+          downloaded_at?: string | null
+          id?: string
+          resource_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_downloads_resource_id_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_favorites: {
         Row: {
@@ -927,7 +1010,14 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      check_download_limit: {
+        Args: { user_uuid: string }
+        Returns: boolean
+      }
+      check_group_limit: {
+        Args: { user_uuid: string }
+        Returns: boolean
+      }
     }
     Enums: {
       [_ in never]: never

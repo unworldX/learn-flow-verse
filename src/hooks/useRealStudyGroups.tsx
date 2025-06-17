@@ -3,6 +3,7 @@ import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { useSubscription } from '@/hooks/useSubscription';
 
 export interface StudyGroup {
   id: string;
@@ -19,6 +20,7 @@ export interface StudyGroup {
 export const useRealStudyGroups = () => {
   const { user } = useAuth();
   const { toast } = useToast();
+  const { subscription, checkGroupLimit, updateUsage } = useSubscription();
   const [studyGroups, setStudyGroups] = useState<StudyGroup[]>([]);
   const [myGroups, setMyGroups] = useState<StudyGroup[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -88,6 +90,17 @@ export const useRealStudyGroups = () => {
   const joinGroup = async (groupId: string) => {
     if (!user) return;
 
+    // Check group limit
+    const canJoin = await checkGroupLimit();
+    if (!canJoin) {
+      toast({
+        title: "Group limit reached",
+        description: "You have reached your group limit. Please upgrade your subscription.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       const { error } = await supabase
         .from('study_group_members')
@@ -98,6 +111,9 @@ export const useRealStudyGroups = () => {
         });
 
       if (error) throw error;
+
+      // Update usage count
+      await updateUsage('group');
 
       toast({
         title: "Joined group",
@@ -126,6 +142,9 @@ export const useRealStudyGroups = () => {
         .eq('user_id', user.id);
 
       if (error) throw error;
+
+      // Update usage count (decrease)
+      await updateUsage('group', -1);
 
       toast({
         title: "Left group",
