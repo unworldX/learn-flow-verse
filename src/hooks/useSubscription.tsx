@@ -53,7 +53,13 @@ export const useSubscription = () => {
           .single();
           
         if (createError) throw createError;
-        setSubscription(newSub as Subscription);
+        
+        // Type the new subscription properly
+        const typedNewSub = {
+          ...newSub,
+          subscription_tier: newSub.subscription_tier as 'basic' | 'premium' | 'enterprise' | null
+        };
+        setSubscription(typedNewSub as Subscription);
       } else {
         // Ensure subscription_tier is properly typed
         const typedSubscription = {

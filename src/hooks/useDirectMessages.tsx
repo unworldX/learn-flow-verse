@@ -60,6 +60,11 @@ export const useDirectMessages = () => {
         if (msg.receiver_id !== user.id) userIds.add(msg.receiver_id);
       });
 
+      if (userIds.size === 0) {
+        setChatUsers([]);
+        return;
+      }
+
       // Fetch user details
       const { data: usersData, error: usersError } = await supabase
         .from('users')
@@ -76,13 +81,18 @@ export const useDirectMessages = () => {
           msg.sender_id === userData.id || msg.receiver_id === userData.id
         );
         
-        userMap.set(userData.id, {
-          id: userData.id,
-          email: userData.email,
-          full_name: userData.full_name,
-          last_message: lastMessage as DirectMessage,
-          unread_count: 0
-        });
+        if (lastMessage) {
+          userMap.set(userData.id, {
+            id: userData.id,
+            email: userData.email,
+            full_name: userData.full_name,
+            last_message: {
+              ...lastMessage,
+              message_type: lastMessage.message_type as 'text' | 'image' | 'video' | 'file'
+            } as DirectMessage,
+            unread_count: 0
+          });
+        }
       });
 
       setChatUsers(Array.from(userMap.values()));
@@ -118,9 +128,10 @@ export const useDirectMessages = () => {
 
       if (usersError) throw usersError;
 
-      // Map messages with user details
+      // Map messages with user details and proper typing
       const messagesWithUsers = data?.map(msg => ({
         ...msg,
+        message_type: msg.message_type as 'text' | 'image' | 'video' | 'file',
         sender: usersData?.find(u => u.id === msg.sender_id),
         receiver: usersData?.find(u => u.id === msg.receiver_id)
       })) || [];
