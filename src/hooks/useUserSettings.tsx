@@ -44,6 +44,14 @@ export const useUserSettings = () => {
     ai_autocomplete: true,
   };
 
+  const validateAndCastSettings = (data: any): UserSettings => {
+    return {
+      ...data,
+      theme: ['light', 'dark', 'auto'].includes(data.theme) ? data.theme : 'auto',
+      font_size: ['small', 'medium', 'large'].includes(data.font_size) ? data.font_size : 'medium',
+    };
+  };
+
   const loadSettings = async () => {
     if (!user) return;
 
@@ -54,7 +62,7 @@ export const useUserSettings = () => {
       // Try to get from cache first
       let cachedSettings = await cacheService.get<UserSettings>(cacheKey);
       if (cachedSettings) {
-        setSettings(cachedSettings);
+        setSettings(validateAndCastSettings(cachedSettings));
         setIsLoading(false);
         return;
       }
@@ -71,8 +79,9 @@ export const useUserSettings = () => {
       }
 
       if (data) {
-        setSettings(data);
-        await cacheService.set(cacheKey, data, { ttlMinutes: 30 });
+        const validatedSettings = validateAndCastSettings(data);
+        setSettings(validatedSettings);
+        await cacheService.set(cacheKey, validatedSettings, { ttlMinutes: 30 });
       } else {
         // Create default settings
         const newSettings = { ...defaultSettings, user_id: user.id };
@@ -84,8 +93,9 @@ export const useUserSettings = () => {
 
         if (createError) throw createError;
 
-        setSettings(created);
-        await cacheService.set(cacheKey, created, { ttlMinutes: 30 });
+        const validatedSettings = validateAndCastSettings(created);
+        setSettings(validatedSettings);
+        await cacheService.set(cacheKey, validatedSettings, { ttlMinutes: 30 });
       }
     } catch (error) {
       console.error('Error loading settings:', error);
@@ -116,11 +126,12 @@ export const useUserSettings = () => {
 
       if (error) throw error;
 
-      setSettings(data);
+      const validatedSettings = validateAndCastSettings(data);
+      setSettings(validatedSettings);
       
       // Update cache
       const cacheKey = `user_settings_${user.id}`;
-      await cacheService.set(cacheKey, data, { ttlMinutes: 30 });
+      await cacheService.set(cacheKey, validatedSettings, { ttlMinutes: 30 });
 
       toast({
         title: "Settings updated",

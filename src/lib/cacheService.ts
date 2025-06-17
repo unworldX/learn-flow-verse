@@ -21,7 +21,7 @@ export class CacheService {
     const memoryItem = this.memoryCache.get(key);
     if (memoryItem && memoryItem.expires > Date.now()) {
       console.log(`Cache hit (memory): ${key}`);
-      return memoryItem.data;
+      return memoryItem.data as T;
     }
 
     // Check database cache
@@ -36,7 +36,7 @@ export class CacheService {
           data,
           expires: Date.now() + (5 * 60 * 1000) // 5 minutes in memory
         });
-        return data;
+        return data as T;
       }
     } catch (error) {
       console.error('Cache get error:', error);
@@ -50,10 +50,12 @@ export class CacheService {
     const { ttlMinutes = 60 } = options;
 
     try {
-      // Store in database cache
+      // Store in database cache - convert to JSON-compatible format
+      const jsonValue = JSON.parse(JSON.stringify(value));
+      
       await supabase.rpc('set_cache', {
         cache_key_param: key,
-        cache_value_param: value,
+        cache_value_param: jsonValue,
         ttl_minutes: ttlMinutes
       });
 
