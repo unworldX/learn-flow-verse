@@ -56,10 +56,10 @@ export const useGamification = () => {
           .single();
 
         if (createError) throw createError;
-        setGamificationData(newData);
+        setGamificationData(newData as GamificationData);
         await cacheService.set(cacheKey, newData, { ttlMinutes: 60 });
       } else {
-        setGamificationData(data);
+        setGamificationData(data as GamificationData);
         await cacheService.set(cacheKey, data, { ttlMinutes: 60 });
       }
     } catch (error) {
