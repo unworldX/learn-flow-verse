@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
@@ -135,7 +136,7 @@ export const useAISettings = () => {
     try {
       console.log('Saving API key for provider:', { original: providerKey, normalized: normalizedProvider });
       
-      // Delete existing key for this provider using exact match
+      // Delete existing key for this provider
       await supabase
         .from('user_api_keys')
         .delete()
@@ -200,14 +201,14 @@ export const useAISettings = () => {
   const saveModel = async (providerKey: string, modelToSave: string) => {
     if (!user) return;
 
-    const normalizedProvider = providerKey.toLowerCase().trim();
+    const normalizedProvider = normalizeProvider(providerKey);
 
     try {
       const { data: existingData, error: selectError } = await supabase
         .from('user_api_keys')
         .select('id')
         .eq('user_id', user.id)
-        .ilike('provider', normalizedProvider)
+        .eq('provider', normalizedProvider)
         .maybeSingle();
 
       if (selectError) throw selectError;
@@ -217,7 +218,7 @@ export const useAISettings = () => {
           .from('user_api_keys')
           .update({ model: modelToSave })
           .eq('user_id', user.id)
-          .ilike('provider', normalizedProvider);
+          .eq('provider', normalizedProvider);
 
         if (error) throw error;
       } else {
@@ -277,7 +278,7 @@ export const useAISettings = () => {
   };
 
   const getCurrentModels = (providerKey: string) => {
-    const normalizedProvider = providerKey.toLowerCase().trim();
+    const normalizedProvider = normalizeProvider(providerKey);
     if (AI_PROVIDERS[providerKey]?.fetchModels && dynamicModels[normalizedProvider]?.length > 0) {
       return dynamicModels[normalizedProvider];
     }
@@ -285,7 +286,7 @@ export const useAISettings = () => {
   };
 
   const getDefaultModel = (providerKey: string) => {
-    const normalizedProvider = providerKey.toLowerCase().trim();
+    const normalizedProvider = normalizeProvider(providerKey);
     const currentModels = getCurrentModels(providerKey);
     return savedModels[normalizedProvider] || currentModels[0] || '';
   };

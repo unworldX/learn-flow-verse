@@ -1,231 +1,185 @@
 
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-const supabaseKey = Deno.env.get('SUPABASE_ANON_KEY') || '';
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
+    return new Response('ok', { headers: corsHeaders })
   }
 
   try {
-    const { message, provider, model, reasoning, userId } = await req.json();
+    const { message, provider, model, reasoning, userId } = await req.json()
 
-    console.log('AI Chat Request:', { provider, model, userId, messageLength: message?.length });
-
-    // Validate inputs
-    if (!userId) {
-      throw new Error('User authentication required');
+    if (!message || !provider || !model || !userId) {
+      return new Response(
+        JSON.stringify({ error: 'Missing required fields: message, provider, model, userId' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
-    if (!message?.trim()) {
-      throw new Error('Message cannot be empty');
-    }
+    console.log('AI Chat request:', { provider, model, reasoning, userId, messageLength: message.length })
 
-    if (!provider) {
-      throw new Error('Provider is required');
-    }
+    // Create Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
+    const supabase = createClient(supabaseUrl, supabaseKey)
 
-    // Initialize Supabase client
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // Normalize provider name for consistency
+    const normalizedProvider = provider.toLowerCase().trim()
+    
+    console.log('Looking for API key with provider:', normalizedProvider)
 
-    // Get user's API key with simplified query
-    const { data: apiKeyData, error: apiKeyError } = await supabase
+    // Get user's API key for the specified provider
+    const { data: apiKeyData, error: keyError } = await supabase
       .from('user_api_keys')
-      .select('encrypted_key, provider')
+      .select('encrypted_key')
       .eq('user_id', userId)
-      .eq('provider', provider.toLowerCase().trim())
-      .single();
+      .eq('provider', normalizedProvider)
+      .maybeSingle()
 
-    if (apiKeyError || !apiKeyData?.encrypted_key) {
-      console.error('API key not found:', { provider, userId, error: apiKeyError });
-      throw new Error(`No API key configured for ${provider}. Please add your API key in Settings.`);
+    if (keyError) {
+      console.error('Error fetching API key:', keyError)
+      return new Response(
+        JSON.stringify({ error: 'Failed to fetch API key' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
     }
 
-    const apiKey = apiKeyData.encrypted_key.trim();
-    console.log('Found API key for provider:', provider);
+    if (!apiKeyData || !apiKeyData.encrypted_key) {
+      console.error('No API key found for provider:', normalizedProvider)
+      return new Response(
+        JSON.stringify({ error: `No API key found for provider: ${provider}` }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
 
-    // Call AI API based on provider
-    let response;
-    const systemPrompt = reasoning 
-      ? 'You are a helpful AI study assistant. Think step by step and provide detailed reasoning for your responses.'
-      : 'You are a helpful AI study assistant.';
+    const apiKey = apiKeyData.encrypted_key
 
-    switch (provider.toLowerCase()) {
+    let apiResponse
+    let apiUrl
+    let headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+    }
+    let body: any = {
+      model,
+      messages: [{ role: 'user', content: message }],
+      max_tokens: 4000,
+      temperature: 0.7,
+    }
+
+    // Configure API call based on provider
+    switch (normalizedProvider) {
       case 'openai':
-        response = await callOpenAI(apiKey, model, message, systemPrompt);
-        break;
+        apiUrl = 'https://api.openai.com/v1/chat/completions'
+        headers['Authorization'] = `Bearer ${apiKey}`
+        if (reasoning && model.includes('o1')) {
+          // o1 models don't support some parameters
+          delete body.temperature
+          delete body.max_tokens
+        }
+        break
+
       case 'anthropic':
-        response = await callAnthropic(apiKey, model, message, systemPrompt);
-        break;
+        apiUrl = 'https://api.anthropic.com/v1/messages'
+        headers['Authorization'] = `Bearer ${apiKey}`
+        headers['anthropic-version'] = '2023-06-01'
+        body = {
+          model,
+          max_tokens: 4000,
+          messages: [{ role: 'user', content: message }]
+        }
+        break
+
       case 'google':
-        response = await callGoogle(apiKey, model, message, systemPrompt);
-        break;
+        apiUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
+        body = {
+          contents: [{ parts: [{ text: message }] }],
+          generationConfig: {
+            maxOutputTokens: 4000,
+            temperature: 0.7,
+          }
+        }
+        break
+
       case 'deepseek':
-        response = await callDeepSeek(apiKey, model, message, systemPrompt);
-        break;
+        apiUrl = 'https://api.deepseek.com/v1/chat/completions'
+        headers['Authorization'] = `Bearer ${apiKey}`
+        break
+
       case 'openrouter':
-        response = await callOpenRouter(apiKey, model, message, systemPrompt);
-        break;
+        apiUrl = 'https://openrouter.ai/api/v1/chat/completions'
+        headers['Authorization'] = `Bearer ${apiKey}`
+        headers['HTTP-Referer'] = 'https://lovable.app'
+        headers['X-Title'] = 'StudyFlow AI Chat'
+        break
+
       default:
-        throw new Error(`Unsupported provider: ${provider}`);
+        return new Response(
+          JSON.stringify({ error: `Unsupported provider: ${provider}` }),
+          { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+        )
     }
 
-    console.log('AI response successful');
+    console.log('Making API request to:', apiUrl)
 
-    return new Response(JSON.stringify({ content: response }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    // Make API request
+    apiResponse = await fetch(apiUrl, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(body),
+    })
+
+    if (!apiResponse.ok) {
+      const errorText = await apiResponse.text()
+      console.error('API Error:', { status: apiResponse.status, error: errorText })
+      return new Response(
+        JSON.stringify({ error: `API Error: ${apiResponse.status} - ${errorText}` }),
+        { status: apiResponse.status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    const data = await apiResponse.json()
+    console.log('API Response received successfully')
+
+    // Extract content based on provider
+    let content = ''
+    switch (normalizedProvider) {
+      case 'openai':
+      case 'deepseek':
+      case 'openrouter':
+        content = data.choices?.[0]?.message?.content || ''
+        break
+      case 'anthropic':
+        content = data.content?.[0]?.text || ''
+        break
+      case 'google':
+        content = data.candidates?.[0]?.content?.parts?.[0]?.text || ''
+        break
+    }
+
+    if (!content) {
+      console.error('No content in API response:', data)
+      return new Response(
+        JSON.stringify({ error: 'No content received from AI provider' }),
+        { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      )
+    }
+
+    return new Response(
+      JSON.stringify({ content }),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
 
   } catch (error) {
-    console.error('AI Chat Error:', error.message);
-    
-    return new Response(JSON.stringify({ 
-      error: error.message
-    }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    console.error('Edge function error:', error)
+    return new Response(
+      JSON.stringify({ error: error.message }),
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+    )
   }
-});
-
-async function callOpenAI(apiKey: string, model: string, message: string, systemPrompt: string) {
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: message }
-      ],
-      temperature: 0.7,
-      max_tokens: 2000,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`OpenAI API error: ${errorText}`);
-  }
-
-  const data = await response.json();
-  return data.choices[0].message.content;
-}
-
-async function callAnthropic(apiKey: string, model: string, message: string, systemPrompt: string) {
-  const response = await fetch('https://api.anthropic.com/v1/messages', {
-    method: 'POST',
-    headers: {
-      'x-api-key': apiKey,
-      'Content-Type': 'application/json',
-      'anthropic-version': '2023-06-01',
-    },
-    body: JSON.stringify({
-      model,
-      max_tokens: 2000,
-      messages: [{ role: 'user', content: `${systemPrompt}\n\n${message}` }],
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Anthropic API error: ${errorText}`);
-  }
-
-  const data = await response.json();
-  return data.content[0].text;
-}
-
-async function callGoogle(apiKey: string, model: string, message: string, systemPrompt: string) {
-  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      contents: [{
-        parts: [{ text: `${systemPrompt}\n\n${message}` }]
-      }],
-      generationConfig: {
-        temperature: 0.7,
-        maxOutputTokens: 2000,
-      },
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Google API error: ${errorText}`);
-  }
-
-  const data = await response.json();
-  return data.candidates[0].content.parts[0].text;
-}
-
-async function callDeepSeek(apiKey: string, model: string, message: string, systemPrompt: string) {
-  const response = await fetch('https://api.deepseek.com/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: message }
-      ],
-      temperature: 0.7,
-      max_tokens: 2000,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`DeepSeek API error: ${errorText}`);
-  }
-
-  const data = await response.json();
-  return data.choices[0].message.content;
-}
-
-async function callOpenRouter(apiKey: string, model: string, message: string, systemPrompt: string) {
-  const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${apiKey}`,
-      'Content-Type': 'application/json',
-      'HTTP-Referer': 'https://your-study-app.com',
-      'X-Title': 'AI Study Assistant'
-    },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: 'system', content: systemPrompt },
-        { role: 'user', content: message }
-      ],
-      temperature: 0.7,
-      max_tokens: 2000,
-    }),
-  });
-
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`OpenRouter API error: ${errorText}`);
-  }
-
-  const data = await response.json();
-  return data.choices[0].message.content;
-}
+})

@@ -44,7 +44,6 @@ export const useAIChatMessages = () => {
       
       console.log('Checking API key for provider:', { original: provider, normalized: normalizedProvider });
       
-      // Try exact match first
       const { data, error } = await supabase
         .from('user_api_keys')
         .select('id, encrypted_key, provider')

@@ -1,95 +1,79 @@
 
-import { supabase } from '@/integrations/supabase/client';
+interface CacheItem<T> {
+  data: T;
+  expiresAt: number;
+  createdAt: number;
+}
 
 interface CacheOptions {
   ttlMinutes?: number;
 }
 
-export class CacheService {
-  private static instance: CacheService;
-  private memoryCache = new Map<string, { data: any; expires: number }>();
-
-  static getInstance(): CacheService {
-    if (!CacheService.instance) {
-      CacheService.instance = new CacheService();
-    }
-    return CacheService.instance;
-  }
+class CacheService {
+  private cache = new Map<string, CacheItem<any>>();
+  private readonly DEFAULT_TTL_MINUTES = 30;
 
   async get<T>(key: string): Promise<T | null> {
-    // Check memory cache first
-    const memoryItem = this.memoryCache.get(key);
-    if (memoryItem && memoryItem.expires > Date.now()) {
-      console.log(`Cache hit (memory): ${key}`);
-      return memoryItem.data as T;
+    const item = this.cache.get(key);
+    
+    if (!item) {
+      return null;
     }
 
-    // Check database cache
-    try {
-      const { data, error } = await supabase.rpc('get_cache', { cache_key_param: key });
-      if (error) throw error;
-
-      if (data) {
-        console.log(`Cache hit (database): ${key}`);
-        // Store in memory cache for faster access
-        this.memoryCache.set(key, {
-          data,
-          expires: Date.now() + (5 * 60 * 1000) // 5 minutes in memory
-        });
-        return data as T;
-      }
-    } catch (error) {
-      console.error('Cache get error:', error);
+    // Check if expired
+    if (Date.now() > item.expiresAt) {
+      this.cache.delete(key);
+      return null;
     }
 
-    console.log(`Cache miss: ${key}`);
-    return null;
+    return item.data as T;
   }
 
-  async set<T>(key: string, value: T, options: CacheOptions = {}): Promise<void> {
-    const { ttlMinutes = 60 } = options;
-
-    try {
-      // Store in database cache - convert to JSON-compatible format
-      const jsonValue = JSON.parse(JSON.stringify(value));
-      
-      await supabase.rpc('set_cache', {
-        cache_key_param: key,
-        cache_value_param: jsonValue,
-        ttl_minutes: ttlMinutes
-      });
-
-      // Store in memory cache
-      this.memoryCache.set(key, {
-        data: value,
-        expires: Date.now() + (Math.min(ttlMinutes, 5) * 60 * 1000)
-      });
-
-      console.log(`Cache set: ${key} (TTL: ${ttlMinutes}m)`);
-    } catch (error) {
-      console.error('Cache set error:', error);
-    }
+  async set<T>(key: string, data: T, options: CacheOptions = {}): Promise<void> {
+    const ttlMinutes = options.ttlMinutes || this.DEFAULT_TTL_MINUTES;
+    const expiresAt = Date.now() + (ttlMinutes * 60 * 1000);
+    
+    this.cache.set(key, {
+      data,
+      expiresAt,
+      createdAt: Date.now()
+    });
   }
 
-  async invalidate(pattern: string): Promise<void> {
-    // Clear from memory cache
-    for (const key of this.memoryCache.keys()) {
+  async invalidate(key: string): Promise<void> {
+    this.cache.delete(key);
+  }
+
+  async invalidatePattern(pattern: string): Promise<void> {
+    const keys = Array.from(this.cache.keys());
+    keys.forEach(key => {
       if (key.includes(pattern)) {
-        this.memoryCache.delete(key);
+        this.cache.delete(key);
       }
-    }
-
-    // Clear from database cache (simplified approach)
-    try {
-      await supabase.rpc('cleanup_expired_cache');
-    } catch (error) {
-      console.error('Cache invalidation error:', error);
-    }
+    });
   }
 
-  clearMemoryCache(): void {
-    this.memoryCache.clear();
+  async clear(): Promise<void> {
+    this.cache.clear();
+  }
+
+  // Clean up expired items
+  private cleanup(): void {
+    const now = Date.now();
+    const keys = Array.from(this.cache.keys());
+    
+    keys.forEach(key => {
+      const item = this.cache.get(key);
+      if (item && now > item.expiresAt) {
+        this.cache.delete(key);
+      }
+    });
+  }
+
+  constructor() {
+    // Run cleanup every 5 minutes
+    setInterval(() => this.cleanup(), 5 * 60 * 1000);
   }
 }
 
-export const cacheService = CacheService.getInstance();
+export const cacheService = new CacheService();
