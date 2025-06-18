@@ -7,12 +7,12 @@ import { cacheService } from '@/lib/cacheService';
 
 export interface FileUpload {
   id: string;
-  user_id: string;
   file_name: string;
-  file_type: string | null;
-  file_size: number | null;
   file_path: string;
+  file_size: number | null;
+  file_type: string | null;
   upload_date: string;
+  uploader_id: string;
   is_processed: boolean;
 }
 
@@ -30,7 +30,7 @@ export const useFileUpload = () => {
     try {
       const cacheKey = `file_uploads_${user.id}`;
       
-      // Try cache first for better performance
+      // Try cache first
       let cachedUploads = await cacheService.get<FileUpload[]>(cacheKey);
       if (cachedUploads) {
         setUploads(cachedUploads);
@@ -41,21 +41,18 @@ export const useFileUpload = () => {
       const { data, error } = await supabase
         .from('file_uploads')
         .select('*')
-        .eq('user_id', user.id)
+        .eq('uploader_id', user.id)
         .order('upload_date', { ascending: false });
 
       if (error) throw error;
-      
-      const uploadsData = data || [];
-      setUploads(uploadsData);
-      
-      // Cache for 15 minutes
-      await cacheService.set(cacheKey, uploadsData, { ttlMinutes: 15 });
+
+      setUploads(data || []);
+      await cacheService.set(cacheKey, data || [], { ttlMinutes: 5 });
     } catch (error) {
       console.error('Error fetching uploads:', error);
       toast({
-        title: "Error loading uploads",
-        description: "Unable to fetch your uploaded files",
+        title: "Error",
+        description: "Failed to fetch your uploads",
         variant: "destructive"
       });
     } finally {
@@ -65,64 +62,79 @@ export const useFileUpload = () => {
 
   const uploadFile = async (file: File, metadata: {
     title: string;
-    description: string;
-    author: string;
-    subject: string;
-    class: string;
-    resourceType: string;
+    description?: string;
+    author?: string;
+    subject?: string;
+    class?: string;
+    resourceType?: string;
   }) => {
-    if (!user) return;
+    if (!user) return false;
 
     setIsUploading(true);
     try {
-      // Create file upload record
-      const { data: uploadData, error: uploadError } = await supabase
+      // Upload file to storage
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${user.id}/${Date.now()}.${fileExt}`;
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('uploads')
+        .upload(fileName, file);
+
+      if (uploadError) throw uploadError;
+
+      // Record upload in database
+      const { data: fileData, error: fileError } = await supabase
         .from('file_uploads')
         .insert({
-          user_id: user.id,
           file_name: file.name,
-          file_type: file.type,
+          file_path: uploadData.path,
           file_size: file.size,
-          file_path: `uploads/${user.id}/${Date.now()}_${file.name}`,
-          is_processed: true
+          file_type: file.type,
+          uploader_id: user.id
         })
         .select()
         .single();
 
-      if (uploadError) throw uploadError;
+      if (fileError) throw fileError;
 
-      // Also create a resource entry
+      // Create resource entry
       const { error: resourceError } = await supabase
         .from('resources')
         .insert({
           title: metadata.title,
-          description: metadata.description,
-          author: metadata.author,
-          subject: metadata.subject,
-          class: metadata.class,
-          resource_type: metadata.resourceType,
-          file_url: uploadData.file_path,
+          description: metadata.description || '',
+          author: metadata.author || 'Unknown',
+          subject: metadata.subject || 'General',
+          class: metadata.class || 'N/A',
+          resource_type: metadata.resourceType || 'Document',
+          file_url: uploadData.path,
           uploader_id: user.id,
+          offline_access: true,
+          download_count: 0,
           premium_content: false
         });
 
       if (resourceError) throw resourceError;
 
       toast({
-        title: "File uploaded successfully",
-        description: "Your file has been uploaded and is now available as a resource"
+        title: "Upload successful",
+        description: "Your file has been uploaded and is now available in resources"
       });
 
-      // Invalidate cache and refetch
+      // Invalidate relevant caches
       await cacheService.invalidate(`file_uploads_${user.id}`);
+      await cacheService.invalidate('resources_');
+
       await fetchUploads();
+      return true;
     } catch (error) {
       console.error('Error uploading file:', error);
       toast({
         title: "Upload failed",
-        description: "Failed to upload file",
+        description: "Failed to upload your file. Please try again.",
         variant: "destructive"
       });
+      return false;
     } finally {
       setIsUploading(false);
     }
@@ -132,27 +144,44 @@ export const useFileUpload = () => {
     if (!user) return;
 
     try {
-      const { error } = await supabase
+      // Delete from storage
+      const { error: storageError } = await supabase.storage
+        .from('uploads')
+        .remove([filePath]);
+
+      if (storageError) throw storageError;
+
+      // Delete from database
+      const { error: dbError } = await supabase
         .from('file_uploads')
         .delete()
         .eq('id', uploadId)
-        .eq('user_id', user.id);
+        .eq('uploader_id', user.id);
 
-      if (error) throw error;
+      if (dbError) throw dbError;
+
+      // Delete associated resource
+      await supabase
+        .from('resources')
+        .delete()
+        .eq('file_url', filePath)
+        .eq('uploader_id', user.id);
 
       toast({
         title: "File deleted",
-        description: "File has been deleted successfully"
+        description: "Your file has been successfully deleted"
       });
 
-      // Invalidate cache and refetch
+      // Invalidate caches
       await cacheService.invalidate(`file_uploads_${user.id}`);
+      await cacheService.invalidate('resources_');
+
       await fetchUploads();
     } catch (error) {
       console.error('Error deleting file:', error);
       toast({
         title: "Delete failed",
-        description: "Failed to delete file",
+        description: "Failed to delete the file",
         variant: "destructive"
       });
     }
