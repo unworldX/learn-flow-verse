@@ -3,10 +3,11 @@ import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Users, Plus, Lock, Globe } from "lucide-react";
+import { Users, Lock, Globe } from "lucide-react";
 import { useRealStudyGroups } from "@/hooks/useRealStudyGroups";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CreateGroupDialog } from "@/components/CreateGroupDialog";
 
 const StudyGroups = () => {
   const { studyGroups, myGroups, isLoading, joinGroup, leaveGroup } = useRealStudyGroups();
@@ -87,10 +88,7 @@ const StudyGroups = () => {
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-8">
         <h1 className="text-3xl font-bold">Study Groups</h1>
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          Create Group
-        </Button>
+        <CreateGroupDialog />
       </div>
 
       <Tabs defaultValue="all" className="space-y-6">

@@ -9,29 +9,21 @@ export interface DirectMessage {
   id: string;
   sender_id: string;
   receiver_id: string;
-  encrypted_content: string | null;
-  message_type: 'text' | 'image' | 'video' | 'file';
-  file_url: string | null;
-  file_name: string | null;
-  file_size: number | null;
+  encrypted_content: string;
+  message_type: string;
+  file_url?: string;
+  file_name?: string;
+  file_size?: number;
   created_at: string;
   is_read: boolean;
-  sender?: {
-    full_name: string | null;
-    email: string;
-  };
-  receiver?: {
-    full_name: string | null;
-    email: string;
-  };
+  deleted_by_sender: boolean;
+  deleted_by_receiver: boolean;
 }
 
 export interface ChatUser {
   id: string;
   email: string;
-  full_name: string | null;
-  last_message?: DirectMessage;
-  unread_count: number;
+  full_name?: string;
 }
 
 export const useDirectMessages = () => {
@@ -46,24 +38,22 @@ export const useDirectMessages = () => {
 
     try {
       const cacheKey = `chat_users_${user.id}`;
-      
-      // Try cache first
       let cachedUsers = await cacheService.get<ChatUser[]>(cacheKey);
+      
       if (cachedUsers) {
         setChatUsers(cachedUsers);
         return;
       }
 
-      // Get all users who have exchanged messages with current user
-      const { data: messageData, error } = await supabase
+      // Get users we've had conversations with
+      const { data: messageData, error: messageError } = await supabase
         .from('direct_messages')
-        .select('*')
-        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-        .order('created_at', { ascending: false });
+        .select('sender_id, receiver_id')
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`);
 
-      if (error) throw error;
+      if (messageError) throw messageError;
 
-      // Get unique user IDs from messages
+      // Extract unique user IDs
       const userIds = new Set<string>();
       messageData?.forEach(msg => {
         if (msg.sender_id !== user.id) userIds.add(msg.sender_id);
@@ -76,60 +66,29 @@ export const useDirectMessages = () => {
       }
 
       // Fetch user details
-      const { data: usersData, error: usersError } = await supabase
+      const { data: users, error: usersError } = await supabase
         .from('users')
         .select('id, email, full_name')
         .in('id', Array.from(userIds));
 
       if (usersError) throw usersError;
 
-      // Process chat users
-      const userMap = new Map<string, ChatUser>();
-      
-      usersData?.forEach(userData => {
-        const lastMessage = messageData?.find(msg => 
-          msg.sender_id === userData.id || msg.receiver_id === userData.id
-        );
-        
-        if (lastMessage) {
-          userMap.set(userData.id, {
-            id: userData.id,
-            email: userData.email,
-            full_name: userData.full_name,
-            last_message: {
-              ...lastMessage,
-              message_type: lastMessage.message_type as 'text' | 'image' | 'video' | 'file'
-            } as DirectMessage,
-            unread_count: 0
-          });
-        }
-      });
-
-      const finalUsers = Array.from(userMap.values());
-      setChatUsers(finalUsers);
-      
-      // Cache the results
-      await cacheService.set(cacheKey, finalUsers, { ttlMinutes: 2 });
+      setChatUsers(users || []);
+      await cacheService.set(cacheKey, users || [], { ttlMinutes: 30 });
     } catch (error) {
       console.error('Error fetching chat users:', error);
+      toast({
+        title: "Error loading conversations",
+        description: "Unable to load conversation list",
+        variant: "destructive"
+      });
     }
   };
 
   const fetchMessages = async (otherUserId: string) => {
     if (!user) return;
 
-    setIsLoading(true);
     try {
-      const cacheKey = `messages_${user.id}_${otherUserId}`;
-      
-      // Try cache first
-      let cachedMessages = await cacheService.get<DirectMessage[]>(cacheKey);
-      if (cachedMessages) {
-        setMessages(cachedMessages);
-        setIsLoading(false);
-        return;
-      }
-
       const { data, error } = await supabase
         .from('direct_messages')
         .select('*')
@@ -138,45 +97,18 @@ export const useDirectMessages = () => {
 
       if (error) throw error;
 
-      // Get user details for sender and receiver
-      const userIds = new Set<string>();
-      data?.forEach(msg => {
-        userIds.add(msg.sender_id);
-        userIds.add(msg.receiver_id);
-      });
-
-      const { data: usersData, error: usersError } = await supabase
-        .from('users')
-        .select('id, email, full_name')
-        .in('id', Array.from(userIds));
-
-      if (usersError) throw usersError;
-
-      // Map messages with user details and proper typing
-      const messagesWithUsers = data?.map(msg => ({
-        ...msg,
-        message_type: msg.message_type as 'text' | 'image' | 'video' | 'file',
-        sender: usersData?.find(u => u.id === msg.sender_id),
-        receiver: usersData?.find(u => u.id === msg.receiver_id)
-      })) || [];
-
-      setMessages(messagesWithUsers as DirectMessage[]);
-      
-      // Cache the results
-      await cacheService.set(cacheKey, messagesWithUsers, { ttlMinutes: 1 });
+      setMessages(data || []);
     } catch (error) {
       console.error('Error fetching messages:', error);
       toast({
         title: "Error loading messages",
-        description: "Unable to fetch messages",
+        description: "Unable to load messages",
         variant: "destructive"
       });
-    } finally {
-      setIsLoading(false);
     }
   };
 
-  const sendMessage = async (receiverId: string, content: string, messageType: 'text' | 'file' = 'text', fileUrl?: string, fileName?: string) => {
+  const sendMessage = async (receiverId: string, content: string) => {
     if (!user) return;
 
     try {
@@ -186,27 +118,22 @@ export const useDirectMessages = () => {
           sender_id: user.id,
           receiver_id: receiverId,
           encrypted_content: content,
-          message_type: messageType,
-          file_url: fileUrl || null,
-          file_name: fileName || null
+          message_type: 'text'
         });
 
       if (error) throw error;
 
+      // Refresh messages
+      await fetchMessages(receiverId);
+      
       toast({
         title: "Message sent",
         description: "Your message has been sent successfully"
       });
-
-      // Invalidate caches and refetch
-      await cacheService.invalidate(`messages_${user.id}_${receiverId}`);
-      await cacheService.invalidate(`chat_users_${user.id}`);
-      fetchMessages(receiverId);
-      fetchChatUsers();
     } catch (error) {
       console.error('Error sending message:', error);
       toast({
-        title: "Error",
+        title: "Error sending message",
         description: "Failed to send message",
         variant: "destructive"
       });
@@ -215,7 +142,8 @@ export const useDirectMessages = () => {
 
   useEffect(() => {
     if (user) {
-      fetchChatUsers();
+      setIsLoading(true);
+      fetchChatUsers().finally(() => setIsLoading(false));
     }
   }, [user]);
 
