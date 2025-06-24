@@ -2,22 +2,21 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { supabase } from '@/integrations/supabase/client';
 
 export const useSubscriptionStatus = () => {
-  const { user, session } = useAuth();
+  const { user } = useAuth();
   const { toast } = useToast();
   const [isChecking, setIsChecking] = useState(false);
 
   const checkSubscriptionStatus = async () => {
-    if (!user || !session) return;
+    if (!user) return;
 
     setIsChecking(true);
     try {
       const { data, error } = await fetch('/api/check-subscription', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${session.access_token}`,
+          'Authorization': `Bearer ${(await user.getSession())?.access_token}`,
           'Content-Type': 'application/json'
         }
       }).then(res => res.json());
@@ -43,13 +42,13 @@ export const useSubscriptionStatus = () => {
   };
 
   const createCheckoutSession = async (planId: string) => {
-    if (!user || !session) return;
+    if (!user) return;
 
     try {
       const { data, error } = await fetch('/api/create-checkout', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${session.access_token}`,
+          'Authorization': `Bearer ${(await user.getSession())?.access_token}`,
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({ planId })
