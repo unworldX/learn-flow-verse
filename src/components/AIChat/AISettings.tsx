@@ -3,7 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Bot, Shield, Trash2, Save, RefreshCw } from 'lucide-react';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { useAISettings } from '@/hooks/useAISettings';
 import { AI_PROVIDERS, PROVIDER_KEYS } from '@/config/aiProviders';
 import SecureKeyManager from './SecureKeyManager';

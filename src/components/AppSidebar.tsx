@@ -27,7 +27,8 @@ import {
   SidebarMenuButton,
   SidebarMenuItem,
 } from "@/components/ui/sidebar"
-import { useAuth } from "@/hooks/useAuth"
+import { useAuth } from "@/contexts/AuthContext"
+import { Link } from "react-router-dom"
 import { Badge } from "@/components/ui/badge"
 
 const items = [
@@ -37,34 +38,19 @@ const items = [
     icon: Home,
   },
   {
-    title: "Profile",
-    url: "/profile",
-    icon: User,
-  },
-  {
-    title: "Study Plans",
-    url: "/study-plans",
-    icon: Calendar,
-  },
-  {
     title: "Resources",
     url: "/resources",
     icon: FileText,
   },
   {
-    title: "Forums",
-    url: "/forums",
-    icon: MessageSquare,
-  },
-  {
-    title: "Reminders",
-    url: "/reminders",
-    icon: Bell,
-  },
-  {
     title: "Upload",
     url: "/upload",
     icon: Upload,
+  },
+  {
+    title: "Subscription",
+    url: "/subscription",
+    icon: User,
   },
 ]
 
@@ -76,12 +62,12 @@ const chatItems = [
   },
   {
     title: "Direct Messages",
-    url: "/chats",
+    url: "/messages",
     icon: MessageCircle,
   },
   {
     title: "Study Groups",
-    url: "/groups",
+    url: "/study-groups",
     icon: Users,
   },
 ]
@@ -114,10 +100,10 @@ export function AppSidebar() {
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild className="hover:bg-slate-100 rounded-lg mx-2 transition-all duration-200">
-                    <a href={item.url} className="flex items-center gap-3 px-3 py-2">
+                    <Link to={item.url} className="flex items-center gap-3 px-3 py-2">
                       <item.icon className="w-5 h-5" />
                       <span className="font-medium">{item.title}</span>
-                    </a>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -132,10 +118,10 @@ export function AppSidebar() {
               {chatItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
                   <SidebarMenuButton asChild className="hover:bg-slate-100 rounded-lg mx-2 transition-all duration-200">
-                    <a href={item.url} className="flex items-center gap-3 px-3 py-2">
+                    <Link to={item.url} className="flex items-center gap-3 px-3 py-2">
                       <item.icon className="w-5 h-5" />
                       <span className="font-medium">{item.title}</span>
-                    </a>
+                    </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
               ))}
@@ -149,10 +135,10 @@ export function AppSidebar() {
             <SidebarMenu>
               <SidebarMenuItem>
                 <SidebarMenuButton asChild className="hover:bg-slate-100 rounded-lg mx-2 transition-all duration-200">
-                  <a href="/settings" className="flex items-center gap-3 px-3 py-2">
+                  <Link to="/settings" className="flex items-center gap-3 px-3 py-2">
                     <Settings className="w-5 h-5" />
                     <span className="font-medium">Settings</span>
-                  </a>
+                  </Link>
                 </SidebarMenuButton>
               </SidebarMenuItem>
             </SidebarMenu>

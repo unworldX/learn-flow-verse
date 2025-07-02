@@ -6,7 +6,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Send, Bot, Upload, Settings } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { useAIChatMessages } from '@/hooks/useAIChatMessages';
 import { Link } from 'react-router-dom';
 import WelcomeScreen from './WelcomeScreen';

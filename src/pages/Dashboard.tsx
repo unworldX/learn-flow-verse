@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import { BookOpen, Users, MessageSquare, TrendingUp, Plus, Calendar } from 'lucide-react';
 import { useSupabaseData } from '@/hooks/useSupabaseData';
-import { useAuth } from '@/hooks/useAuth';
+import { useAuth } from '@/contexts/AuthContext';
 import { Link } from 'react-router-dom';
 
 const Dashboard = () => {

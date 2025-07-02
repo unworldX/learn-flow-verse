@@ -11,7 +11,7 @@ import { Badge } from "@/components/ui/badge";
 import { User, Bell, Shield, Palette, Bot, HelpCircle, Settings as SettingsIcon, Key, Database, Zap } from "lucide-react";
 import { useUserSettings } from "@/hooks/useUserSettings";
 import { useAISettings } from "@/hooks/useAISettings";
-import { useAuth } from "@/hooks/useAuth";
+import { useAuth } from "@/contexts/AuthContext";
 import { useToast } from "@/hooks/use-toast";
 import { AI_PROVIDERS, PROVIDER_KEYS } from "@/config/aiProviders";
 import { cacheService } from "@/lib/cacheService";
