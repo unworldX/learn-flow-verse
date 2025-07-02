@@ -157,8 +157,17 @@ const Settings = () => {
                   <Input id="email" value={user?.email || ''} disabled className="bg-gray-50" />
                 </div>
                 <div>
-                  <Label htmlFor="userId">User ID</Label>
-                  <Input id="userId" value={user?.id || ''} disabled className="bg-gray-50" />
+                  <Label htmlFor="username">Username</Label>
+                  <Input id="username" value={user?.user_metadata?.username || 'Not set'} disabled className="bg-gray-50" />
+                </div>
+              </div>
+              <Separator />
+              <div className="space-y-2">
+                <Label>Subscription Status</Label>
+                <div className="text-sm text-muted-foreground">
+                  <p>Plan: Free (Basic features)</p>
+                  <p>Resources Downloaded: 0/5</p>
+                  <p>Groups Joined: 0/1</p>
                 </div>
               </div>
               <Separator />

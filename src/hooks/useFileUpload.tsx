@@ -103,7 +103,9 @@ export const useFileUpload = () => {
           resource_type: metadata.resourceType,
           file_url: uploadData.file_path,
           uploader_id: user.id,
-          premium_content: false
+          premium_content: false,
+          upload_date: new Date().toISOString(),
+          download_count: 0
         });
 
       if (resourceError) throw resourceError;
