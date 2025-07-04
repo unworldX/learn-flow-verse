@@ -49,12 +49,12 @@ const Forums = () => {
   };
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold">Discussion Forums</h1>
+    <div className="container mx-auto px-4 py-4 md:py-8">
+      <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 mb-6 md:mb-8">
+        <h1 className="text-2xl md:text-3xl font-bold">Discussion Forums</h1>
         <Dialog open={showCreatePost} onOpenChange={setShowCreatePost}>
           <DialogTrigger asChild>
-            <Button>
+            <Button className="w-full md:w-auto">
               <Plus className="h-4 w-4 mr-2" />
               New Post
             </Button>
@@ -101,38 +101,36 @@ const Forums = () => {
         </Dialog>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 md:gap-6">
         {/* Categories Sidebar */}
-        <div className="lg:col-span-1">
-          <Card>
-            <CardHeader>
-              <CardTitle>Categories</CardTitle>
+        <div className="lg:col-span-1 order-2 lg:order-1">
+          <Card className="lg:sticky lg:top-4">
+            <CardHeader className="pb-3">
+              <CardTitle className="text-base md:text-lg">Categories</CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
+            <CardContent className="space-y-2">
+              <Button
+                variant={!selectedCategory ? "default" : "ghost"}
+                className="w-full justify-start text-sm"
+                onClick={() => {
+                  setSelectedCategory('');
+                }}
+              >
+                All Posts
+              </Button>
+              {categories.map((category) => (
                 <Button
-                  variant={!selectedCategory ? "default" : "ghost"}
-                  className="w-full justify-start"
+                  key={category.id}
+                  variant={selectedCategory === category.id ? "default" : "ghost"}
+                  className="w-full justify-start text-sm"
                   onClick={() => {
-                    setSelectedCategory('');
+                    setSelectedCategory(category.id);
+                    refetch();
                   }}
                 >
-                  All Posts
+                  {category.name}
                 </Button>
-                {categories.map((category) => (
-                  <Button
-                    key={category.id}
-                    variant={selectedCategory === category.id ? "default" : "ghost"}
-                    className="w-full justify-start"
-                    onClick={() => {
-                      setSelectedCategory(category.id);
-                      refetch();
-                    }}
-                  >
-                    {category.name}
-                  </Button>
-                ))}
-              </div>
+              ))}
             </CardContent>
           </Card>
         </div>

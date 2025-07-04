@@ -1,5 +1,5 @@
 
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,10 +8,16 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
 import { useProfile } from "@/hooks/useProfile";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Camera, Upload } from "lucide-react";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
 
 const Profile = () => {
   const { profile, isLoading, updateProfile } = useProfile();
+  const { toast } = useToast();
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [isUploading, setIsUploading] = useState(false);
   const [formData, setFormData] = useState({
     full_name: '',
     email: ''
@@ -37,6 +43,48 @@ const Profile = () => {
 
   const handleCancel = () => {
     setIsEditing(false);
+  };
+
+  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file || !profile) return;
+
+    setIsUploading(true);
+    try {
+      const fileExt = file.name.split('.').pop();
+      const fileName = `${profile.id}.${fileExt}`;
+      
+      const { error: uploadError } = await supabase.storage
+        .from('uploads')
+        .upload(`avatars/${fileName}`, file, {
+          upsert: true
+        });
+
+      if (uploadError) throw uploadError;
+
+      const { data } = supabase.storage
+        .from('uploads')
+        .getPublicUrl(`avatars/${fileName}`);
+
+      await updateProfile({
+        avatar_url: data.publicUrl
+      });
+
+      toast({
+        title: "Avatar updated",
+        description: "Your profile picture has been updated successfully"
+      });
+
+    } catch (error) {
+      console.error('Error uploading avatar:', error);
+      toast({
+        title: "Upload failed",
+        description: "Failed to upload profile picture",
+        variant: "destructive"
+      });
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   if (isLoading) {
@@ -73,12 +121,33 @@ const Profile = () => {
     <div className="container mx-auto px-4 py-8">
       <Card className="max-w-2xl mx-auto">
         <CardHeader className="text-center">
-          <Avatar className="h-24 w-24 mx-auto mb-4">
-            <AvatarImage src={profile.avatar_url || ''} />
-            <AvatarFallback className="text-2xl">
-              {profile.full_name ? profile.full_name.charAt(0).toUpperCase() : profile.email.charAt(0).toUpperCase()}
-            </AvatarFallback>
-          </Avatar>
+          <div className="relative inline-block mb-4">
+            <Avatar className="h-24 w-24 mx-auto">
+              <AvatarImage src={profile.avatar_url || ''} />
+              <AvatarFallback className="text-2xl">
+                {profile.full_name ? profile.full_name.charAt(0).toUpperCase() : profile.email.charAt(0).toUpperCase()}
+              </AvatarFallback>
+            </Avatar>
+            <Button
+              size="sm"
+              className="absolute bottom-0 right-0 rounded-full h-8 w-8 p-0"
+              onClick={() => fileInputRef.current?.click()}
+              disabled={isUploading}
+            >
+              {isUploading ? (
+                <Upload className="h-4 w-4 animate-spin" />
+              ) : (
+                <Camera className="h-4 w-4" />
+              )}
+            </Button>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept="image/*"
+              onChange={handleAvatarUpload}
+              className="hidden"
+            />
+          </div>
           <CardTitle className="text-2xl">
             {profile.full_name || profile.email.split('@')[0]}
           </CardTitle>

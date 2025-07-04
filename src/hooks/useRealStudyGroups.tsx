@@ -42,7 +42,7 @@ export const useRealStudyGroups = () => {
         return;
       }
 
-      // Fetch all study groups first
+      // Fetch all study groups first (include private groups for now)
       const { data: groups, error: groupsError } = await supabase
         .from('study_groups')
         .select('*')
