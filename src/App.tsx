@@ -17,6 +17,7 @@ import AIChatPage from "./pages/AIChatPage";
 import Profile from "./pages/Profile";
 import Search from "./pages/Search";
 import Notes from "./pages/Notes";
+import Forums from "./pages/Forums";
 
 const queryClient = new QueryClient();
 
@@ -40,6 +41,7 @@ const App = () => (
               <Route path="/profile" element={<Profile />} />
               <Route path="/search" element={<Search />} />
               <Route path="/notes" element={<Notes />} />
+              <Route path="/forums" element={<Forums />} />
             </Routes>
           </Layout>
         </BrowserRouter>

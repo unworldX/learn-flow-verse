@@ -1,85 +1,77 @@
-
 import { useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { MessageSquare, Plus, User } from "lucide-react";
+import { MessageSquare, ThumbsUp, ThumbsDown, Users, Plus } from "lucide-react";
 import { useForums } from "@/hooks/useForums";
-import { format } from "date-fns";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 const Forums = () => {
-  const { categories, posts, isLoading, createPost, createComment } = useForums();
+  const { 
+    categories, 
+    posts, 
+    isLoading, 
+    createPost, 
+    createComment, 
+    refetch 
+  } = useForums();
+  
+  const [selectedCategory, setSelectedCategory] = useState<string>('');
+  const [newPost, setNewPost] = useState({ subject: '', content: '', category_id: '' });
+  const [newComment, setNewComment] = useState({ post_id: '', content: '' });
   const [showCreatePost, setShowCreatePost] = useState(false);
-  const [selectedPost, setSelectedPost] = useState<string | null>(null);
-  const [postForm, setPostForm] = useState({
-    subject: '',
-    content: '',
-    category_id: ''
-  });
-  const [commentText, setCommentText] = useState('');
+  const [comments, setComments] = useState<any[]>([]);
 
-  const handleCreatePost = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!postForm.subject || !postForm.category_id) return;
-
-    await createPost(postForm);
-    setPostForm({ subject: '', content: '', category_id: '' });
+  const handleCreatePost = async () => {
+    if (!newPost.subject.trim() || !newPost.category_id) return;
+    
+    await createPost({
+      subject: newPost.subject,
+      content: newPost.content,
+      category_id: newPost.category_id
+    });
+    setNewPost({ subject: '', content: '', category_id: '' });
     setShowCreatePost(false);
+    refetch();
   };
 
-  const handleCreateComment = async (postId: string) => {
-    if (!commentText.trim()) return;
-
+  const handleCreateComment = async (postId: string, content: string) => {
+    if (!content.trim()) return;
     await createComment({
       post_id: postId,
-      comment_text: commentText
+      comment_text: content
     });
-    setCommentText('');
-  };
-
-  const getCategoryName = (categoryId: string) => {
-    const category = categories.find(c => c.id === categoryId);
-    return category?.name || 'Unknown';
+    refetch();
   };
 
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex justify-between items-center mb-8">
-        <h1 className="text-3xl font-bold">Forums</h1>
-        <Button onClick={() => setShowCreatePost(!showCreatePost)}>
-          <Plus className="h-4 w-4 mr-2" />
-          New Post
-        </Button>
-      </div>
-
-      {showCreatePost && (
-        <Card className="mb-8">
-          <CardHeader>
-            <CardTitle>Create New Post</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleCreatePost} className="space-y-4">
+        <h1 className="text-3xl font-bold">Discussion Forums</h1>
+        <Dialog open={showCreatePost} onOpenChange={setShowCreatePost}>
+          <DialogTrigger asChild>
+            <Button>
+              <Plus className="h-4 w-4 mr-2" />
+              New Post
+            </Button>
+          </DialogTrigger>
+          <DialogContent>
+            <DialogHeader>
+              <DialogTitle>Create New Post</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
               <div>
-                <Label htmlFor="subject">Subject</Label>
-                <Input
-                  id="subject"
-                  value={postForm.subject}
-                  onChange={(e) => setPostForm({ ...postForm, subject: e.target.value })}
-                  placeholder="Post subject"
-                  required
-                />
-              </div>
-              
-              <div>
-                <Label>Category</Label>
-                <Select value={postForm.category_id} onValueChange={(value) => setPostForm({ ...postForm, category_id: value })}>
+                <label className="text-sm font-medium mb-2 block">Category</label>
+                <Select 
+                  value={newPost.category_id} 
+                  onValueChange={(value) => setNewPost({...newPost, category_id: value})}
+                >
                   <SelectTrigger>
-                    <SelectValue placeholder="Select category" />
+                    <SelectValue placeholder="Select a category" />
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map((category) => (
@@ -90,121 +82,168 @@ const Forums = () => {
                   </SelectContent>
                 </Select>
               </div>
-              
-              <div>
-                <Label htmlFor="content">Content</Label>
-                <Textarea
-                  id="content"
-                  value={postForm.content}
-                  onChange={(e) => setPostForm({ ...postForm, content: e.target.value })}
-                  placeholder="Post content"
-                  rows={6}
-                />
-              </div>
-              
-              <div className="flex gap-2">
-                <Button type="submit">Create Post</Button>
-                <Button type="button" variant="outline" onClick={() => setShowCreatePost(false)}>
-                  Cancel
-                </Button>
-              </div>
-            </form>
-          </CardContent>
-        </Card>
-      )}
-
-      {/* Categories Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-        {categories.map((category) => (
-          <Card key={category.id}>
-            <CardContent className="p-4">
-              <h3 className="font-semibold">{category.name}</h3>
-              <p className="text-sm text-muted-foreground mt-1">{category.description}</p>
-              <Badge variant="secondary" className="mt-2">
-                {posts.filter(p => p.category_id === category.id).length} posts
-              </Badge>
-            </CardContent>
-          </Card>
-        ))}
+              <Input
+                placeholder="Post title"
+                value={newPost.subject}
+                onChange={(e) => setNewPost({...newPost, subject: e.target.value})}
+              />
+              <Textarea
+                placeholder="What's on your mind?"
+                value={newPost.content}
+                onChange={(e) => setNewPost({...newPost, content: e.target.value})}
+                rows={6}
+              />
+              <Button onClick={handleCreatePost} className="w-full">
+                Create Post
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
 
-      {/* Posts List */}
-      <div className="space-y-6">
-        {isLoading ? (
-          <p className="text-muted-foreground">Loading posts...</p>
-        ) : posts.length === 0 ? (
+      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        {/* Categories Sidebar */}
+        <div className="lg:col-span-1">
           <Card>
-            <CardContent className="text-center py-8">
-              <MessageSquare className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
-              <p className="text-muted-foreground">No posts yet. Be the first to start a discussion!</p>
+            <CardHeader>
+              <CardTitle>Categories</CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="space-y-2">
+                <Button
+                  variant={!selectedCategory ? "default" : "ghost"}
+                  className="w-full justify-start"
+                  onClick={() => {
+                    setSelectedCategory('');
+                  }}
+                >
+                  All Posts
+                </Button>
+                {categories.map((category) => (
+                  <Button
+                    key={category.id}
+                    variant={selectedCategory === category.id ? "default" : "ghost"}
+                    className="w-full justify-start"
+                    onClick={() => {
+                      setSelectedCategory(category.id);
+                      refetch();
+                    }}
+                  >
+                    {category.name}
+                  </Button>
+                ))}
+              </div>
             </CardContent>
           </Card>
-        ) : (
-          posts.map((post) => (
-            <Card key={post.id}>
-              <CardHeader>
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <Avatar className="h-10 w-10">
-                      <AvatarFallback>
-                        <User className="h-4 w-4" />
-                      </AvatarFallback>
-                    </Avatar>
-                    <div>
-                      <h3 className="font-semibold">{post.subject}</h3>
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <span>by {(post as any).users?.full_name || (post as any).users?.email || 'Anonymous'}</span>
-                        <span>•</span>
-                        <span>{format(new Date(post.created_at), 'MMM dd, yyyy')}</span>
+        </div>
+
+        {/* Posts */}
+        <div className="lg:col-span-3">
+          {isLoading ? (
+            <div className="space-y-4">
+              {[...Array(5)].map((_, i) => (
+                <Card key={i}>
+                  <CardHeader>
+                    <Skeleton className="h-6 w-3/4" />
+                    <Skeleton className="h-4 w-1/2" />
+                  </CardHeader>
+                  <CardContent>
+                    <Skeleton className="h-4 w-full mb-2" />
+                    <Skeleton className="h-4 w-2/3" />
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {posts.map((post) => (
+                <Card key={post.id} className="hover:shadow-lg transition-shadow">
+                  <CardHeader>
+                    <div className="flex justify-between items-start">
+                      <CardTitle className="text-lg">{post.subject}</CardTitle>
+                      <Badge variant="outline">
+                        {categories.find(c => c.id === post.category_id)?.name || 'General'}
+                      </Badge>
+                    </div>
+                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                      <Users className="h-4 w-4" />
+                      <span>Posted {new Date(post.created_at).toLocaleDateString()}</span>
+                    </div>
+                  </CardHeader>
+                  <CardContent>
+                    <p className="text-sm mb-4">{post.content}</p>
+                    
+                    {/* Comments Section */}
+                    <div className="border-t pt-4">
+                      <div className="flex items-center gap-2 mb-4">
+                        <MessageSquare className="h-4 w-4" />
+                        <span className="text-sm font-medium">
+                          {comments.filter(c => c.post_id === post.id).length} Comments
+                        </span>
+                      </div>
+                      
+                      {/* Existing Comments */}
+                      <div className="space-y-2 mb-4">
+                        {comments
+                          .filter(comment => comment.post_id === post.id)
+                          .slice(0, 3)
+                          .map((comment) => (
+                            <div key={comment.id} className="p-3 bg-muted rounded-lg">
+                              <p className="text-sm">{comment.comment_text}</p>
+                              <p className="text-xs text-muted-foreground mt-1">
+                                {new Date(comment.created_at).toLocaleDateString()}
+                              </p>
+                            </div>
+                          ))
+                        }
+                      </div>
+
+                      {/* Add Comment */}
+                      <div className="flex gap-2">
+                        <Input
+                          placeholder="Add a comment..."
+                          value={newComment.post_id === post.id ? newComment.content : ''}
+                          onChange={(e) => setNewComment({ post_id: post.id, content: e.target.value })}
+                          onKeyPress={(e) => {
+                            if (e.key === 'Enter') {
+                              handleCreateComment(post.id, newComment.content);
+                              setNewComment({ post_id: '', content: '' });
+                            }
+                          }}
+                        />
+                        <Button
+                          size="sm"
+                          onClick={() => {
+                            handleCreateComment(post.id, newComment.content);
+                            setNewComment({ post_id: '', content: '' });
+                          }}
+                        >
+                          Reply
+                        </Button>
                       </div>
                     </div>
-                  </div>
-                  <Badge variant="outline">
-                    {getCategoryName(post.category_id)}
-                  </Badge>
-                </div>
-              </CardHeader>
-              <CardContent>
-                {post.content && (
-                  <p className="text-muted-foreground mb-4">{post.content}</p>
-                )}
-                
-                <div className="flex gap-2">
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setSelectedPost(selectedPost === post.id ? null : post.id)}
-                  >
-                    <MessageSquare className="h-4 w-4 mr-2" />
-                    Reply
-                  </Button>
-                </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+          )}
 
-                {selectedPost === post.id && (
-                  <div className="mt-4 p-4 border rounded-lg bg-muted">
-                    <Label htmlFor="comment">Add a comment</Label>
-                    <Textarea
-                      id="comment"
-                      value={commentText}
-                      onChange={(e) => setCommentText(e.target.value)}
-                      placeholder="Write your comment..."
-                      className="mt-2"
-                      rows={3}
-                    />
-                    <div className="flex gap-2 mt-2">
-                      <Button size="sm" onClick={() => handleCreateComment(post.id)}>
-                        Post Comment
-                      </Button>
-                      <Button variant="outline" size="sm" onClick={() => setSelectedPost(null)}>
-                        Cancel
-                      </Button>
-                    </div>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          ))
-        )}
+          {posts.length === 0 && !isLoading && (
+            <div className="text-center py-12">
+              <h3 className="text-lg font-medium mb-2">No posts yet</h3>
+              <p className="text-muted-foreground mb-4">
+                {selectedCategory 
+                  ? 'No posts in this category yet' 
+                  : 'Be the first to start a discussion!'
+                }
+              </p>
+              <Button onClick={() => setShowCreatePost(true)}>
+                <Plus className="h-4 w-4 mr-2" />
+                Create First Post
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

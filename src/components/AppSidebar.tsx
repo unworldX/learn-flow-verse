@@ -14,6 +14,7 @@ import {
   LogOut,
   Bot,
   Search,
+  Globe,
 } from "lucide-react"
 
 import {
@@ -85,6 +86,11 @@ const chatItems = [
     title: "Study Groups",
     url: "/study-groups",
     icon: Users,
+  },
+  {
+    title: "Forums",
+    url: "/forums",
+    icon: Globe,
   },
 ]
 
