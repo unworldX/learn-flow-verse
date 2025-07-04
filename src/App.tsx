@@ -18,6 +18,7 @@ import Profile from "./pages/Profile";
 import Search from "./pages/Search";
 import Notes from "./pages/Notes";
 import Forums from "./pages/Forums";
+import GroupChat from "./pages/GroupChat";
 
 const queryClient = new QueryClient();
 
@@ -42,6 +43,7 @@ const App = () => (
               <Route path="/search" element={<Search />} />
               <Route path="/notes" element={<Notes />} />
               <Route path="/forums" element={<Forums />} />
+              <Route path="/group-chat/:groupId" element={<GroupChat />} />
             </Routes>
           </Layout>
         </BrowserRouter>

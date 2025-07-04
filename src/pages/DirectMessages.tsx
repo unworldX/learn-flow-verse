@@ -5,13 +5,18 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Send, User } from "lucide-react";
+import { Send, User, Plus, Search } from "lucide-react";
 import { useDirectMessages } from "@/hooks/useDirectMessages";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { useAuth } from "@/contexts/AuthContext";
 
 const DirectMessages = () => {
+  const { user } = useAuth();
   const { messages, chatUsers, isLoading, fetchMessages, sendMessage } = useDirectMessages();
   const [selectedUser, setSelectedUser] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState('');
+  const [showNewChat, setShowNewChat] = useState(false);
+  const [searchEmail, setSearchEmail] = useState('');
 
   const handleUserSelect = (userId: string) => {
     setSelectedUser(userId);
@@ -31,78 +36,142 @@ const DirectMessages = () => {
     }
   };
 
+  const handleNewChat = () => {
+    if (searchEmail.trim()) {
+      // In a real app, you'd search for users by email
+      setShowNewChat(false);
+      setSearchEmail('');
+    }
+  };
+
   if (isLoading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <div className="flex items-center justify-center h-64">
-          <div className="text-lg">Loading messages...</div>
+      <div className="min-h-screen liquid-bg flex items-center justify-center">
+        <div className="glass-card p-6">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="text-sm text-slate-600 mt-2">Loading messages...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-8">Direct Messages</h1>
-      
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[600px]">
-        {/* Chat Users List */}
-        <Card>
-          <CardHeader>
-            <CardTitle>Conversations</CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
-            <ScrollArea className="h-[500px]">
+    <div className="min-h-screen liquid-bg">
+      <div className="container mx-auto px-3 py-4 md:px-4 md:py-6">
+        {/* Title Bar */}
+        <div className="glass-card p-4 md:p-6 mb-6">
+          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
+            <div>
+              <h1 className="text-xl md:text-2xl font-bold gradient-text">Direct Messages</h1>
+              <p className="text-sm text-slate-600 mt-1">Private conversations with other students</p>
+            </div>
+            
+            <Dialog open={showNewChat} onOpenChange={setShowNewChat}>
+              <DialogTrigger asChild>
+                <Button className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600">
+                  <Plus className="h-4 w-4 mr-2" />
+                  New Chat
+                </Button>
+              </DialogTrigger>
+              <DialogContent className="glass-card border-white/30">
+                <DialogHeader>
+                  <DialogTitle>Start New Conversation</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="relative">
+                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+                    <Input
+                      placeholder="Enter user email..."
+                      value={searchEmail}
+                      onChange={(e) => setSearchEmail(e.target.value)}
+                      className="pl-10 bg-white/80 border-white/30"
+                    />
+                  </div>
+                  <Button onClick={handleNewChat} className="w-full">
+                    Start Chat
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+          </div>
+        </div>
+        
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[600px]">
+          {/* Chat Users List */}
+          <div className="glass-card flex flex-col">
+            <div className="p-4 border-b border-white/20">
+              <h3 className="font-semibold text-slate-700">Conversations</h3>
+            </div>
+            <ScrollArea className="flex-1">
               {chatUsers.length === 0 ? (
-                <div className="p-4 text-center text-gray-500">
-                  No conversations yet
+                <div className="p-6 text-center">
+                  <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-3">
+                    <User className="w-6 h-6 text-white" />
+                  </div>
+                  <p className="text-slate-600 mb-2">No conversations yet</p>
+                  <p className="text-sm text-slate-500">Start a new chat to begin</p>
                 </div>
               ) : (
-                chatUsers.map((user) => (
-                  <div
-                    key={user.id}
-                    className={`p-4 cursor-pointer hover:bg-gray-50 border-l-4 ${
-                      selectedUser === user.id ? 'border-blue-500 bg-blue-50' : 'border-transparent'
-                    }`}
-                    onClick={() => handleUserSelect(user.id)}
-                  >
-                    <div className="flex items-center space-x-3">
-                      <div className="bg-gray-200 rounded-full p-2">
-                        <User className="h-5 w-5" />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">
-                          {user.full_name || user.email.split('@')[0]}
-                        </p>
-                        <p className="text-xs text-gray-500 truncate">
-                          {user.email}
-                        </p>
+                <div className="p-2">
+                  {chatUsers.map((chatUser) => (
+                    <div
+                      key={chatUser.id}
+                      className={`p-3 m-1 cursor-pointer rounded-xl transition-all ${
+                        selectedUser === chatUser.id 
+                          ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white' 
+                          : 'hover:bg-white/50'
+                      }`}
+                      onClick={() => handleUserSelect(chatUser.id)}
+                    >
+                      <div className="flex items-center space-x-3">
+                        <div className={`rounded-full p-2 ${
+                          selectedUser === chatUser.id 
+                            ? 'bg-white/20' 
+                            : 'bg-gradient-to-br from-blue-500 to-purple-500'
+                        }`}>
+                          <User className={`h-4 w-4 ${
+                            selectedUser === chatUser.id ? 'text-white' : 'text-white'
+                          }`} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate">
+                            {chatUser.full_name || chatUser.email.split('@')[0]}
+                          </p>
+                          <p className={`text-xs truncate ${
+                            selectedUser === chatUser.id ? 'text-white/70' : 'text-slate-500'
+                          }`}>
+                            {chatUser.email}
+                          </p>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                ))
+                  ))}
+                </div>
               )}
             </ScrollArea>
-          </CardContent>
-        </Card>
+          </div>
 
-        {/* Messages Area */}
-        <Card className="lg:col-span-2">
-          <CardHeader>
-            <CardTitle>
-              {selectedUser 
-                ? chatUsers.find(u => u.id === selectedUser)?.full_name || 'Chat'
-                : 'Select a conversation'
-              }
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="p-0">
+          {/* Messages Area */}
+          <div className="lg:col-span-2 glass-card flex flex-col">
+            <div className="p-4 border-b border-white/20">
+              <h3 className="font-semibold text-slate-700">
+                {selectedUser 
+                  ? chatUsers.find(u => u.id === selectedUser)?.full_name || 'Chat'
+                  : 'Select a conversation'
+                }
+              </h3>
+            </div>
+            
             {selectedUser ? (
-              <div className="h-[500px] flex flex-col">
+              <div className="flex-1 flex flex-col">
                 <ScrollArea className="flex-1 p-4">
                   {messages.length === 0 ? (
-                    <div className="text-center text-gray-500 py-8">
-                      No messages yet. Start a conversation!
+                    <div className="text-center py-8">
+                      <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-3">
+                        <Send className="w-6 h-6 text-white" />
+                      </div>
+                      <p className="text-slate-600 mb-2">No messages yet</p>
+                      <p className="text-sm text-slate-500">Start a conversation!</p>
                     </div>
                   ) : (
                     <div className="space-y-4">
@@ -110,18 +179,20 @@ const DirectMessages = () => {
                         <div
                           key={message.id}
                           className={`flex ${
-                            message.sender_id === selectedUser ? 'justify-start' : 'justify-end'
+                            message.sender_id === user?.id ? 'justify-end' : 'justify-start'
                           }`}
                         >
                           <div
-                            className={`max-w-xs lg:max-w-md px-4 py-2 rounded-lg ${
-                              message.sender_id === selectedUser
-                                ? 'bg-gray-200 text-gray-800'
-                                : 'bg-blue-500 text-white'
+                            className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
+                              message.sender_id === user?.id
+                                ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white'
+                                : 'glass border border-white/30'
                             }`}
                           >
                             <p className="text-sm">{message.encrypted_content}</p>
-                            <p className="text-xs opacity-70 mt-1">
+                            <p className={`text-xs mt-1 ${
+                              message.sender_id === user?.id ? 'text-white/70' : 'text-slate-500'
+                            }`}>
                               {new Date(message.created_at).toLocaleTimeString()}
                             </p>
                           </div>
@@ -131,30 +202,38 @@ const DirectMessages = () => {
                   )}
                 </ScrollArea>
                 
-                <Separator />
-                
-                <div className="p-4">
+                <div className="p-4 border-t border-white/20">
                   <div className="flex space-x-2">
                     <Input
                       placeholder="Type a message..."
                       value={newMessage}
                       onChange={(e) => setNewMessage(e.target.value)}
                       onKeyPress={handleKeyPress}
-                      className="flex-1"
+                      className="flex-1 bg-white/80 border-white/30"
                     />
-                    <Button onClick={handleSendMessage} disabled={!newMessage.trim()}>
+                    <Button 
+                      onClick={handleSendMessage} 
+                      disabled={!newMessage.trim()}
+                      className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+                    >
                       <Send className="h-4 w-4" />
                     </Button>
                   </div>
                 </div>
               </div>
             ) : (
-              <div className="h-[500px] flex items-center justify-center text-gray-500">
-                Select a conversation to start messaging
+              <div className="flex-1 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <User className="w-8 h-8 text-white" />
+                  </div>
+                  <p className="text-slate-600 mb-2">Select a conversation</p>
+                  <p className="text-sm text-slate-500">Choose someone to start messaging</p>
+                </div>
               </div>
             )}
-          </CardContent>
-        </Card>
+          </div>
+        </div>
       </div>
     </div>
   );

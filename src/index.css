@@ -129,9 +129,23 @@
     @apply bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent;
   }
   
-  /* Glass morphism effect */
+  /* Liquid Glass morphism effect */
   .glass {
     @apply bg-white/80 backdrop-blur-md border border-white/20;
+  }
+  
+  .liquid-glass {
+    @apply bg-white/10 backdrop-blur-xl border border-white/20 shadow-lg;
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
+  }
+  
+  .glass-card {
+    @apply bg-white/70 backdrop-blur-lg border border-white/30 shadow-xl rounded-2xl;
+    background: linear-gradient(145deg, rgba(255, 255, 255, 0.8), rgba(255, 255, 255, 0.6));
+  }
+  
+  .liquid-bg {
+    background: linear-gradient(135deg, hsl(240 100% 97%), hsl(260 100% 97%), hsl(220 100% 98%));
   }
 }
 
