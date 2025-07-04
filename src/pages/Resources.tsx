@@ -5,9 +5,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Download, Heart, Search, Star } from "lucide-react";
+import { Download, Heart, Search, Star, Eye } from "lucide-react";
 import { useRealResources } from "@/hooks/useRealResources";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 const Resources = () => {
   const { resources, isLoading, filters, setFilters, downloadResource, addToFavorites } = useRealResources();
@@ -26,11 +27,11 @@ const Resources = () => {
 
   if (isLoading) {
     return (
-      <div className="container mx-auto px-4 py-8">
-        <h1 className="text-3xl font-bold mb-8">Resources</h1>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="container mx-auto px-4 py-4 md:py-8">
+        <h1 className="text-2xl md:text-3xl font-bold mb-6 md:mb-8">Study Resources</h1>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           {[...Array(6)].map((_, i) => (
-            <Card key={i}>
+            <Card key={i} className="animate-pulse">
               <CardHeader>
                 <Skeleton className="h-6 w-3/4" />
                 <Skeleton className="h-4 w-1/2" />
@@ -47,12 +48,12 @@ const Resources = () => {
   }
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <h1 className="text-3xl font-bold mb-8">Resources</h1>
+    <div className="container mx-auto px-4 py-4 md:py-8">
+      <h1 className="text-2xl md:text-3xl font-bold mb-6 md:mb-8">Study Resources</h1>
       
       {/* Filters */}
       <Card className="mb-6">
-        <CardContent className="pt-6">
+        <CardContent className="pt-4 md:pt-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div className="relative">
               <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
@@ -94,56 +95,75 @@ const Resources = () => {
       </Card>
 
       {/* Resources Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
         {resources.length === 0 ? (
-          <div className="col-span-full text-center py-12">
-            <p className="text-lg text-gray-500">No resources found</p>
-            <p className="text-sm text-gray-400">Try adjusting your filters</p>
+          <div className="col-span-full text-center py-8 md:py-12">
+            <div className="w-16 h-16 bg-muted rounded-full flex items-center justify-center mx-auto mb-4">
+              <Search className="w-8 h-8 text-muted-foreground" />
+            </div>
+            <p className="text-lg text-muted-foreground mb-2">No resources found</p>
+            <p className="text-sm text-muted-foreground">Try adjusting your search terms or filters</p>
           </div>
         ) : (
           resources.map((resource) => (
-            <Card key={resource.id} className="hover:shadow-lg transition-shadow">
-              <CardHeader>
-                <div className="flex justify-between items-start">
-                  <CardTitle className="text-lg line-clamp-2">{resource.title}</CardTitle>
+            <Card key={resource.id} className="card-hover transition-all duration-300 hover:shadow-lg">
+              <CardHeader className="pb-3">
+                <div className="flex justify-between items-start gap-2">
+                  <CardTitle className="text-base md:text-lg line-clamp-2 leading-tight">
+                    {resource.title}
+                  </CardTitle>
                   {resource.premium_content && (
-                    <Badge variant="secondary" className="text-xs">
+                    <Badge variant="secondary" className="text-xs shrink-0">
                       <Star className="h-3 w-3 mr-1" />
                       Premium
                     </Badge>
                   )}
                 </div>
-                <div className="flex flex-wrap gap-2">
-                  <Badge variant="outline">{resource.subject}</Badge>
-                  <Badge variant="outline">{resource.resource_type}</Badge>
+                <div className="flex flex-wrap gap-1 md:gap-2">
+                  <Badge variant="outline" className="text-xs">{resource.subject}</Badge>
+                  <Badge variant="outline" className="text-xs">{resource.resource_type}</Badge>
                 </div>
               </CardHeader>
-              <CardContent>
-                <p className="text-sm text-gray-600 mb-4 line-clamp-3">
+              <CardContent className="pt-0">
+                <p className="text-sm text-muted-foreground mb-4 line-clamp-3 leading-relaxed">
                   {resource.description}
                 </p>
-                <div className="text-xs text-gray-500 mb-4">
-                  <p>By: {resource.author}</p>
-                  <p>Class: {resource.class}</p>
-                  <p>Downloads: {resource.download_count}</p>
-                  <p>Uploaded: {new Date(resource.upload_date).toLocaleDateString()}</p>
+                <div className="text-xs text-muted-foreground mb-4 space-y-1">
+                  <p>By: <span className="font-medium">{resource.author}</span></p>
+                  <p>Class: <span className="font-medium">{resource.class}</span></p>
+                  <div className="flex items-center justify-between">
+                    <span>Downloads: <span className="font-medium">{resource.download_count}</span></span>
+                    <span>{new Date(resource.upload_date).toLocaleDateString()}</span>
+                  </div>
                 </div>
-                <div className="flex space-x-2">
+                <div className="flex gap-2">
                   <Button 
                     size="sm" 
-                    className="flex-1"
+                    className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700"
                     onClick={() => downloadResource(resource)}
                   >
                     <Download className="h-4 w-4 mr-1" />
-                    Download
+                    <span className="hidden sm:inline">Download</span>
+                    <span className="sm:hidden">Get</span>
                   </Button>
                   <Button 
                     size="sm" 
                     variant="outline"
                     onClick={() => addToFavorites(resource.id)}
+                    className="shrink-0"
                   >
                     <Heart className="h-4 w-4" />
                   </Button>
+                  {resource.file_url && (
+                    <Button 
+                      size="sm" 
+                      variant="outline"
+                      onClick={() => window.open(resource.file_url, '_blank')}
+                      className="shrink-0"
+                    >
+                      <Eye className="h-4 w-4" />
+                    </Button>
+                  )}
                 </div>
               </CardContent>
             </Card>

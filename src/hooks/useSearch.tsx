@@ -38,7 +38,7 @@ export const useSearch = () => {
         .from('resources')
         .select('*');
 
-      // Text search
+      // Text search - if query is empty, show all resources
       if (query.trim()) {
         queryBuilder = queryBuilder.or(`title.ilike.%${query}%,description.ilike.%${query}%,author.ilike.%${query}%`);
       }
@@ -82,6 +82,8 @@ export const useSearch = () => {
 
   useEffect(() => {
     fetchCategories();
+    // Load initial results (all resources)
+    searchResources('');
   }, []);
 
   return {

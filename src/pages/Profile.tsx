@@ -52,19 +52,19 @@ const Profile = () => {
     setIsUploading(true);
     try {
       const fileExt = file.name.split('.').pop();
-      const fileName = `${profile.id}.${fileExt}`;
+      const fileName = `${profile.id}/${Date.now()}.${fileExt}`;
       
       const { error: uploadError } = await supabase.storage
-        .from('uploads')
-        .upload(`avatars/${fileName}`, file, {
+        .from('avatars')
+        .upload(fileName, file, {
           upsert: true
         });
 
       if (uploadError) throw uploadError;
 
       const { data } = supabase.storage
-        .from('uploads')
-        .getPublicUrl(`avatars/${fileName}`);
+        .from('avatars')
+        .getPublicUrl(fileName);
 
       await updateProfile({
         avatar_url: data.publicUrl
