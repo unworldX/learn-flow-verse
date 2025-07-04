@@ -13,6 +13,7 @@ import {
   MessageSquare,
   LogOut,
   Bot,
+  Search,
 } from "lucide-react"
 
 import {
@@ -38,8 +39,18 @@ const items = [
     icon: Home,
   },
   {
+    title: "Search",
+    url: "/search",
+    icon: Search,
+  },
+  {
     title: "Resources",
     url: "/resources",
+    icon: BookOpen,
+  },
+  {
+    title: "Notes",
+    url: "/notes",
     icon: FileText,
   },
   {
@@ -48,9 +59,14 @@ const items = [
     icon: Upload,
   },
   {
+    title: "Profile",
+    url: "/profile",
+    icon: User,
+  },
+  {
     title: "Subscription",
     url: "/subscription",
-    icon: User,
+    icon: Calendar,
   },
 ]
 

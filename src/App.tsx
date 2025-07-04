@@ -14,6 +14,9 @@ import Settings from "./pages/Settings";
 import Upload from "./pages/Upload";
 import Subscription from "./pages/Subscription";
 import AIChatPage from "./pages/AIChatPage";
+import Profile from "./pages/Profile";
+import Search from "./pages/Search";
+import Notes from "./pages/Notes";
 
 const queryClient = new QueryClient();
 
@@ -34,6 +37,9 @@ const App = () => (
               <Route path="/upload" element={<Upload />} />
               <Route path="/subscription" element={<Subscription />} />
               <Route path="/ai-chat" element={<AIChatPage />} />
+              <Route path="/profile" element={<Profile />} />
+              <Route path="/search" element={<Search />} />
+              <Route path="/notes" element={<Notes />} />
             </Routes>
           </Layout>
         </BrowserRouter>

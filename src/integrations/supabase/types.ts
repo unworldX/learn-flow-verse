@@ -36,6 +36,44 @@ export type Database = {
         }
         Relationships: []
       }
+      bookmarks: {
+        Row: {
+          created_at: string | null
+          id: string
+          note: string | null
+          page_number: number | null
+          position: Json | null
+          resource_id: string | null
+          user_id: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          note?: string | null
+          page_number?: number | null
+          position?: Json | null
+          resource_id?: string | null
+          user_id: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          note?: string | null
+          page_number?: number | null
+          position?: Json | null
+          resource_id?: string | null
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "bookmarks_resource_id_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       collaborative_notes: {
         Row: {
           content: string | null
@@ -583,6 +621,56 @@ export type Database = {
           user_id?: string
         }
         Relationships: []
+      }
+      resource_categories: {
+        Row: {
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      resource_tags: {
+        Row: {
+          created_at: string | null
+          id: string
+          resource_id: string | null
+          tag_name: string
+        }
+        Insert: {
+          created_at?: string | null
+          id?: string
+          resource_id?: string | null
+          tag_name: string
+        }
+        Update: {
+          created_at?: string | null
+          id?: string
+          resource_id?: string | null
+          tag_name?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "resource_tags_resource_id_fkey"
+            columns: ["resource_id"]
+            isOneToOne: false
+            referencedRelation: "resources"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       resources: {
         Row: {
