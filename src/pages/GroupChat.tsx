@@ -19,7 +19,7 @@ interface GroupMessage {
   sender?: {
     full_name: string | null;
     email: string;
-  };
+  } | null;
 }
 
 interface GroupInfo {
@@ -96,13 +96,20 @@ const GroupChat = () => {
         .from('group_messages')
         .select(`
           *,
-          users:sender_id (full_name, email)
+          sender:users!sender_id (full_name, email)
         `)
         .eq('group_id', groupId)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
-      setMessages(data || []);
+      
+      // Transform the data to match our interface
+      const transformedMessages = data?.map(msg => ({
+        ...msg,
+        sender: msg.sender && typeof msg.sender === 'object' && !Array.isArray(msg.sender) ? msg.sender : null
+      })) || [];
+      
+      setMessages(transformedMessages);
     } catch (error) {
       console.error('Error fetching messages:', error);
       toast({

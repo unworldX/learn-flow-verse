@@ -5,7 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
-import { Send, User, Plus, Search } from "lucide-react";
+import { Send, User, Plus, Search, MessageCircle } from "lucide-react";
 import { useDirectMessages } from "@/hooks/useDirectMessages";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { useAuth } from "@/contexts/AuthContext";
@@ -57,13 +57,18 @@ const DirectMessages = () => {
 
   return (
     <div className="min-h-screen liquid-bg">
-      <div className="container mx-auto px-3 py-4 md:px-4 md:py-6">
-        {/* Title Bar */}
-        <div className="glass-card p-4 md:p-6 mb-6">
-          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-            <div>
-              <h1 className="text-xl md:text-2xl font-bold gradient-text">Direct Messages</h1>
-              <p className="text-sm text-slate-600 mt-1">Private conversations with other students</p>
+      <div className="container mx-auto px-3 py-4 md:px-4 md:py-6 max-w-7xl">
+        {/* Enhanced Title Bar */}
+        <div className="glass-card p-4 md:p-6 mb-6 border border-white/20">
+          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center">
+                <User className="w-6 h-6 text-white" />
+              </div>
+              <div>
+                <h1 className="text-xl md:text-2xl font-bold gradient-text">Direct Messages</h1>
+                <p className="text-sm text-slate-600 mt-1">Private conversations with other students</p>
+              </div>
             </div>
             
             <Dialog open={showNewChat} onOpenChange={setShowNewChat}>
@@ -96,11 +101,14 @@ const DirectMessages = () => {
           </div>
         </div>
         
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[600px]">
-          {/* Chat Users List */}
-          <div className="glass-card flex flex-col">
-            <div className="p-4 border-b border-white/20">
-              <h3 className="font-semibold text-slate-700">Conversations</h3>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-200px)] min-h-[500px]">
+          {/* Enhanced Chat Users List */}
+          <div className="glass-card flex flex-col border border-white/20 lg:max-h-full">
+            <div className="p-4 border-b border-white/20 bg-white/5">
+              <h3 className="font-semibold text-slate-700 flex items-center gap-2">
+                <MessageCircle className="w-5 h-5" />
+                Conversations
+              </h3>
             </div>
             <ScrollArea className="flex-1">
               {chatUsers.length === 0 ? (
@@ -151,14 +159,21 @@ const DirectMessages = () => {
             </ScrollArea>
           </div>
 
-          {/* Messages Area */}
-          <div className="lg:col-span-2 glass-card flex flex-col">
-            <div className="p-4 border-b border-white/20">
-              <h3 className="font-semibold text-slate-700">
-                {selectedUser 
-                  ? chatUsers.find(u => u.id === selectedUser)?.full_name || 'Chat'
-                  : 'Select a conversation'
-                }
+          {/* Enhanced Messages Area */}
+          <div className="lg:col-span-2 glass-card flex flex-col border border-white/20">
+            <div className="p-4 border-b border-white/20 bg-white/5">
+              <h3 className="font-semibold text-slate-700 flex items-center gap-2">
+                {selectedUser && (
+                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                    <User className="w-4 h-4 text-white" />
+                  </div>
+                )}
+                <span>
+                  {selectedUser 
+                    ? chatUsers.find(u => u.id === selectedUser)?.full_name || chatUsers.find(u => u.id === selectedUser)?.email?.split('@')[0] || 'Chat'
+                    : 'Select a conversation'
+                  }
+                </span>
               </h3>
             </div>
             
