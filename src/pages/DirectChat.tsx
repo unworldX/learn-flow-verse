@@ -97,12 +97,16 @@ const DirectChat = () => {
       <div className="flex-1 flex flex-col">
         <ScrollArea className="flex-1 p-4">
           {messages.length === 0 ? (
-            <div className="text-center py-8">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-3">
-                <Send className="w-6 h-6 text-white" />
+            <div className="text-center py-12">
+              <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                <span className="text-white text-2xl font-bold">
+                  {chatUser.full_name?.[0] || chatUser.email?.[0]?.toUpperCase()}
+                </span>
               </div>
-              <p className="text-slate-600 mb-2">No messages yet</p>
-              <p className="text-sm text-slate-500">Start a conversation!</p>
+              <h3 className="text-xl font-semibold text-slate-800 mb-2">
+                {chatUser.full_name || chatUser.email.split('@')[0]}
+              </h3>
+              <p className="text-slate-500">This is the beginning of your conversation</p>
             </div>
           ) : (
             <div className="space-y-4">
@@ -135,22 +139,22 @@ const DirectChat = () => {
         </ScrollArea>
         
         {/* Message Input */}
-        <div className="p-3 border-t border-white/20 bg-white/5">
-          <div className="flex items-center space-x-2">
+        <div className="p-4 border-t border-white/20 bg-white/5">
+          <div className="flex items-center space-x-3">
             <Input
-              placeholder="Type a message..."
+              placeholder="Message..."
               value={newMessage}
               onChange={(e) => setNewMessage(e.target.value)}
               onKeyPress={handleKeyPress}
-              className="flex-1 bg-white border-gray-200 rounded-full px-4 py-2 text-sm"
+              className="flex-1 bg-white border-gray-200 rounded-full px-5 py-3 text-sm placeholder:text-slate-500"
             />
             <Button 
               onClick={handleSendMessage} 
               disabled={!newMessage.trim()}
               size="sm"
-              className="w-10 h-10 rounded-full bg-blue-500 hover:bg-blue-600 p-0"
+              className="w-12 h-12 rounded-full bg-blue-500 hover:bg-blue-600 p-0 shrink-0"
             >
-              <Send className="h-4 w-4" />
+              <Send className="h-5 w-5" />
             </Button>
           </div>
         </div>

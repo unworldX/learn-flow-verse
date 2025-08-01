@@ -183,7 +183,6 @@ const GroupChat = () => {
             </div>
             <div>
               <h1 className="font-semibold text-lg">{groupInfo?.name}</h1>
-              <p className="text-sm text-slate-600">{groupInfo?.member_count} members</p>
             </div>
           </div>
           <Button variant="ghost" size="sm">
@@ -198,12 +197,15 @@ const GroupChat = () => {
           <ScrollArea className="flex-1 p-4">
             <div className="space-y-4">
               {messages.length === 0 ? (
-                <div className="text-center py-8">
-                  <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4">
-                    <Users className="w-8 h-8 text-white" />
+                <div className="text-center py-12">
+                  <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-6">
+                    <Users className="w-10 h-10 text-white" />
                   </div>
-                  <p className="text-slate-600 mb-2">Welcome to the group chat!</p>
-                  <p className="text-sm text-slate-500">Start a conversation with your study group.</p>
+                  <h3 className="text-xl font-semibold text-slate-800 mb-2">{groupInfo?.name}</h3>
+                  <p className="text-slate-500 mb-4">This is the beginning of your group conversation</p>
+                  <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 max-w-sm mx-auto">
+                    <p className="text-sm text-blue-800">📚 Share study materials, ask questions, and collaborate with your group members!</p>
+                  </div>
                 </div>
               ) : (
                 messages.map((message) => (
@@ -256,21 +258,21 @@ const GroupChat = () => {
           </ScrollArea>
           
           {/* Message Input */}
-          <div className="p-4 border-t border-white/20">
-            <div className="flex gap-2">
+          <div className="p-4 border-t border-white/20 bg-white/5">
+            <div className="flex gap-3">
               <Input
                 value={newMessage}
                 onChange={(e) => setNewMessage(e.target.value)}
                 onKeyPress={handleKeyPress}
-                placeholder="Type a message..."
-                className="flex-1 bg-white/80 border-white/30"
+                placeholder="Message..."
+                className="flex-1 bg-white border-gray-200 rounded-full px-5 py-3 text-sm placeholder:text-slate-500"
               />
               <Button 
                 onClick={sendMessage}
                 disabled={!newMessage.trim()}
-                className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+                className="w-12 h-12 rounded-full bg-blue-500 hover:bg-blue-600 p-0 shrink-0"
               >
-                <Send className="h-4 w-4" />
+                <Send className="h-5 w-5" />
               </Button>
             </div>
           </div>

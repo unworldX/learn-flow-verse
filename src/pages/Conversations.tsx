@@ -41,15 +41,12 @@ const Conversations = () => {
       <div className="container mx-auto px-3 py-4 md:px-4 md:py-6 max-w-4xl">
         {/* WhatsApp-style Header */}
         <div className="glass-card p-3 md:p-4 mb-4 border border-white/20">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center">
-                <MessageCircle className="w-5 h-5 text-white" />
-              </div>
-              <div>
-                <h1 className="text-lg md:text-xl font-semibold text-slate-800">Chats</h1>
-                <p className="text-xs text-slate-500">{filteredDirectMessages.length + filteredGroups.length} conversations</p>
-              </div>
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center">
+              <MessageCircle className="w-5 h-5 text-white" />
+            </div>
+            <div>
+              <h1 className="text-lg md:text-xl font-semibold text-slate-800">Chats</h1>
             </div>
           </div>
         </div>
@@ -124,7 +121,7 @@ const Conversations = () => {
                             <p className="text-xs text-slate-400">Yesterday</p>
                           </div>
                           <p className="text-xs truncate text-slate-500 mt-1">
-                            {group.member_count} members
+                            Study group • Tap to join
                           </p>
                         </div>
                       </div>
@@ -159,24 +156,28 @@ const Conversations = () => {
               <Plus className="w-6 h-6" />
             </Button>
           </DialogTrigger>
-          <DialogContent className="glass-card border-white/30">
-            <DialogHeader>
-              <DialogTitle>Start New Chat</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
-                <Input
-                  placeholder="Enter user email..."
-                  value={searchEmail}
-                  onChange={(e) => setSearchEmail(e.target.value)}
-                  className="pl-10 bg-white/80 border-white/30"
-                />
+            <DialogContent className="glass-card border-white/30 max-w-md mx-auto">
+              <DialogHeader>
+                <DialogTitle className="text-xl font-semibold">New Chat</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-6">
+                <div className="relative">
+                  <Search className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
+                  <Input
+                    placeholder="Search by email or name..."
+                    value={searchEmail}
+                    onChange={(e) => setSearchEmail(e.target.value)}
+                    className="pl-12 py-3 bg-slate-50 border-slate-200 rounded-xl text-base"
+                  />
+                </div>
+                <Button 
+                  onClick={handleNewChat} 
+                  className="w-full py-3 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-xl text-base font-medium"
+                  disabled={!searchEmail.trim()}
+                >
+                  Start Conversation
+                </Button>
               </div>
-              <Button onClick={handleNewChat} className="w-full">
-                Start Chat
-              </Button>
-            </div>
           </DialogContent>
         </Dialog>
       </div>
