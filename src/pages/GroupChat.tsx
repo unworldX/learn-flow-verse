@@ -174,7 +174,7 @@ const GroupChat = () => {
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Button variant="ghost" size="sm" asChild className="md:hidden">
-              <Link to="/study-groups">
+              <Link to="/conversations">
                 <ArrowLeft className="h-4 w-4" />
               </Link>
             </Button>

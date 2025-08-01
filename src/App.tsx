@@ -10,6 +10,8 @@ import Index from "./pages/Index";
 import Resources from "./pages/Resources";
 import StudyGroups from "./pages/StudyGroups";
 import DirectMessages from "./pages/DirectMessages";
+import Conversations from "./pages/Conversations";
+import DirectChat from "./pages/DirectChat";
 import Settings from "./pages/Settings";
 import Upload from "./pages/Upload";
 import Subscription from "./pages/Subscription";
@@ -34,6 +36,8 @@ const App = () => (
               <Route path="/" element={<Index />} />
               <Route path="/resources" element={<Resources />} />
               <Route path="/study-groups" element={<StudyGroups />} />
+              <Route path="/conversations" element={<Conversations />} />
+              <Route path="/chat/:userId" element={<DirectChat />} />
               <Route path="/messages" element={<DirectMessages />} />
               <Route path="/settings" element={<Settings />} />
               <Route path="/upload" element={<Upload />} />

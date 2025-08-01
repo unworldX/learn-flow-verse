@@ -78,14 +78,9 @@ const chatItems = [
     icon: Bot,
   },
   {
-    title: "Direct Messages",
-    url: "/messages",
+    title: "Conversations",
+    url: "/conversations",
     icon: MessageCircle,
-  },
-  {
-    title: "Study Groups",
-    url: "/study-groups",
-    icon: Users,
   },
   {
     title: "Forums",
