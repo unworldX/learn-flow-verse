@@ -1,40 +1,214 @@
 import { useState, useEffect } from 'react';
-import { Card } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Search, MessageCircle, Users, Plus } from "lucide-react";
-import { useDirectMessages } from "@/hooks/useDirectMessages";
-import { useRealStudyGroups } from "@/hooks/useRealStudyGroups";
 import { useAuth } from "@/contexts/AuthContext";
 import { Link } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { supabase } from "@/integrations/supabase/client";
+import { useToast } from "@/hooks/use-toast";
+
+interface Conversation {
+  id: string;
+  type: 'direct' | 'group';
+  name: string;
+  lastMessage?: string;
+  lastMessageTime?: string;
+  unreadCount?: number;
+  otherUserId?: string;
+  avatarUrl?: string;
+}
 
 const Conversations = () => {
   const { user } = useAuth();
-  const { chatUsers } = useDirectMessages();
-  const { myGroups } = useRealStudyGroups();
+  const { toast } = useToast();
+  const [conversations, setConversations] = useState<Conversation[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [showNewChat, setShowNewChat] = useState(false);
   const [searchEmail, setSearchEmail] = useState('');
+  const [isLoading, setIsLoading] = useState(true);
 
-  // Filter conversations based on search
-  const filteredDirectMessages = chatUsers.filter(chatUser =>
-    chatUser.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    chatUser.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  useEffect(() => {
+    if (user) {
+      fetchConversations();
+    }
+  }, [user]);
 
-  const filteredGroups = myGroups.filter(group =>
-    group.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const fetchConversations = async () => {
+    if (!user) return;
 
-  const handleNewChat = () => {
-    if (searchEmail.trim()) {
-      setShowNewChat(false);
-      setSearchEmail('');
+    try {
+      // Fetch direct message conversations
+      const { data: directMessages, error: dmError } = await supabase
+        .from('direct_messages')
+        .select(`
+          id, sender_id, receiver_id, encrypted_content, created_at,
+          sender:users!sender_id(full_name, email),
+          receiver:users!receiver_id(full_name, email)
+        `)
+        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+        .order('created_at', { ascending: false });
+
+      if (dmError) throw dmError;
+
+      // Fetch group conversations
+      const { data: groupMemberships, error: groupError } = await supabase
+        .from('study_group_members')
+        .select(`
+          group_id,
+          study_groups!inner(id, name, description)
+        `)
+        .eq('user_id', user.id);
+
+      if (groupError) throw groupError;
+
+      // Get latest group messages
+      const groupIds = groupMemberships?.map(m => m.group_id) || [];
+      let groupMessages: any[] = [];
+      
+      if (groupIds.length > 0) {
+        const { data: latestGroupMessages, error: groupMsgError } = await supabase
+          .from('group_messages')
+          .select('group_id, encrypted_content, created_at')
+          .in('group_id', groupIds)
+          .order('created_at', { ascending: false });
+
+        if (groupMsgError) throw groupMsgError;
+        groupMessages = latestGroupMessages || [];
+      }
+
+      // Process direct message conversations
+      const dmConversations = new Map<string, Conversation>();
+      
+      directMessages?.forEach((message: any) => {
+        const otherUserId = message.sender_id === user.id ? message.receiver_id : message.sender_id;
+        const otherUser = message.sender_id === user.id ? message.receiver : message.sender;
+        
+        if (!dmConversations.has(otherUserId)) {
+          dmConversations.set(otherUserId, {
+            id: otherUserId,
+            type: 'direct',
+            name: otherUser?.full_name || otherUser?.email?.split('@')[0] || 'Unknown User',
+            lastMessage: message.encrypted_content,
+            lastMessageTime: message.created_at,
+            otherUserId: otherUserId,
+            unreadCount: 0
+          });
+        }
+      });
+
+      // Process group conversations
+      const groupConversations: Conversation[] = groupMemberships?.map(membership => {
+        const group = membership.study_groups;
+        const latestMessage = groupMessages.find(msg => msg.group_id === group.id);
+        
+        return {
+          id: group.id,
+          type: 'group',
+          name: group.name,
+          lastMessage: latestMessage?.encrypted_content || 'No messages yet',
+          lastMessageTime: latestMessage?.created_at || new Date().toISOString(),
+          unreadCount: 0
+        };
+      }) || [];
+
+      // Combine and sort all conversations
+      const allConversations = [
+        ...Array.from(dmConversations.values()),
+        ...groupConversations
+      ].sort((a, b) => {
+        const timeA = new Date(a.lastMessageTime || 0).getTime();
+        const timeB = new Date(b.lastMessageTime || 0).getTime();
+        return timeB - timeA;
+      });
+
+      setConversations(allConversations);
+    } catch (error) {
+      console.error('Error fetching conversations:', error);
+      toast({
+        title: "Error",
+        description: "Failed to load conversations",
+        variant: "destructive"
+      });
+    } finally {
+      setIsLoading(false);
     }
   };
+
+  const filteredConversations = conversations.filter(conv =>
+    conv.name.toLowerCase().includes(searchQuery.toLowerCase())
+  );
+
+  const handleNewChat = async () => {
+    if (!searchEmail.trim()) return;
+
+    try {
+      // Search for user by email
+      const { data: users, error } = await supabase
+        .from('users')
+        .select('id, email, full_name')
+        .eq('email', searchEmail.trim().toLowerCase())
+        .limit(1);
+
+      if (error) throw error;
+
+      if (users && users.length > 0) {
+        const foundUser = users[0];
+        setShowNewChat(false);
+        setSearchEmail('');
+        // Navigate to chat with found user
+        window.location.href = `/chat/${foundUser.id}`;
+      } else {
+        toast({
+          title: "User not found",
+          description: "No user found with that email address",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error('Error searching for user:', error);
+      toast({
+        title: "Error",
+        description: "Failed to search for user",
+        variant: "destructive"
+      });
+    }
+  };
+
+  const formatTime = (timeString?: string) => {
+    if (!timeString) return '';
+    
+    const date = new Date(timeString);
+    const now = new Date();
+    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
+    
+    if (diffInHours < 24) {
+      return date.toLocaleTimeString('en-US', { 
+        hour: 'numeric', 
+        minute: '2-digit',
+        hour12: true 
+      });
+    } else if (diffInHours < 168) { // 7 days
+      return date.toLocaleDateString('en-US', { weekday: 'short' });
+    } else {
+      return date.toLocaleDateString('en-US', { 
+        month: 'short', 
+        day: 'numeric' 
+      });
+    }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen liquid-bg flex items-center justify-center">
+        <div className="glass-card p-6">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
+          <p className="text-sm text-slate-600 mt-2">Loading conversations...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen liquid-bg relative">
@@ -67,72 +241,53 @@ const Conversations = () => {
         {/* Conversations List */}
         <div className="glass-card border border-white/20 rounded-2xl overflow-hidden">
           <ScrollArea className="h-[calc(100vh-300px)] min-h-[400px]">
-            {/* Direct Messages */}
-            {filteredDirectMessages.length > 0 && (
-              <div>
-                {filteredDirectMessages.map((chatUser) => (
-                  <Link
-                    key={chatUser.id}
-                    to={`/chat/${chatUser.id}`}
-                    className="block"
-                  >
-                    <div className="p-4 hover:bg-white/30 transition-all border-b border-white/10 cursor-pointer">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center flex-shrink-0">
-                          <MessageCircle className="h-5 w-5 text-white" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium truncate text-slate-800">
-                              {chatUser.full_name || chatUser.email.split('@')[0]}
-                            </p>
-                            <p className="text-xs text-slate-400">12:30 PM</p>
-                          </div>
-                          <p className="text-xs truncate text-slate-500 mt-1">
-                            Tap to start chatting
-                          </p>
-                        </div>
-                      </div>
-                    </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-
-            {/* Group Chats */}
-            {filteredGroups.length > 0 && (
-              <div>
-                {filteredGroups.map((group) => (
-                  <Link
-                    key={group.id}
-                    to={`/group-chat/${group.id}`}
-                    className="block"
-                  >
-                    <div className="p-4 hover:bg-white/30 transition-all border-b border-white/10 cursor-pointer">
-                      <div className="flex items-center space-x-3">
-                        <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center flex-shrink-0">
+            {filteredConversations.length > 0 ? (
+              filteredConversations.map((conversation) => (
+                <Link
+                  key={conversation.id}
+                  to={conversation.type === 'direct' ? `/chat/${conversation.otherUserId}` : `/group-chat/${conversation.id}`}
+                  className="block"
+                >
+                  <div className="p-4 hover:bg-white/30 transition-all border-b border-white/10 cursor-pointer">
+                    <div className="flex items-center space-x-3">
+                      <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 ${
+                        conversation.type === 'direct' 
+                          ? 'bg-gradient-to-br from-blue-500 to-purple-500' 
+                          : 'bg-gradient-to-br from-green-500 to-teal-500'
+                      }`}>
+                        {conversation.type === 'direct' ? (
+                          <span className="text-white text-sm font-medium">
+                            {conversation.name[0]?.toUpperCase()}
+                          </span>
+                        ) : (
                           <Users className="h-5 w-5 text-white" />
-                        </div>
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between">
-                            <p className="text-sm font-medium truncate text-slate-800">
-                              {group.name}
-                            </p>
-                            <p className="text-xs text-slate-400">Yesterday</p>
-                          </div>
-                          <p className="text-xs truncate text-slate-500 mt-1">
-                            Study group • Tap to join
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center justify-between">
+                          <p className="text-sm font-medium truncate text-slate-800">
+                            {conversation.name}
                           </p>
+                          <p className="text-xs text-slate-400">
+                            {formatTime(conversation.lastMessageTime)}
+                          </p>
+                        </div>
+                        <div className="flex items-center justify-between mt-1">
+                          <p className="text-xs truncate text-slate-500 max-w-[200px]">
+                            {conversation.lastMessage || 'No messages yet'}
+                          </p>
+                          {conversation.unreadCount && conversation.unreadCount > 0 && (
+                            <div className="bg-green-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center">
+                              {conversation.unreadCount}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>
-                  </Link>
-                ))}
-              </div>
-            )}
-
-            {/* Empty State */}
-            {filteredDirectMessages.length === 0 && filteredGroups.length === 0 && (
+                  </div>
+                </Link>
+              ))
+            ) : (
               <div className="text-center py-12">
                 <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-4">
                   <MessageCircle className="w-8 h-8 text-white" />
@@ -156,28 +311,29 @@ const Conversations = () => {
               <Plus className="w-6 h-6" />
             </Button>
           </DialogTrigger>
-            <DialogContent className="glass-card border-white/30 max-w-md mx-auto">
-              <DialogHeader>
-                <DialogTitle className="text-xl font-semibold">New Chat</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-6">
-                <div className="relative">
-                  <Search className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
-                  <Input
-                    placeholder="Search by email or name..."
-                    value={searchEmail}
-                    onChange={(e) => setSearchEmail(e.target.value)}
-                    className="pl-12 py-3 bg-slate-50 border-slate-200 rounded-xl text-base"
-                  />
-                </div>
-                <Button 
-                  onClick={handleNewChat} 
-                  className="w-full py-3 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-xl text-base font-medium"
-                  disabled={!searchEmail.trim()}
-                >
-                  Start Conversation
-                </Button>
+          <DialogContent className="glass-card border-white/30 max-w-md mx-auto">
+            <DialogHeader>
+              <DialogTitle className="text-xl font-semibold">New Chat</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-6">
+              <div className="relative">
+                <Search className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
+                <Input
+                  placeholder="Search by email..."
+                  value={searchEmail}
+                  onChange={(e) => setSearchEmail(e.target.value)}
+                  onKeyPress={(e) => e.key === 'Enter' && handleNewChat()}
+                  className="pl-12 py-3 bg-slate-50 border-slate-200 rounded-xl text-base"
+                />
               </div>
+              <Button 
+                onClick={handleNewChat} 
+                className="w-full py-3 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-xl text-base font-medium"
+                disabled={!searchEmail.trim()}
+              >
+                Start Conversation
+              </Button>
+            </div>
           </DialogContent>
         </Dialog>
       </div>
