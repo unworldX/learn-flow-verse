@@ -8,7 +8,11 @@ import { Switch } from "@/components/ui/switch";
 import { Plus } from "lucide-react";
 import { useRealStudyGroups } from "@/hooks/useRealStudyGroups";
 
-export const CreateGroupDialog = () => {
+interface CreateGroupDialogProps {
+  children?: React.ReactNode;
+}
+
+export const CreateGroupDialog = ({ children }: CreateGroupDialogProps = {}) => {
   const { createGroup } = useRealStudyGroups();
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -36,10 +40,12 @@ export const CreateGroupDialog = () => {
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
-        <Button>
-          <Plus className="h-4 w-4 mr-2" />
-          Create Group
-        </Button>
+        {children || (
+          <Button>
+            <Plus className="h-4 w-4 mr-2" />
+            Create Group
+          </Button>
+        )}
       </DialogTrigger>
       <DialogContent>
         <DialogHeader>

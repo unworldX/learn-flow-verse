@@ -56,59 +56,26 @@ const DirectMessages = () => {
   }
 
   return (
-    <div className="min-h-screen liquid-bg">
+    <div className="min-h-screen liquid-bg relative">
       <div className="container mx-auto px-3 py-4 md:px-4 md:py-6 max-w-7xl">
-        {/* Enhanced Title Bar */}
-        <div className="glass-card p-4 md:p-6 mb-6 border border-white/20">
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center">
-                <User className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl md:text-2xl font-bold gradient-text">Direct Messages</h1>
-                <p className="text-sm text-slate-600 mt-1">Private conversations with other students</p>
-              </div>
+        {/* WhatsApp-style Title Bar */}
+        <div className="glass-card p-3 md:p-4 mb-4 border border-white/20">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+              <MessageCircle className="w-5 h-5 text-white" />
             </div>
-            
-            <Dialog open={showNewChat} onOpenChange={setShowNewChat}>
-              <DialogTrigger asChild>
-                <Button className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600">
-                  <Plus className="h-4 w-4 mr-2" />
-                  New Chat
-                </Button>
-              </DialogTrigger>
-              <DialogContent className="glass-card border-white/30">
-                <DialogHeader>
-                  <DialogTitle>Start New Conversation</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="relative">
-                    <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
-                    <Input
-                      placeholder="Enter user email..."
-                      value={searchEmail}
-                      onChange={(e) => setSearchEmail(e.target.value)}
-                      className="pl-10 bg-white/80 border-white/30"
-                    />
-                  </div>
-                  <Button onClick={handleNewChat} className="w-full">
-                    Start Chat
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
+            <div>
+              <h1 className="text-lg md:text-xl font-semibold text-slate-800">Messages</h1>
+              <p className="text-xs text-slate-500">Private conversations</p>
+            </div>
           </div>
         </div>
         
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-200px)] min-h-[500px]">
-          {/* Enhanced Chat Users List */}
-          <div className="glass-card flex flex-col border border-white/20 lg:max-h-full">
-            <div className="p-4 border-b border-white/20 bg-white/5">
-              <h3 className="font-semibold text-slate-700 flex items-center gap-2">
-                <MessageCircle className="w-5 h-5" />
-                Conversations
-              </h3>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 h-[calc(100vh-160px)] min-h-[500px]">
+          {/* WhatsApp-style Chat Users List */}
+          <div className="glass-card flex flex-col border border-white/20 lg:max-h-full rounded-2xl overflow-hidden">
+            <div className="p-3 border-b border-white/20 bg-white/5">
+              <h3 className="font-medium text-slate-700 text-sm">Chats</h3>
             </div>
             <ScrollArea className="flex-1">
               {chatUsers.length === 0 ? (
@@ -124,32 +91,27 @@ const DirectMessages = () => {
                   {chatUsers.map((chatUser) => (
                     <div
                       key={chatUser.id}
-                      className={`p-3 m-1 cursor-pointer rounded-xl transition-all ${
+                      className={`p-3 cursor-pointer transition-all border-b border-white/10 ${
                         selectedUser === chatUser.id 
-                          ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white' 
-                          : 'hover:bg-white/50'
+                          ? 'bg-blue-50 border-l-4 border-l-blue-500' 
+                          : 'hover:bg-white/30'
                       }`}
                       onClick={() => handleUserSelect(chatUser.id)}
                     >
                       <div className="flex items-center space-x-3">
-                        <div className={`rounded-full p-2 ${
-                          selectedUser === chatUser.id 
-                            ? 'bg-white/20' 
-                            : 'bg-gradient-to-br from-blue-500 to-purple-500'
-                        }`}>
-                          <User className={`h-4 w-4 ${
-                            selectedUser === chatUser.id ? 'text-white' : 'text-white'
-                          }`} />
+                        <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center flex-shrink-0">
+                          <User className="h-5 w-5 text-white" />
                         </div>
                         <div className="flex-1 min-w-0">
-                          <p className="text-sm font-medium truncate">
+                          <p className="text-sm font-medium truncate text-slate-800">
                             {chatUser.full_name || chatUser.email.split('@')[0]}
                           </p>
-                          <p className={`text-xs truncate ${
-                            selectedUser === chatUser.id ? 'text-white/70' : 'text-slate-500'
-                          }`}>
-                            {chatUser.email}
+                          <p className="text-xs truncate text-slate-500">
+                            Last seen recently
                           </p>
+                        </div>
+                        <div className="text-xs text-slate-400">
+                          12:30 PM
                         </div>
                       </div>
                     </div>
@@ -159,23 +121,23 @@ const DirectMessages = () => {
             </ScrollArea>
           </div>
 
-          {/* Enhanced Messages Area */}
-          <div className="lg:col-span-2 glass-card flex flex-col border border-white/20">
-            <div className="p-4 border-b border-white/20 bg-white/5">
-              <h3 className="font-semibold text-slate-700 flex items-center gap-2">
-                {selectedUser && (
-                  <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
-                    <User className="w-4 h-4 text-white" />
+          {/* WhatsApp-style Messages Area */}
+          <div className="lg:col-span-2 glass-card flex flex-col border border-white/20 rounded-2xl overflow-hidden">
+            {selectedUser && (
+              <div className="p-3 border-b border-white/20 bg-white/5">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
+                    <User className="w-5 h-5 text-white" />
                   </div>
-                )}
-                <span>
-                  {selectedUser 
-                    ? chatUsers.find(u => u.id === selectedUser)?.full_name || chatUsers.find(u => u.id === selectedUser)?.email?.split('@')[0] || 'Chat'
-                    : 'Select a conversation'
-                  }
-                </span>
-              </h3>
-            </div>
+                  <div>
+                    <h3 className="font-medium text-slate-800 text-sm">
+                      {chatUsers.find(u => u.id === selectedUser)?.full_name || chatUsers.find(u => u.id === selectedUser)?.email?.split('@')[0] || 'Chat'}
+                    </h3>
+                    <p className="text-xs text-slate-500">Online</p>
+                  </div>
+                </div>
+              </div>
+            )}
             
             {selectedUser ? (
               <div className="flex-1 flex flex-col">
@@ -198,10 +160,10 @@ const DirectMessages = () => {
                           }`}
                         >
                           <div
-                            className={`max-w-xs lg:max-w-md px-4 py-2 rounded-2xl ${
+                            className={`max-w-xs lg:max-w-md px-3 py-2 ${
                               message.sender_id === user?.id
-                                ? 'bg-gradient-to-r from-blue-500 to-purple-500 text-white'
-                                : 'glass border border-white/30'
+                                ? 'bg-blue-500 text-white rounded-bl-2xl rounded-tl-2xl rounded-tr-lg'
+                                : 'bg-white border border-gray-200 text-slate-800 rounded-br-2xl rounded-tr-2xl rounded-tl-lg shadow-sm'
                             }`}
                           >
                             <p className="text-sm">{message.encrypted_content}</p>
@@ -217,19 +179,20 @@ const DirectMessages = () => {
                   )}
                 </ScrollArea>
                 
-                <div className="p-4 border-t border-white/20">
-                  <div className="flex space-x-2">
+                <div className="p-3 border-t border-white/20 bg-white/5">
+                  <div className="flex items-center space-x-2">
                     <Input
                       placeholder="Type a message..."
                       value={newMessage}
                       onChange={(e) => setNewMessage(e.target.value)}
                       onKeyPress={handleKeyPress}
-                      className="flex-1 bg-white/80 border-white/30"
+                      className="flex-1 bg-white border-gray-200 rounded-full px-4 py-2 text-sm"
                     />
                     <Button 
                       onClick={handleSendMessage} 
                       disabled={!newMessage.trim()}
-                      className="bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600"
+                      size="sm"
+                      className="w-10 h-10 rounded-full bg-blue-500 hover:bg-blue-600 p-0"
                     >
                       <Send className="h-4 w-4" />
                     </Button>
@@ -249,6 +212,39 @@ const DirectMessages = () => {
             )}
           </div>
         </div>
+      </div>
+      
+      {/* Floating Action Button for New Message */}
+      <div className="fixed bottom-6 right-6 z-50">
+        <Dialog open={showNewChat} onOpenChange={setShowNewChat}>
+          <DialogTrigger asChild>
+            <Button 
+              size="lg"
+              className="w-14 h-14 rounded-full bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 shadow-xl hover:shadow-2xl transition-all duration-200 hover:scale-110"
+            >
+              <Plus className="w-6 h-6" />
+            </Button>
+          </DialogTrigger>
+          <DialogContent className="glass-card border-white/30">
+            <DialogHeader>
+              <DialogTitle>Start New Conversation</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+              <div className="relative">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+                <Input
+                  placeholder="Enter user email..."
+                  value={searchEmail}
+                  onChange={(e) => setSearchEmail(e.target.value)}
+                  className="pl-10 bg-white/80 border-white/30"
+                />
+              </div>
+              <Button onClick={handleNewChat} className="w-full">
+                Start Chat
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
       </div>
     </div>
   );

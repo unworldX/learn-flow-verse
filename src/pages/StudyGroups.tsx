@@ -98,16 +98,18 @@ const StudyGroups = () => {
   );
 
   return (
-    <div className="min-h-screen liquid-bg">
+    <div className="min-h-screen liquid-bg relative">
       <div className="container mx-auto px-3 py-4 md:px-4 md:py-6">
-        {/* Title Bar */}
-        <div className="glass-card p-4 md:p-6 mb-6">
-          <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4">
-            <div>
-              <h1 className="text-xl md:text-2xl font-bold gradient-text">Study Groups</h1>
-              <p className="text-sm text-slate-600 mt-1">Connect and collaborate with fellow students</p>
+        {/* WhatsApp-style Title Bar */}
+        <div className="glass-card p-3 md:p-4 mb-4 border border-white/20">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center">
+              <Users className="w-5 h-5 text-white" />
             </div>
-            <CreateGroupDialog />
+            <div>
+              <h1 className="text-lg md:text-xl font-semibold text-slate-800">Study Groups</h1>
+              <p className="text-xs text-slate-500">Connect and collaborate</p>
+            </div>
           </div>
         </div>
 
@@ -154,6 +156,18 @@ const StudyGroups = () => {
             </div>
           </TabsContent>
         </Tabs>
+      </div>
+      
+      {/* Floating Action Button for New Group */}
+      <div className="fixed bottom-6 right-6 z-50">
+        <CreateGroupDialog>
+          <Button 
+            size="lg"
+            className="w-14 h-14 rounded-full bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 shadow-xl hover:shadow-2xl transition-all duration-200 hover:scale-110"
+          >
+            <Plus className="w-6 h-6" />
+          </Button>
+        </CreateGroupDialog>
       </div>
     </div>
   );
