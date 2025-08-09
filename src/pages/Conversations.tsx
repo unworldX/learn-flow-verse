@@ -279,25 +279,6 @@ const Conversations = () => {
   return (
     <div className="min-h-screen liquid-bg relative">
       <div className="container mx-auto px-3 py-4 md:px-4 md:py-6 max-w-4xl">
-        {/* WhatsApp-style Header */}
-        <div className="glass-card p-4 mb-4 border border-white/20 shadow-lg">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center shadow-md">
-                <MessageCircle className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-slate-800">Chats</h1>
-                <p className="text-xs text-slate-500">{conversations.length} conversations</p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Button variant="ghost" size="sm" className="rounded-full w-10 h-10 p-0">
-                <Search className="w-5 h-5" />
-              </Button>
-            </div>
-          </div>
-        </div>
 
         {/* Search Bar */}
         <div className="glass-card p-3 mb-4 border border-white/20 shadow-sm">
@@ -320,7 +301,7 @@ const Conversations = () => {
                 value="all" 
                 className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm text-sm font-medium"
               >
-                All Chats
+                Chats
                 {conversations.length > 0 && (
                   <Badge variant="secondary" className="ml-2 h-5 text-xs">
                     {conversations.length}

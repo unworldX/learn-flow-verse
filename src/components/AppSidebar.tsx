@@ -171,25 +171,20 @@ export function AppSidebar() {
       
       <SidebarFooter className="border-t border-white/20 p-4 glass">
         {user && (
-          <div className="space-y-3">
-            <div className="flex items-center gap-3 px-3 py-2 glass border border-white/30 rounded-2xl">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl flex items-center justify-center shadow-lg">
-                <span className="text-white text-sm font-medium">
-                  {user.email?.[0]?.toUpperCase()}
-                </span>
-              </div>
-              <div className="flex-1 min-w-0 hidden sm:block">
-                <p className="text-sm font-medium text-slate-800 truncate">{user.email}</p>
-                <p className="text-xs text-slate-500">Active now</p>
-              </div>
+          <div className="flex items-center justify-between px-2">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl flex items-center justify-center shadow-lg">
+              <span className="text-white text-sm font-medium">
+                {user.email?.[0]?.toUpperCase()}
+              </span>
             </div>
-            <SidebarMenuButton 
-              onClick={handleSignOut} 
-              className="w-full justify-center sm:justify-start text-red-600 hover:text-red-700 hover:bg-red-50/80 rounded-xl transition-all duration-200 p-2"
+            <button
+              onClick={handleSignOut}
+              className="rounded-full p-2 text-red-600 hover:text-red-700 hover:bg-red-50/80 transition-all duration-200"
+              aria-label="Sign out"
+              title="Sign out"
             >
               <LogOut className="w-5 h-5" />
-              <span className="font-medium hidden sm:inline ml-2">Sign Out</span>
-            </SidebarMenuButton>
+            </button>
           </div>
         )}
       </SidebarFooter>
