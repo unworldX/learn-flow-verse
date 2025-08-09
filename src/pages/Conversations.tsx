@@ -8,6 +8,7 @@ import { Search, MessageCircle, Users, Plus, UserPlus } from "lucide-react";
 import { useAuth } from "@/contexts/AuthContext";
 import { Link } from "react-router-dom";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { CreateGroupDialog } from "@/components/CreateGroupDialog";
@@ -280,57 +281,55 @@ const Conversations = () => {
     <div className="min-h-screen liquid-bg relative">
       <div className="container mx-auto px-3 py-4 md:px-4 md:py-6 max-w-4xl">
 
-        {/* Search Bar */}
-        <div className="glass-card p-3 mb-4 border border-white/20 shadow-sm">
-          <div className="relative">
-            <Search className="absolute left-3 top-3 h-4 w-4 text-slate-500" />
-            <Input
-              placeholder="Search conversations..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-white/90 border-0 rounded-full text-sm h-10 shadow-sm"
-            />
-          </div>
-        </div>
-
-        {/* Tabs */}
+        {/* Tabs + Search (compact header) */}
         <Tabs defaultValue="all" className="space-y-4">
-          <div className="glass-card p-2 border border-white/20 rounded-2xl shadow-sm">
-            <TabsList className="grid w-full grid-cols-3 bg-transparent p-1">
-              <TabsTrigger 
-                value="all" 
-                className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm text-sm font-medium"
-              >
-                Chats
-                {conversations.length > 0 && (
-                  <Badge variant="secondary" className="ml-2 h-5 text-xs">
-                    {conversations.length}
-                  </Badge>
-                )}
-              </TabsTrigger>
-              <TabsTrigger 
-                value="groups" 
-                className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm text-sm font-medium"
-              >
-                Groups
-                {groupConversations.length > 0 && (
-                  <Badge variant="secondary" className="ml-2 h-5 text-xs">
-                    {groupConversations.length}
-                  </Badge>
-                )}
-              </TabsTrigger>
-              <TabsTrigger 
-                value="unread" 
-                className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm text-sm font-medium"
-              >
-                Unread
-                {unreadConversations.length > 0 && (
-                  <Badge className="ml-2 h-5 text-xs bg-green-500">
-                    {unreadConversations.length}
-                  </Badge>
-                )}
-              </TabsTrigger>
-            </TabsList>
+          <div className="glass-card p-2 mb-4 border border-white/20 rounded-2xl shadow-sm">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
+              <TabsList className="bg-transparent p-1 rounded-xl h-9 w-full md:w-auto">
+                <TabsTrigger 
+                  value="all" 
+                  className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm text-xs md:text-sm px-3"
+                >
+                  Chats
+                  {conversations.length > 0 && (
+                    <Badge variant="secondary" className="ml-2 h-5 text-[10px] md:text-xs">
+                      {conversations.length}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="groups" 
+                  className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm text-xs md:text-sm px-3"
+                >
+                  Groups
+                  {groupConversations.length > 0 && (
+                    <Badge variant="secondary" className="ml-2 h-5 text-[10px] md:text-xs">
+                      {groupConversations.length}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="unread" 
+                  className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm text-xs md:text-sm px-3"
+                >
+                  Unread
+                  {unreadConversations.length > 0 && (
+                    <Badge className="ml-2 h-5 text-[10px] md:text-xs bg-green-500">
+                      {unreadConversations.length}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+              </TabsList>
+              <div className="relative w-full md:w-80">
+                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+                <Input
+                  placeholder="Search..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-9 bg-white/90 border-0 rounded-full text-sm h-9 shadow-sm"
+                />
+              </div>
+            </div>
           </div>
 
           {/* All Conversations */}
@@ -398,37 +397,45 @@ const Conversations = () => {
         </Tabs>
       </div>
 
-      {/* Floating Action Buttons */}
-      <div className="fixed bottom-6 right-6 z-50 flex flex-col gap-3">
-        {/* New Group FAB */}
-        <CreateGroupDialog>
-          <Button 
-            size="lg"
-            className="w-14 h-14 rounded-full bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 shadow-xl hover:shadow-2xl transition-all duration-200 hover:scale-110"
-          >
-            <Users className="w-6 h-6" />
-          </Button>
-        </CreateGroupDialog>
-        
-        {/* New Message FAB */}
-        <Dialog open={showNewChat} onOpenChange={setShowNewChat}>
-          <DialogTrigger asChild>
+      {/* Speed-dial FAB */}
+      <div className="fixed bottom-6 right-6 z-50">
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
             <Button 
               size="lg"
-              className="w-16 h-16 rounded-full bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 shadow-xl hover:shadow-2xl transition-all duration-200 hover:scale-110"
+              className="w-16 h-16 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-xl hover:shadow-2xl transition-all duration-200 hover:scale-110"
             >
-              <UserPlus className="w-7 h-7" />
+              <Plus className="w-7 h-7 text-white" />
             </Button>
-          </DialogTrigger>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-48 p-1">
+            <CreateGroupDialog>
+              <DropdownMenuItem className="flex items-center gap-2 cursor-pointer">
+                <Users className="w-4 h-4 text-teal-600" />
+                <span>Create Group</span>
+              </DropdownMenuItem>
+            </CreateGroupDialog>
+            <DropdownMenuItem 
+              className="flex items-center gap-2 cursor-pointer"
+              onClick={() => setShowNewChat(true)}
+            >
+              <UserPlus className="w-4 h-4 text-blue-600" />
+              <span>New Chat</span>
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        {/* New Chat Dialog */}
+        <Dialog open={showNewChat} onOpenChange={setShowNewChat}>
           <DialogContent className="glass-card border-white/30 max-w-md mx-auto">
             <DialogHeader>
-              <DialogTitle className="text-xl font-semibold">New Chat</DialogTitle>
+              <DialogTitle className="text-xl font-semibold">Start a conversation</DialogTitle>
             </DialogHeader>
-            <div className="space-y-6">
+            <div className="space-y-4">
               <div className="relative">
                 <Search className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
                 <Input
-                  placeholder="Search by email..."
+                  placeholder="Enter email to find user"
                   value={searchEmail}
                   onChange={(e) => setSearchEmail(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleNewChat()}
@@ -440,7 +447,7 @@ const Conversations = () => {
                 className="w-full py-3 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-xl text-base font-medium"
                 disabled={!searchEmail.trim()}
               >
-                Start Conversation
+                Start Chat
               </Button>
             </div>
           </DialogContent>

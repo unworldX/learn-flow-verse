@@ -12,6 +12,7 @@ import { Link } from 'react-router-dom';
 import WelcomeScreen from './WelcomeScreen';
 import ChatMessage from './ChatMessage';
 import TypingIndicator from './TypingIndicator';
+import { useToast } from '@/hooks/use-toast';
 
 const AIChatInterface = () => {
   const { user } = useAuth();
@@ -19,6 +20,7 @@ const AIChatInterface = () => {
   const [input, setInput] = useState('');
   const [reasoning, setReasoning] = useState(false);
   const [file, setFile] = useState<File | null>(null);
+  const { toast } = useToast();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
@@ -37,9 +39,12 @@ const AIChatInterface = () => {
     setInput('');
     setFile(null);
 
-    if (file) {
-      alert(`Selected file: ${file.name}. File upload logic not implemented.`);
-    }
+  if (file) {
+    toast({
+      title: "File attached",
+      description: `${file.name} attached. Summarization will be added next step.`,
+    });
+  }
 
     if (message) {
       await sendMessage(message, reasoning);

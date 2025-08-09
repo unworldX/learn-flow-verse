@@ -91,11 +91,12 @@ const chatItems = [
 
 export function AppSidebar() {
   const { signOut, user } = useAuth();
+  const displayName = user?.email?.split('@')[0] || '';
+  const shortName = displayName.length > 8 ? displayName.slice(0, 8) + '..' : displayName;
 
   const handleSignOut = () => {
     signOut();
   };
-
   return (
     <Sidebar className="border-r border-white/20 bg-white/95 backdrop-blur-md">
       <SidebarHeader className="border-b border-white/20 p-4 md:p-6 glass">
@@ -172,10 +173,15 @@ export function AppSidebar() {
       <SidebarFooter className="border-t border-white/20 p-4 glass">
         {user && (
           <div className="flex items-center justify-between px-2">
-            <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl flex items-center justify-center shadow-lg">
-              <span className="text-white text-sm font-medium">
-                {user.email?.[0]?.toUpperCase()}
-              </span>
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl flex items-center justify-center shadow-lg">
+                <span className="text-white text-sm font-medium">
+                  {user.email?.[0]?.toUpperCase()}
+                </span>
+              </div>
+              {shortName && (
+                <span className="text-slate-700 text-sm font-medium">{shortName}</span>
+              )}
             </div>
             <button
               onClick={handleSignOut}
