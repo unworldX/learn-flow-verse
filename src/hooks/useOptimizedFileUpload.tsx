@@ -78,6 +78,14 @@ export const useOptimizedFileUpload = () => {
 
     setIsUploading(true);
     try {
+      // Validate allowed file types
+      const allowed = ['txt','pdf','doc','docx'];
+      const ext = file.name.split('.').pop()?.toLowerCase();
+      if (!ext || !allowed.includes(ext)) {
+        toast({ title: 'Unsupported file', description: 'Only .txt, .pdf, .doc, .docx are allowed', variant: 'destructive' });
+        return null;
+      }
+
       const fileExt = file.name.split('.').pop();
       const fileName = `${user.id}/${Date.now()}.${fileExt}`;
 

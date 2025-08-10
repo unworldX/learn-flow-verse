@@ -75,6 +75,18 @@ export const useFileUpload = () => {
 
     setIsUploading(true);
     try {
+      // Validate allowed file types
+      const allowed = ['txt','pdf','doc','docx'];
+      const ext = file.name.split('.').pop()?.toLowerCase();
+      if (!ext || !allowed.includes(ext)) {
+        toast({
+          title: 'Unsupported file',
+          description: 'Only .txt, .pdf, .doc, .docx are allowed',
+          variant: 'destructive'
+        });
+        return;
+      }
+
       // Create file upload record
       const { data: uploadData, error: uploadError } = await supabase
         .from('file_uploads')

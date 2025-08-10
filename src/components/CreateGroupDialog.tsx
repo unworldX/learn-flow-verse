@@ -7,6 +7,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Switch } from "@/components/ui/switch";
 import { Plus } from "lucide-react";
 import { useRealStudyGroups } from "@/hooks/useRealStudyGroups";
+import { useToast } from "@/hooks/use-toast";
 
 interface CreateGroupDialogProps {
   children?: React.ReactNode;
@@ -14,6 +15,7 @@ interface CreateGroupDialogProps {
 
 export const CreateGroupDialog = ({ children }: CreateGroupDialogProps = {}) => {
   const { createGroup } = useRealStudyGroups();
+  const { toast } = useToast();
   const [open, setOpen] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
@@ -34,6 +36,8 @@ export const CreateGroupDialog = ({ children }: CreateGroupDialogProps = {}) => 
         is_private: false,
         max_members: 50
       });
+    } else {
+      toast({ title: 'Failed to create group', description: 'Please try again', variant: 'destructive' });
     }
   };
 

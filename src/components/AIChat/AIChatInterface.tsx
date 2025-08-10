@@ -37,14 +37,28 @@ const AIChatInterface = () => {
 
     const message = input.trim();
     setInput('');
-    setFile(null);
 
-  if (file) {
-    toast({
-      title: "File attached",
-      description: `${file.name} attached. Summarization will be added next step.`,
-    });
-  }
+    if (file) {
+      const ext = file.name.split('.').pop()?.toLowerCase();
+      if (ext === 'txt') {
+        try {
+          const text = await file.text();
+          await sendMessage(`Summarize this study file:\n\n${text.slice(0, 8000)}`, reasoning);
+          toast({ title: 'Summarized', description: `${file.name} processed` });
+        } catch (err) {
+          toast({ title: 'Failed to read file', description: 'Please try again', variant: 'destructive' });
+        }
+      } else if (ext === 'pdf' || ext === 'doc' || ext === 'docx') {
+        toast({
+          title: 'PDF/DOC summarization',
+          description: 'Server-side summarization will be added next. For now, upload .txt for instant summaries.',
+        });
+      } else {
+        toast({ title: 'Unsupported file', description: 'Only .txt, .pdf, .doc, .docx are allowed', variant: 'destructive' });
+      }
+    }
+
+    setFile(null);
 
     if (message) {
       await sendMessage(message, reasoning);
@@ -145,9 +159,19 @@ const AIChatInterface = () => {
                 <input
                   id="file-upload"
                   type="file"
+                  accept=".txt,.pdf,.doc,.docx"
                   className="hidden"
                   onChange={e => {
-                    if (e.target.files && e.target.files[0]) setFile(e.target.files[0]);
+                    const f = e.target.files && e.target.files[0];
+                    if (!f) return;
+                    const ext = f.name.split('.').pop()?.toLowerCase();
+                    const allowed = ['txt','pdf','doc','docx'];
+                    if (!ext || !allowed.includes(ext)) {
+                      toast({ title: 'Unsupported file', description: 'Only .txt, .pdf, .doc, .docx are allowed', variant: 'destructive' });
+                      e.currentTarget.value = '';
+                      return;
+                    }
+                    setFile(f);
                   }}
                   disabled={isLoading}
                 />

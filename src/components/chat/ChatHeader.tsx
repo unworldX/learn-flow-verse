@@ -22,14 +22,14 @@ const ChatHeader = ({ title, subtitle, avatar, isGroup, onBack }: {
         {subtitle && <p className="text-sm text-green-500">{subtitle}</p>}
       </div>
     </div>
-    <div className="flex items-center gap-2">
-      <Button variant="ghost" size="icon">
+    <div className="flex items-center gap-1.5">
+      <Button variant="ghost" size="icon" aria-label="Call" title="Call">
         <Phone className="w-4 h-4" />
       </Button>
-      <Button variant="ghost" size="icon">
+      <Button variant="ghost" size="icon" aria-label="Video call" title="Video call">
         <VideoIcon className="w-4 h-4" />
       </Button>
-      <Button variant="ghost" size="icon">
+      <Button variant="ghost" size="icon" aria-label="More" title="More">
         <MoreVertical className="w-4 h-4" />
       </Button>
     </div>

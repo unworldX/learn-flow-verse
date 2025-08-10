@@ -239,7 +239,7 @@ const Upload = () => {
                     id="file"
                     type="file"
                     onChange={handleFileChange}
-                    accept=".pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.mp4,.mp3,.jpg,.jpeg,.png,.gif,.zip,.rar"
+                    accept=".txt,.pdf,.doc,.docx"
                     required
                   />
                 </div>

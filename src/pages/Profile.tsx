@@ -35,8 +35,7 @@ const Profile = () => {
 
   const handleSave = async () => {
     await updateProfile({
-      full_name: formData.full_name,
-      email: formData.email
+      full_name: formData.full_name
     });
     setIsEditing(false);
   };
@@ -182,7 +181,8 @@ const Profile = () => {
                     id="email"
                     type="email"
                     value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                    disabled
+                    readOnly
                   />
                 ) : (
                   <p className="mt-1 text-sm text-muted-foreground">

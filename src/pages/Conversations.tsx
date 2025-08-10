@@ -46,15 +46,30 @@ const Conversations = () => {
       // Fetch direct message conversations
       const { data: directMessages, error: dmError } = await supabase
         .from('direct_messages')
-        .select(`
-          id, sender_id, receiver_id, encrypted_content, created_at,
-          sender:users!sender_id(full_name, email),
-          receiver:users!receiver_id(full_name, email)
-        `)
-        .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-        .order('created_at', { ascending: false });
+          .select('id, sender_id, receiver_id, encrypted_content, created_at')
+          .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
+          .order('created_at', { ascending: false });
 
       if (dmError) throw dmError;
+      // Build user map for DM participants to avoid FK joins
+      const otherUserIds = Array.from(
+        new Set(
+          (directMessages || [])
+            .map((m: any) => (m.sender_id === user.id ? m.receiver_id : m.sender_id))
+            .filter(Boolean)
+        )
+      );
+      const userMap: Record<string, { full_name: string | null; email: string }> = {};
+      if (otherUserIds.length > 0) {
+        const { data: usersData, error: usersError } = await supabase
+          .from('users')
+          .select('id, full_name, email')
+          .in('id', otherUserIds as string[]);
+        if (usersError) throw usersError;
+        usersData?.forEach((u: any) => {
+          userMap[u.id] = { full_name: u.full_name, email: u.email };
+        });
+      }
 
       // Fetch group conversations
       const { data: groupMemberships, error: groupError } = await supabase
@@ -66,7 +81,6 @@ const Conversations = () => {
         .eq('user_id', user.id);
 
       if (groupError) throw groupError;
-
       // Get latest group messages
       const groupIds = groupMemberships?.map(m => m.group_id) || [];
       let groupMessages: any[] = [];
@@ -87,13 +101,13 @@ const Conversations = () => {
       
       directMessages?.forEach((message: any) => {
         const otherUserId = message.sender_id === user.id ? message.receiver_id : message.sender_id;
-        const otherUser = message.sender_id === user.id ? message.receiver : message.sender;
+        const otherUser = userMap[otherUserId];
         
         if (!dmConversations.has(otherUserId)) {
           dmConversations.set(otherUserId, {
             id: otherUserId,
             type: 'direct',
-            name: otherUser?.full_name || otherUser?.email?.split('@')[0] || 'Unknown User',
+            name: (otherUser?.full_name || otherUser?.email?.split('@')[0] || 'Unknown User'),
             lastMessage: message.encrypted_content,
             lastMessageTime: message.created_at,
             otherUserId: otherUserId,
@@ -335,7 +349,7 @@ const Conversations = () => {
           {/* All Conversations */}
           <TabsContent value="all">
             <div className="glass-card border border-white/20 rounded-2xl overflow-hidden shadow-lg">
-              <ScrollArea className="h-[calc(100vh-350px)] min-h-[400px]">
+              <ScrollArea className="h-[calc(100vh-260px)] min-h-[420px]">
                 {filteredConversations.length > 0 ? (
                   filteredConversations.map((conversation) => (
                     <ConversationItem key={conversation.id} conversation={conversation} />
@@ -356,7 +370,7 @@ const Conversations = () => {
           {/* Groups Only */}
           <TabsContent value="groups">
             <div className="glass-card border border-white/20 rounded-2xl overflow-hidden shadow-lg">
-              <ScrollArea className="h-[calc(100vh-350px)] min-h-[400px]">
+              <ScrollArea className="h-[calc(100vh-260px)] min-h-[420px]">
                 {groupConversations.length > 0 ? (
                   groupConversations.map((conversation) => (
                     <ConversationItem key={conversation.id} conversation={conversation} />
@@ -377,7 +391,7 @@ const Conversations = () => {
           {/* Unread Only */}
           <TabsContent value="unread">
             <div className="glass-card border border-white/20 rounded-2xl overflow-hidden shadow-lg">
-              <ScrollArea className="h-[calc(100vh-350px)] min-h-[400px]">
+              <ScrollArea className="h-[calc(100vh-260px)] min-h-[420px]">
                 {unreadConversations.length > 0 ? (
                   unreadConversations.map((conversation) => (
                     <ConversationItem key={conversation.id} conversation={conversation} />
