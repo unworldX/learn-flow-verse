@@ -98,23 +98,7 @@ const AIChatInterface = () => {
 
   return (
     <div className="h-full bg-gradient-to-br from-slate-50 to-blue-50 flex flex-col">
-      {/* Header */}
-      <div className="bg-white/80 backdrop-blur-md border-b border-slate-200 p-3 md:p-4 shadow-sm">
-        <div className="max-w-4xl mx-auto flex items-center justify-between">
-          <div className="flex items-center gap-2 md:gap-3">
-            <div className="w-8 h-8 md:w-10 md:h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center">
-              <Bot className="w-4 h-4 md:w-5 md:h-5 text-white" />
-            </div>
-            <div>
-              <h1 className="text-base md:text-lg font-semibold text-slate-800">AI Assistant</h1>
-              <p className="text-xs md:text-sm text-slate-600">Your study companion</p>
-            </div>
-          </div>
-          <Link to="/settings" className="text-slate-600 hover:text-slate-800">
-            <Settings className="w-5 h-5 md:w-6 md:h-6" />
-          </Link>
-        </div>
-      </div>
+      
 
       {/* Chat Messages */}
       <div className="flex-1 overflow-hidden">

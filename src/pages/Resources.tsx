@@ -56,7 +56,7 @@ const Resources = () => {
   if (isLoading) {
     return (
       <div className="container mx-auto px-4 py-4 md:py-8">
-        <h1 className="text-2xl md:text-3xl font-bold mb-6 md:mb-8">Study Resources</h1>
+        
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
           {[...Array(6)].map((_, i) => (
             <Card key={i} className="animate-pulse">
@@ -78,24 +78,7 @@ const Resources = () => {
   return (
     <div className="min-h-screen liquid-bg">
       <div className="container mx-auto px-3 py-4 md:px-4 md:py-6 max-w-7xl">
-        {/* Enhanced Title Bar */}
-        <div className="glass-card p-4 md:p-6 mb-6 border border-white/20">
-          <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center">
-                <BookOpen className="w-6 h-6 text-white" />
-              </div>
-              <div>
-                <h1 className="text-xl md:text-2xl font-bold gradient-text">Study Resources</h1>
-                <p className="text-sm text-slate-600 mt-1">Access learning materials and documents</p>
-              </div>
-            </div>
-            <Button variant="outline" className="glass border-white/30 hover:bg-white/20">
-              <Filter className="w-4 h-4 mr-2" />
-              Advanced Filters
-            </Button>
-          </div>
-        </div>
+        
       
         {/* Enhanced Filters */}
         <div className="glass-card p-4 md:p-6 mb-6 border border-white/20">
