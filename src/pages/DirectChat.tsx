@@ -62,7 +62,7 @@ const DirectChat = () => {
       <div className="glass-card border-b border-white/20 shadow-sm">
         <div className="flex items-center justify-between p-4">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" asChild className="md:hidden rounded-full">
+            <Button variant="ghost" size="sm" asChild className="rounded-full">
               <Link to="/conversations">
                 <ArrowLeft className="h-5 w-5" />
               </Link>

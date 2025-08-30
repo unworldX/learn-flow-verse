@@ -20,14 +20,22 @@ const Profile = () => {
   const [isUploading, setIsUploading] = useState(false);
   const [formData, setFormData] = useState({
     full_name: '',
-    email: ''
+    email: '',
+    regions: '',
+    status: 'student',
+    profession: '',
+    location: ''
   });
 
   const handleEdit = () => {
     if (profile) {
       setFormData({
         full_name: profile.full_name || '',
-        email: profile.email
+        email: profile.email,
+        regions: (profile as any).regions || '',
+        status: (profile as any).status || 'student',
+        profession: (profile as any).profession || '',
+        location: (profile as any).location || ''
       });
     }
     setIsEditing(true);
@@ -35,8 +43,12 @@ const Profile = () => {
 
   const handleSave = async () => {
     await updateProfile({
-      full_name: formData.full_name
-    });
+      full_name: formData.full_name,
+      regions: formData.regions,
+      status: formData.status,
+      profession: formData.profession,
+      location: formData.location
+    } as any);
     setIsEditing(false);
   };
 
@@ -150,7 +162,11 @@ const Profile = () => {
           <CardTitle className="text-2xl">
             {profile.full_name || profile.email.split('@')[0]}
           </CardTitle>
-          <p className="text-muted-foreground">{profile.email}</p>
+          <p className="text-muted-foreground">
+            {profile.email.includes('@') 
+              ? `${profile.email.split('@')[0]}@tempstox.ac` 
+              : profile.email}
+          </p>
         </CardHeader>
         
         <Separator />
@@ -186,7 +202,82 @@ const Profile = () => {
                   />
                 ) : (
                   <p className="mt-1 text-sm text-muted-foreground">
-                    {profile.email}
+                    {profile.email.includes('@') 
+                      ? `${profile.email.split('@')[0]}@tempstox.ac` 
+                      : profile.email}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="regions">Region</Label>
+                {isEditing ? (
+                  <Input
+                    id="regions"
+                    value={formData.regions}
+                    onChange={(e) => setFormData({ ...formData, regions: e.target.value })}
+                    placeholder="e.g., North America, Europe"
+                  />
+                ) : (
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {(profile as any).regions || 'Not set'}
+                  </p>
+                )}
+              </div>
+              
+              <div>
+                <Label htmlFor="status">Status</Label>
+                {isEditing ? (
+                  <select
+                    id="status"
+                    value={formData.status}
+                    onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                    className="w-full mt-1 p-2 border border-gray-300 rounded-md text-sm"
+                  >
+                    <option value="student">Student</option>
+                    <option value="teacher">Teacher</option>
+                    <option value="researcher">Researcher</option>
+                    <option value="professional">Professional</option>
+                  </select>
+                ) : (
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {(profile as any).status || 'Student'}
+                  </p>
+                )}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <Label htmlFor="profession">Profession</Label>
+                {isEditing ? (
+                  <Input
+                    id="profession"
+                    value={formData.profession}
+                    onChange={(e) => setFormData({ ...formData, profession: e.target.value })}
+                    placeholder="e.g., Computer Science, Medicine"
+                  />
+                ) : (
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {(profile as any).profession || 'Not set'}
+                  </p>
+                )}
+              </div>
+              
+              <div>
+                <Label htmlFor="location">Location</Label>
+                {isEditing ? (
+                  <Input
+                    id="location"
+                    value={formData.location}
+                    onChange={(e) => setFormData({ ...formData, location: e.target.value })}
+                    placeholder="e.g., New York, London"
+                  />
+                ) : (
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {(profile as any).location || 'Not set'}
                   </p>
                 )}
               </div>

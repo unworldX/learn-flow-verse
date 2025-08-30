@@ -94,19 +94,32 @@ const GroupChat = () => {
     try {
       const { data, error } = await supabase
         .from('group_messages')
-        .select(`
-          *,
-          sender:users!sender_id (full_name, email)
-        `)
+        .select('*')
         .eq('group_id', groupId)
         .order('created_at', { ascending: true });
 
       if (error) throw error;
       
-      // Transform the data to match our interface
+      // Get sender information separately to avoid foreign key issues
+      const messageIds = data?.map(m => m.sender_id) || [];
+      const uniqueSenderIds = [...new Set(messageIds)];
+      let senderMap: Record<string, any> = {};
+      
+      if (uniqueSenderIds.length > 0) {
+        const { data: sendersData } = await supabase
+          .from('users')
+          .select('id, full_name, email')
+          .in('id', uniqueSenderIds);
+        
+        sendersData?.forEach(sender => {
+          senderMap[sender.id] = sender;
+        });
+      }
+      
+      // Transform messages with sender info
       const transformedMessages = data?.map(msg => ({
         ...msg,
-        sender: msg.sender && typeof msg.sender === 'object' && !Array.isArray(msg.sender) ? msg.sender : null
+        sender: senderMap[msg.sender_id] || null
       })) || [];
       
       setMessages(transformedMessages);
@@ -173,7 +186,7 @@ const GroupChat = () => {
       <div className="bg-white border-b border-gray-200 shadow-sm">
         <div className="flex items-center justify-between p-4">
           <div className="flex items-center gap-3">
-            <Button variant="ghost" size="sm" asChild className="md:hidden rounded-full">
+            <Button variant="ghost" size="sm" asChild className="rounded-full">
               <Link to="/conversations">
                 <ArrowLeft className="h-5 w-5" />
               </Link>
