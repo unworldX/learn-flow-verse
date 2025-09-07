@@ -153,12 +153,12 @@ const Settings = () => {
             <CardContent className="p-6 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="email">Email Address</Label>
+                  <Label htmlFor="email">Original Email</Label>
                   <Input id="email" value={user?.email || ''} disabled className="bg-gray-50" />
                 </div>
                 <div>
-                  <Label htmlFor="username">Username</Label>
-                  <Input id="username" value={user?.user_metadata?.username || 'Not set'} disabled className="bg-gray-50" />
+                  <Label htmlFor="appmail">App Mail</Label>
+                  <Input id="appmail" value={user?.email ? `${user.email.split('@')[0]}@tempstoxedu.ac` : ''} disabled className="bg-gray-50" />
                 </div>
               </div>
               <Separator />

@@ -162,18 +162,21 @@ const Profile = () => {
           <CardTitle className="text-2xl">
             {profile.full_name || profile.email.split('@')[0]}
           </CardTitle>
-          <p className="text-muted-foreground">
-            {profile.email.includes('@') 
-              ? `${profile.email.split('@')[0]}@tempstox.ac` 
-              : profile.email}
-          </p>
+          <div className="space-y-1">
+            <p className="text-muted-foreground text-sm">
+              {profile.email}
+            </p>
+            <p className="text-muted-foreground text-xs">
+              App Mail: {profile.email.split('@')[0]}@tempstoxedu.ac
+            </p>
+          </div>
         </CardHeader>
         
         <Separator />
         
         <CardContent className="pt-6">
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 gap-4">
               <div>
                 <Label htmlFor="full_name">Full Name</Label>
                 {isEditing ? (
@@ -191,22 +194,17 @@ const Profile = () => {
               </div>
               
               <div>
-                <Label htmlFor="email">Email</Label>
-                {isEditing ? (
-                  <Input
-                    id="email"
-                    type="email"
-                    value={formData.email}
-                    disabled
-                    readOnly
-                  />
-                ) : (
-                  <p className="mt-1 text-sm text-muted-foreground">
-                    {profile.email.includes('@') 
-                      ? `${profile.email.split('@')[0]}@tempstox.ac` 
-                      : profile.email}
-                  </p>
-                )}
+                <Label htmlFor="email">Original Email</Label>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {profile.email}
+                </p>
+              </div>
+              
+              <div>
+                <Label htmlFor="appmail">App Mail</Label>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {profile.email.split('@')[0]}@tempstoxedu.ac
+                </p>
               </div>
             </div>
 

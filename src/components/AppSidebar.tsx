@@ -4,11 +4,9 @@ import {
   FileText,
   Home,
   MessageCircle,
-  Settings,
   Upload,
   User,
   Users,
-  Bell,
   BookOpen,
   MessageSquare,
   LogOut,
@@ -32,6 +30,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext"
 import { Link } from "react-router-dom"
 import { Badge } from "@/components/ui/badge"
+import NotificationPopover from "@/components/NotificationPopover"
 
 const items = [
   {
@@ -151,23 +150,6 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-slate-600 font-medium px-3 py-2 text-xs uppercase tracking-wider">Account</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild className="hover:bg-white/60 rounded-xl mx-2 my-1 transition-all duration-200 group">
-                  <Link to="/settings" className="flex items-center gap-3 px-3 py-3">
-                    <div className="p-1.5 rounded-lg bg-gradient-to-br from-slate-500 to-slate-600 group-hover:from-slate-600 group-hover:to-slate-700 transition-all">
-                      <Settings className="w-4 h-4 text-white" />
-                    </div>
-                    <span className="font-medium hidden sm:inline">Settings</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
       </SidebarContent>
       
       <SidebarFooter className="border-t border-white/20 p-4 glass">
@@ -183,14 +165,17 @@ export function AppSidebar() {
                 <span className="text-slate-700 text-sm font-medium">{shortName}</span>
               )}
             </div>
-            <button
-              onClick={handleSignOut}
-              className="rounded-full p-2 text-red-600 hover:text-red-700 hover:bg-red-50/80 transition-all duration-200"
-              aria-label="Sign out"
-              title="Sign out"
-            >
-              <LogOut className="w-5 h-5" />
-            </button>
+            <div className="flex items-center gap-2">
+              <NotificationPopover />
+              <button
+                onClick={handleSignOut}
+                className="rounded-full p-2 text-red-600 hover:text-red-700 hover:bg-red-50/80 transition-all duration-200"
+                aria-label="Sign out"
+                title="Sign out"
+              >
+                <LogOut className="w-5 h-5" />
+              </button>
+            </div>
           </div>
         )}
       </SidebarFooter>

@@ -10,6 +10,10 @@ export interface UserProfile {
   full_name: string | null;
   avatar_url: string | null;
   created_at: string;
+  regions?: string | null;
+  status?: string | null;
+  profession?: string | null;
+  location?: string | null;
 }
 
 export const useProfile = () => {
