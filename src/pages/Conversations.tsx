@@ -226,51 +226,51 @@ const Conversations = () => {
       to={conversation.type === 'direct' ? `/chat/${conversation.otherUserId}` : `/group-chat/${conversation.id}`}
       className="block"
     >
-      <div className="p-4 m-2 hover:bg-white/60 transition-all duration-200 cursor-pointer rounded-2xl border border-white/30 hover:border-white/50 hover:shadow-lg backdrop-blur-sm">
+      <div className="p-4 m-2 hover:bg-background/60 transition-all duration-200 cursor-pointer rounded-2xl border border-border/30 hover:border-border/50 hover:shadow-lg backdrop-blur-sm">
         <div className="flex items-center space-x-3">
           {/* Avatar */}
           <div className="relative">
             <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg ${
               conversation.type === 'direct' 
-                ? 'bg-gradient-to-br from-blue-500 to-purple-500' 
-                : 'bg-gradient-to-br from-green-500 to-teal-500'
+                ? 'bg-gradient-primary' 
+                : 'bg-gradient-secondary'
             }`}>
               {conversation.type === 'direct' ? (
-                <span className="text-white text-lg font-semibold">
+                <span className="text-primary-foreground text-lg font-semibold">
                   {conversation.name[0]?.toUpperCase()}
                 </span>
               ) : (
-                <Users className="h-7 w-7 text-white" />
+                <Users className="h-7 w-7 text-success-foreground" />
               )}
             </div>
             {/* Online Status */}
             {conversation.type === 'direct' && (
-              <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 border-3 border-white rounded-full shadow-sm"></div>
+              <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-success border-3 border-background rounded-full shadow-sm"></div>
             )}
           </div>
           
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-1">
-              <h3 className="text-base font-semibold truncate text-slate-900 max-w-[180px]">
+              <h3 className="text-base font-semibold truncate text-foreground max-w-[180px]">
                 {conversation.name}
               </h3>
               <div className="flex items-center gap-2">
-                <p className="text-xs text-slate-500 font-medium">
+                <p className="text-xs text-muted-foreground font-medium">
                   {formatTime(conversation.lastMessageTime)}
                 </p>
                 {conversation.unreadCount && conversation.unreadCount > 0 && (
-                  <Badge className="bg-red-500 text-white text-xs min-w-[20px] h-5 rounded-full flex items-center justify-center px-1.5 shadow-sm">
+                  <Badge className="bg-destructive text-destructive-foreground text-xs min-w-[20px] h-5 rounded-full flex items-center justify-center px-1.5 shadow-sm">
                     {conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}
                   </Badge>
                 )}
               </div>
             </div>
             <div className="flex items-center justify-between">
-              <p className="text-sm truncate text-slate-600 max-w-[200px] leading-tight">
+              <p className="text-sm truncate text-muted-foreground max-w-[200px] leading-tight">
                 {conversation.lastMessage || (conversation.type === 'group' ? 'Tap to join the conversation' : 'Start a conversation')}
               </p>
               {/* Read receipts for sent messages */}
-              <div className="text-blue-500 text-xs">
+              <div className="text-primary text-xs">
                 ✓✓
               </div>
             </div>
@@ -282,166 +282,162 @@ const Conversations = () => {
 
   if (isLoading) {
     return (
-      <div className="h-full bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
-        <div className="bg-white/70 backdrop-blur-sm rounded-3xl border border-white/50 shadow-xl p-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="text-sm text-slate-600 mt-4">Loading conversations...</p>
+      <div className="h-full bg-gradient-surface flex items-center justify-center">
+        <div className="bg-card/70 backdrop-blur-sm rounded-3xl border border-border/50 shadow-xl p-8">
+          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+          <p className="text-sm text-muted-foreground mt-4">Loading conversations...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="h-full bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
-      <div className="h-full flex flex-col">
+    <div className="h-full bg-gradient-surface">
+      <div className="h-full flex flex-col p-4 lg:p-6">
         {/* Modern Header Section */}
-        <div className="bg-white/80 backdrop-blur-sm border-b border-white/50 p-6">
-          <div className="max-w-7xl mx-auto">
-            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-              {/* Title Section */}
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
-                  <MessageCircle className="w-6 h-6 text-white" />
-                </div>
-                <div>
-                  <h1 className="text-2xl font-bold text-slate-900">Conversations</h1>
-                  <p className="text-slate-600">Connect with your study community</p>
-                </div>
+        <div className="bg-card/95 backdrop-blur-sm border border-border/50 rounded-3xl p-6 shadow-xl mb-6">
+          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+            {/* Title Section */}
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 bg-gradient-primary rounded-2xl flex items-center justify-center shadow-lg">
+                <MessageCircle className="w-6 h-6 text-primary-foreground" />
               </div>
-
-              {/* Search Bar */}
-              <div className="relative max-w-md w-full">
-                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-400" />
-                <Input
-                  placeholder="Search conversations..."
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-12 pr-4 py-3 bg-white/90 border-2 border-white/50 rounded-2xl text-sm shadow-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
-                />
+              <div>
+                <h1 className="text-2xl font-bold text-foreground">Conversations</h1>
+                <p className="text-muted-foreground">Connect with your study community</p>
               </div>
             </div>
 
-            {/* Tab Navigation */}
-            <div className="mt-8">
-              <Tabs defaultValue="all" className="w-full">
-                <TabsList className="bg-white/60 backdrop-blur-sm p-1 rounded-2xl border border-white/50 shadow-sm inline-flex">
-                  <TabsTrigger 
-                    value="all" 
-                    className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-md px-6 py-2 font-medium transition-all"
-                  >
-                    All Chats
-                    {conversations.length > 0 && (
-                      <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-700 text-xs">
-                        {conversations.length}
-                      </Badge>
-                    )}
-                  </TabsTrigger>
-                  <TabsTrigger 
-                    value="groups" 
-                    className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-md px-6 py-2 font-medium transition-all"
-                  >
-                    Groups
-                    {groupConversations.length > 0 && (
-                      <Badge variant="secondary" className="ml-2 bg-green-100 text-green-700 text-xs">
-                        {groupConversations.length}
-                      </Badge>
-                    )}
-                  </TabsTrigger>
-                  <TabsTrigger 
-                    value="unread" 
-                    className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-md px-6 py-2 font-medium transition-all"
-                  >
-                    Unread
-                    {unreadConversations.length > 0 && (
-                      <Badge className="ml-2 bg-red-500 text-white text-xs">
-                        {unreadConversations.length}
-                      </Badge>
-                    )}
-                  </TabsTrigger>
-                </TabsList>
+            {/* Search Bar */}
+            <div className="relative max-w-md w-full">
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
+              <Input
+                placeholder="Search conversations..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="pl-12 pr-4 py-3 bg-background/90 border-2 border-border rounded-2xl text-sm shadow-sm focus:ring-2 focus:ring-ring/20 focus:border-ring"
+              />
+            </div>
+          </div>
+
+          {/* Tab Navigation */}
+          <div className="mt-8">
+            <Tabs defaultValue="all" className="w-full">
+              <TabsList className="bg-muted/60 backdrop-blur-sm p-1 rounded-2xl border border-border shadow-sm inline-flex">
+                <TabsTrigger 
+                  value="all" 
+                  className="rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-md px-6 py-2 font-medium transition-all"
+                >
+                  All Chats
+                  {conversations.length > 0 && (
+                    <Badge variant="secondary" className="ml-2 bg-primary/10 text-primary text-xs">
+                      {conversations.length}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="groups" 
+                  className="rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-md px-6 py-2 font-medium transition-all"
+                >
+                  Groups
+                  {groupConversations.length > 0 && (
+                    <Badge variant="secondary" className="ml-2 bg-success/10 text-success text-xs">
+                      {groupConversations.length}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+                <TabsTrigger 
+                  value="unread" 
+                  className="rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-md px-6 py-2 font-medium transition-all"
+                >
+                  Unread
+                  {unreadConversations.length > 0 && (
+                    <Badge className="ml-2 bg-destructive text-destructive-foreground text-xs">
+                      {unreadConversations.length}
+                    </Badge>
+                  )}
+                </TabsTrigger>
+              </TabsList>
+              
+              {/* Content Area */}
+              <div className="flex-1 overflow-hidden mt-8">
                 
-                {/* Content Area */}
-                <div className="flex-1 overflow-hidden mt-8">
-                  <div className="max-w-7xl mx-auto h-full">
-                    
-                    {/* All Conversations Tab */}
-                    <TabsContent value="all" className="h-full m-0">
-                      <div className="bg-white/70 backdrop-blur-sm rounded-3xl border border-white/50 shadow-xl h-[calc(100vh-300px)] overflow-hidden">
-                        <ScrollArea className="h-full">
-                          {filteredConversations.length > 0 ? (
-                            <div className="p-2">
-                              {filteredConversations.map((conversation) => (
-                                <ConversationItem key={conversation.id} conversation={conversation} />
-                              ))}
+                {/* All Conversations Tab */}
+                <TabsContent value="all" className="h-full m-0">
+                  <div className="bg-card/70 backdrop-blur-sm rounded-3xl border border-border/50 shadow-xl h-[calc(100vh-320px)] overflow-hidden">
+                    <ScrollArea className="h-full">
+                      {filteredConversations.length > 0 ? (
+                        <div className="p-2">
+                          {filteredConversations.map((conversation) => (
+                            <ConversationItem key={conversation.id} conversation={conversation} />
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center h-full">
+                          <div className="text-center py-16">
+                            <div className="w-24 h-24 bg-gradient-primary rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+                              <MessageCircle className="w-12 h-12 text-primary-foreground" />
                             </div>
-                          ) : (
-                            <div className="flex items-center justify-center h-full">
-                              <div className="text-center py-16">
-                                <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-purple-500 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-                                  <MessageCircle className="w-12 h-12 text-white" />
-                                </div>
-                                <h3 className="text-xl font-semibold text-slate-800 mb-3">No conversations yet</h3>
-                                <p className="text-slate-500 mb-6 max-w-sm mx-auto">Start a new chat or join a study group to connect with your learning community</p>
-                              </div>
-                            </div>
-                          )}
-                        </ScrollArea>
-                      </div>
-                    </TabsContent>
-
-                    {/* Groups Tab */}
-                    <TabsContent value="groups" className="h-full m-0">
-                      <div className="bg-white/70 backdrop-blur-sm rounded-3xl border border-white/50 shadow-xl h-[calc(100vh-300px)] overflow-hidden">
-                        <ScrollArea className="h-full">
-                          {groupConversations.length > 0 ? (
-                            <div className="p-2">
-                              {groupConversations.map((conversation) => (
-                                <ConversationItem key={conversation.id} conversation={conversation} />
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="flex items-center justify-center h-full">
-                              <div className="text-center py-16">
-                                <div className="w-24 h-24 bg-gradient-to-br from-green-500 to-teal-500 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-                                  <Users className="w-12 h-12 text-white" />
-                                </div>
-                                <h3 className="text-xl font-semibold text-slate-800 mb-3">No group chats</h3>
-                                <p className="text-slate-500 mb-6 max-w-sm mx-auto">Join or create a study group to start collaborating with others</p>
-                              </div>
-                            </div>
-                          )}
-                        </ScrollArea>
-                      </div>
-                    </TabsContent>
-
-                    {/* Unread Tab */}
-                    <TabsContent value="unread" className="h-full m-0">
-                      <div className="bg-white/70 backdrop-blur-sm rounded-3xl border border-white/50 shadow-xl h-[calc(100vh-300px)] overflow-hidden">
-                        <ScrollArea className="h-full">
-                          {unreadConversations.length > 0 ? (
-                            <div className="p-2">
-                              {unreadConversations.map((conversation) => (
-                                <ConversationItem key={conversation.id} conversation={conversation} />
-                              ))}
-                            </div>
-                          ) : (
-                            <div className="flex items-center justify-center h-full">
-                              <div className="text-center py-16">
-                                <div className="w-24 h-24 bg-gradient-to-br from-orange-500 to-red-500 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-                                  <MessageCircle className="w-12 h-12 text-white" />
-                                </div>
-                                <h3 className="text-xl font-semibold text-slate-800 mb-3">All caught up!</h3>
-                                <p className="text-slate-500 mb-6 max-w-sm mx-auto">You have no unread messages</p>
-                              </div>
-                            </div>
-                          )}
-                        </ScrollArea>
-                      </div>
-                    </TabsContent>
+                            <h3 className="text-xl font-semibold text-foreground mb-3">No conversations yet</h3>
+                            <p className="text-muted-foreground mb-6 max-w-sm mx-auto">Start a new chat or join a study group to connect with your learning community</p>
+                          </div>
+                        </div>
+                      )}
+                    </ScrollArea>
                   </div>
-                </div>
-              </Tabs>
-            </div>
+                </TabsContent>
+
+                {/* Groups Tab */}
+                <TabsContent value="groups" className="h-full m-0">
+                  <div className="bg-card/70 backdrop-blur-sm rounded-3xl border border-border/50 shadow-xl h-[calc(100vh-320px)] overflow-hidden">
+                    <ScrollArea className="h-full">
+                      {groupConversations.length > 0 ? (
+                        <div className="p-2">
+                          {groupConversations.map((conversation) => (
+                            <ConversationItem key={conversation.id} conversation={conversation} />
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center h-full">
+                          <div className="text-center py-16">
+                            <div className="w-24 h-24 bg-gradient-secondary rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+                              <Users className="w-12 h-12 text-success-foreground" />
+                            </div>
+                            <h3 className="text-xl font-semibold text-foreground mb-3">No group chats</h3>
+                            <p className="text-muted-foreground mb-6 max-w-sm mx-auto">Join or create a study group to start collaborating with others</p>
+                          </div>
+                        </div>
+                      )}
+                    </ScrollArea>
+                  </div>
+                </TabsContent>
+
+                {/* Unread Tab */}
+                <TabsContent value="unread" className="h-full m-0">
+                  <div className="bg-card/70 backdrop-blur-sm rounded-3xl border border-border/50 shadow-xl h-[calc(100vh-320px)] overflow-hidden">
+                    <ScrollArea className="h-full">
+                      {unreadConversations.length > 0 ? (
+                        <div className="p-2">
+                          {unreadConversations.map((conversation) => (
+                            <ConversationItem key={conversation.id} conversation={conversation} />
+                          ))}
+                        </div>
+                      ) : (
+                        <div className="flex items-center justify-center h-full">
+                          <div className="text-center py-16">
+                            <div className="w-24 h-24 bg-gradient-accent rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+                              <MessageCircle className="w-12 h-12 text-info-foreground" />
+                            </div>
+                            <h3 className="text-xl font-semibold text-foreground mb-3">All caught up!</h3>
+                            <p className="text-muted-foreground mb-6 max-w-sm mx-auto">You have no unread messages</p>
+                          </div>
+                        </div>
+                      )}
+                    </ScrollArea>
+                  </div>
+                </TabsContent>
+              </div>
+            </Tabs>
           </div>
         </div>
       </div>
@@ -452,26 +448,26 @@ const Conversations = () => {
           <DropdownMenuTrigger asChild>
             <Button 
               size="lg"
-              className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-110 border-0"
+              className="w-16 h-16 rounded-2xl bg-gradient-primary hover:shadow-2xl transition-all duration-300 hover:scale-110 border-0 shadow-xl"
             >
-              <Plus className="w-8 h-8 text-white" />
+              <Plus className="w-8 h-8 text-primary-foreground" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-52 p-2 bg-white/95 backdrop-blur-sm border border-white/50 shadow-xl rounded-2xl">
+          <DropdownMenuContent align="end" className="w-52 p-2 bg-popover/95 backdrop-blur-sm border border-border shadow-xl rounded-2xl">
             <CreateGroupDialog>
-              <DropdownMenuItem className="flex items-center gap-3 cursor-pointer p-3 rounded-xl hover:bg-blue-50 transition-colors">
-                <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-teal-500 rounded-lg flex items-center justify-center">
-                  <Users className="w-4 h-4 text-white" />
+              <DropdownMenuItem className="flex items-center gap-3 cursor-pointer p-3 rounded-xl hover:bg-accent transition-colors">
+                <div className="w-8 h-8 bg-gradient-secondary rounded-lg flex items-center justify-center">
+                  <Users className="w-4 h-4 text-success-foreground" />
                 </div>
                 <span className="font-medium">Create Group</span>
               </DropdownMenuItem>
             </CreateGroupDialog>
             <DropdownMenuItem 
-              className="flex items-center gap-3 cursor-pointer p-3 rounded-xl hover:bg-blue-50 transition-colors"
+              className="flex items-center gap-3 cursor-pointer p-3 rounded-xl hover:bg-accent transition-colors"
               onClick={() => setShowNewChat(true)}
             >
-              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
-                <UserPlus className="w-4 h-4 text-white" />
+              <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
+                <UserPlus className="w-4 h-4 text-primary-foreground" />
               </div>
               <span className="font-medium">New Chat</span>
             </DropdownMenuItem>
@@ -481,13 +477,13 @@ const Conversations = () => {
 
       {/* New Chat Dialog */}
       <Dialog open={showNewChat} onOpenChange={setShowNewChat}>
-        <DialogContent className="sm:max-w-md bg-white/95 backdrop-blur-sm border border-white/50 shadow-xl rounded-2xl">
+        <DialogContent className="sm:max-w-md bg-popover/95 backdrop-blur-sm border border-border shadow-xl rounded-2xl">
           <DialogHeader>
-            <DialogTitle className="text-xl font-semibold">Start New Chat</DialogTitle>
+            <DialogTitle className="text-xl font-semibold text-foreground">Start New Chat</DialogTitle>
           </DialogHeader>
           <div className="space-y-4 p-2">
             <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium text-slate-700">
+              <label htmlFor="email" className="text-sm font-medium text-foreground">
                 Email Address
               </label>
               <Input
@@ -495,21 +491,21 @@ const Conversations = () => {
                 placeholder="Enter user's email address"
                 value={searchEmail}
                 onChange={(e) => setSearchEmail(e.target.value)}
-                className="border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+                className="border-2 border-border rounded-xl focus:ring-2 focus:ring-ring/20 focus:border-ring"
               />
             </div>
             <div className="flex gap-3 pt-2">
               <Button 
                 variant="outline" 
                 onClick={() => setShowNewChat(false)}
-                className="flex-1 border-2 border-slate-200 hover:bg-slate-50 rounded-xl"
+                className="flex-1 border-2 border-border hover:bg-accent rounded-xl"
               >
                 Cancel
               </Button>
               <Button 
                 onClick={handleNewChat}
                 disabled={!searchEmail.trim()}
-                className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 border-0 rounded-xl"
+                className="flex-1 bg-gradient-primary border-0 rounded-xl"
               >
                 Start Chat
               </Button>

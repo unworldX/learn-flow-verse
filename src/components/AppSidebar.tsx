@@ -99,31 +99,31 @@ export function AppSidebar() {
     signOut();
   };
   return (
-    <Sidebar className="border-r border-white/20 bg-white/95 backdrop-blur-md">
-      <SidebarHeader className="border-b border-white/20 p-4 md:p-6 glass">
+    <Sidebar className="border-r border-sidebar-border bg-sidebar/95 backdrop-blur-md">
+      <SidebarHeader className="border-b border-sidebar-border p-4 md:p-6">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
-            <BookOpen className="w-6 h-6 text-white" />
+          <div className="w-10 h-10 bg-gradient-primary rounded-2xl flex items-center justify-center shadow-lg">
+            <BookOpen className="w-6 h-6 text-primary-foreground" />
           </div>
           <div className="hidden sm:block">
-            <span className="font-bold text-lg text-slate-800">Student Library</span>
-            <p className="text-xs text-slate-500">Learning Platform</p>
+            <span className="font-bold text-lg text-sidebar-foreground">Student Library</span>
+            <p className="text-xs text-muted-foreground">Learning Platform</p>
           </div>
         </div>
       </SidebarHeader>
-      <SidebarContent className="glass">
+      <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="text-slate-600 font-medium px-3 py-2 text-xs uppercase tracking-wider">Navigation</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-muted-foreground font-medium px-3 py-2 text-xs uppercase tracking-wider">Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild className="hover:bg-white/60 rounded-xl mx-2 my-1 transition-all duration-200 group">
+                  <SidebarMenuButton asChild className="hover:bg-sidebar-accent rounded-xl mx-2 my-1 transition-all duration-200 group">
                     <Link to={item.url} className="flex items-center gap-3 px-3 py-3">
-                      <div className="p-1.5 rounded-lg bg-gradient-to-br from-blue-500 to-purple-500 group-hover:from-blue-600 group-hover:to-purple-600 transition-all">
-                        <item.icon className="w-4 h-4 text-white" />
+                      <div className="p-1.5 rounded-lg bg-gradient-primary group-hover:shadow-md transition-all">
+                        <item.icon className="w-4 h-4 text-primary-foreground" />
                       </div>
-                      <span className="font-medium hidden sm:inline">{item.title}</span>
+                      <span className="font-medium hidden sm:inline text-sidebar-foreground">{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -133,17 +133,17 @@ export function AppSidebar() {
         </SidebarGroup>
         
         <SidebarGroup>
-          <SidebarGroupLabel className="text-slate-600 font-medium px-3 py-2 text-xs uppercase tracking-wider">Communication</SidebarGroupLabel>
+          <SidebarGroupLabel className="text-muted-foreground font-medium px-3 py-2 text-xs uppercase tracking-wider">Communication</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {chatItems.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild className="hover:bg-white/60 rounded-xl mx-2 my-1 transition-all duration-200 group">
+                  <SidebarMenuButton asChild className="hover:bg-sidebar-accent rounded-xl mx-2 my-1 transition-all duration-200 group">
                     <Link to={item.url} className="flex items-center gap-3 px-3 py-3">
-                      <div className="p-1.5 rounded-lg bg-gradient-to-br from-green-500 to-teal-500 group-hover:from-green-600 group-hover:to-teal-600 transition-all">
-                        <item.icon className="w-4 h-4 text-white" />
+                      <div className="p-1.5 rounded-lg bg-gradient-secondary group-hover:shadow-md transition-all">
+                        <item.icon className="w-4 h-4 text-success-foreground" />
                       </div>
-                      <span className="font-medium hidden sm:inline">{item.title}</span>
+                      <span className="font-medium hidden sm:inline text-sidebar-foreground">{item.title}</span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -154,23 +154,23 @@ export function AppSidebar() {
 
       </SidebarContent>
       
-      <SidebarFooter className="border-t border-white/20 p-4 glass">
+      <SidebarFooter className="border-t border-sidebar-border p-4">
         {user && (
           <div className="flex items-center justify-between px-2">
             <div className="flex items-center gap-3">
-              <Avatar className="h-10 w-10">
+              <Avatar className="h-10 w-10 border-2 border-primary/20">
                 <AvatarImage src={profile?.avatar_url || ''} />
-                <AvatarFallback className="text-sm font-medium">
+                <AvatarFallback className="text-sm font-medium bg-gradient-primary text-primary-foreground">
                   {profile?.full_name ? profile.full_name.charAt(0).toUpperCase() : user.email?.[0]?.toUpperCase()}
                 </AvatarFallback>
               </Avatar>
               {shortName && (
-                <span className="text-slate-700 text-sm font-medium">{shortName}</span>
+                <span className="text-sidebar-foreground text-sm font-medium">{shortName}</span>
               )}
             </div>
             <button
               onClick={handleSignOut}
-              className="rounded-full p-2 text-red-600 hover:text-red-700 hover:bg-red-50/80 transition-all duration-200"
+              className="rounded-full p-2 text-destructive hover:text-destructive/80 hover:bg-destructive/10 transition-all duration-200"
               aria-label="Sign out"
               title="Sign out"
             >
