@@ -42,18 +42,14 @@ const Profile = () => {
   };
 
   const handleSave = async () => {
-    try {
-      await updateProfile({
-        full_name: formData.full_name,
-        regions: formData.regions,
-        status: formData.status,
-        profession: formData.profession,
-        location: formData.location
-      });
-      setIsEditing(false);
-    } catch (error) {
-      console.error('Failed to update profile:', error);
-    }
+    await updateProfile({
+      full_name: formData.full_name,
+      regions: formData.regions,
+      status: formData.status,
+      profession: formData.profession,
+      location: formData.location
+    } as any);
+    setIsEditing(false);
   };
 
   const handleCancel = () => {
@@ -166,18 +162,11 @@ const Profile = () => {
           <CardTitle className="text-2xl">
             {profile.full_name || profile.email.split('@')[0]}
           </CardTitle>
-          <div className="text-muted-foreground space-y-1">
-            <p className="text-sm">
-              {profile.email.includes('@') 
-                ? `${profile.email.split('@')[0]}@tempstox.ac` 
-                : profile.email}
-            </p>
-            <p className="text-sm">
-              {profile.email.includes('@') 
-                ? `${profile.email.split('@')[0]}@tempstoxedu.ac` 
-                : profile.email}
-            </p>
-          </div>
+          <p className="text-muted-foreground">
+            {profile.email.includes('@') 
+              ? `${profile.email.split('@')[0]}@tempstox.ac` 
+              : profile.email}
+          </p>
         </CardHeader>
         
         <Separator />
@@ -212,18 +201,11 @@ const Profile = () => {
                     readOnly
                   />
                 ) : (
-                  <div className="mt-1 text-sm text-muted-foreground space-y-1">
-                    <p>
-                      {profile.email.includes('@') 
-                        ? `${profile.email.split('@')[0]}@tempstox.ac` 
-                        : profile.email}
-                    </p>
-                    <p>
-                      {profile.email.includes('@') 
-                        ? `${profile.email.split('@')[0]}@tempstoxedu.ac` 
-                        : profile.email}
-                    </p>
-                  </div>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {profile.email.includes('@') 
+                      ? `${profile.email.split('@')[0]}@tempstox.ac` 
+                      : profile.email}
+                  </p>
                 )}
               </div>
             </div>

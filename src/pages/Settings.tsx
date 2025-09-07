@@ -153,28 +153,12 @@ const Settings = () => {
             <CardContent className="p-6 space-y-4">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <Label htmlFor="email">Email Addresses</Label>
-                  <div className="space-y-2">
-                    <Input 
-                      id="email" 
-                      value={user?.email?.includes('@') 
-                        ? `${user.email.split('@')[0]}@tempstox.ac` 
-                        : user?.email || ''} 
-                      disabled 
-                      className="bg-gray-50" 
-                    />
-                    <Input 
-                      value={user?.email?.includes('@') 
-                        ? `${user.email.split('@')[0]}@tempstoxedu.ac` 
-                        : user?.email || ''} 
-                      disabled 
-                      className="bg-gray-50" 
-                    />
-                  </div>
+                  <Label htmlFor="email">Email Address</Label>
+                  <Input id="email" value={user?.email || ''} disabled className="bg-gray-50" />
                 </div>
                 <div>
                   <Label htmlFor="username">Username</Label>
-                  <Input id="username" value={user?.email?.split('@')[0] || 'Not set'} disabled className="bg-gray-50" />
+                  <Input id="username" value={user?.user_metadata?.username || 'Not set'} disabled className="bg-gray-50" />
                 </div>
               </div>
               <Separator />
