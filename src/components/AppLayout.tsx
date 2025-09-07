@@ -56,7 +56,6 @@ export function AppLayout({ children }: AppLayoutProps) {
               <div className="flex items-center gap-2">
                 <NotificationPopover />
                 <Avatar className="h-8 w-8">
-                  <AvatarImage src={profile?.avatar_url || ''} />
                   <AvatarFallback className="text-sm">
                     {profile?.full_name ? profile.full_name.charAt(0).toUpperCase() : profile?.email.charAt(0).toUpperCase() || 'U'}
                   </AvatarFallback>
