@@ -30,7 +30,8 @@ import {
 import { useAuth } from "@/contexts/AuthContext"
 import { Link } from "react-router-dom"
 import { Badge } from "@/components/ui/badge"
-import NotificationPopover from "@/components/NotificationPopover"
+import { useProfile } from "@/hooks/useProfile"
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
 
 const items = [
   {
@@ -90,6 +91,7 @@ const chatItems = [
 
 export function AppSidebar() {
   const { signOut, user } = useAuth();
+  const { profile } = useProfile();
   const displayName = user?.email?.split('@')[0] || '';
   const shortName = displayName.length > 8 ? displayName.slice(0, 8) + '..' : displayName;
 
@@ -156,26 +158,24 @@ export function AppSidebar() {
         {user && (
           <div className="flex items-center justify-between px-2">
             <div className="flex items-center gap-3">
-              <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-500 rounded-xl flex items-center justify-center shadow-lg">
-                <span className="text-white text-sm font-medium">
-                  {user.email?.[0]?.toUpperCase()}
-                </span>
-              </div>
+              <Avatar className="h-10 w-10">
+                <AvatarImage src={profile?.avatar_url || ''} />
+                <AvatarFallback className="text-sm font-medium">
+                  {profile?.full_name ? profile.full_name.charAt(0).toUpperCase() : user.email?.[0]?.toUpperCase()}
+                </AvatarFallback>
+              </Avatar>
               {shortName && (
                 <span className="text-slate-700 text-sm font-medium">{shortName}</span>
               )}
             </div>
-            <div className="flex items-center gap-2">
-              <NotificationPopover />
-              <button
-                onClick={handleSignOut}
-                className="rounded-full p-2 text-red-600 hover:text-red-700 hover:bg-red-50/80 transition-all duration-200"
-                aria-label="Sign out"
-                title="Sign out"
-              >
-                <LogOut className="w-5 h-5" />
-              </button>
-            </div>
+            <button
+              onClick={handleSignOut}
+              className="rounded-full p-2 text-red-600 hover:text-red-700 hover:bg-red-50/80 transition-all duration-200"
+              aria-label="Sign out"
+              title="Sign out"
+            >
+              <LogOut className="w-5 h-5" />
+            </button>
           </div>
         )}
       </SidebarFooter>

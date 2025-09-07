@@ -63,7 +63,8 @@ export const useProfile = () => {
         description: "Your profile has been updated successfully"
       });
 
-      fetchProfile();
+      // Refetch profile to get updated data including avatar
+      await fetchProfile();
     } catch (error) {
       console.error('Error updating profile:', error);
       toast({

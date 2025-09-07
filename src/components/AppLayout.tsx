@@ -2,8 +2,11 @@
 import { SidebarProvider, SidebarTrigger } from "@/components/ui/sidebar";
 import { AppSidebar } from "./AppSidebar";
 import { Button } from "@/components/ui/button";
-import { Settings, User, Bell } from "lucide-react";
+import { Settings, User } from "lucide-react";
 import { useLocation } from "react-router-dom";
+import NotificationPopover from "@/components/NotificationPopover";
+import { useProfile } from "@/hooks/useProfile";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface AppLayoutProps {
   children: React.ReactNode;
@@ -29,6 +32,7 @@ const getPageTitle = (pathname: string) => {
 export function AppLayout({ children }: AppLayoutProps) {
   const location = useLocation();
   const pageTitle = getPageTitle(location.pathname);
+  const { profile } = useProfile();
 
   return (
     <SidebarProvider>
@@ -50,16 +54,13 @@ export function AppLayout({ children }: AppLayoutProps) {
               </div>
 
               <div className="flex items-center gap-2">
-                <Button variant="ghost" size="icon" className="relative hover:bg-slate-100 rounded-full">
-                  <Bell className="w-5 h-5" />
-                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></div>
-                </Button>
-                <Button variant="ghost" size="icon" className="hover:bg-slate-100 rounded-full">
-                  <User className="w-5 h-5" />
-                </Button>
-                <Button variant="ghost" size="icon" className="hover:bg-slate-100 rounded-full">
-                  <Settings className="w-5 h-5" />
-                </Button>
+                <NotificationPopover />
+                <Avatar className="h-8 w-8">
+                  <AvatarImage src={profile?.avatar_url || ''} />
+                  <AvatarFallback className="text-sm">
+                    {profile?.full_name ? profile.full_name.charAt(0).toUpperCase() : profile?.email.charAt(0).toUpperCase() || 'U'}
+                  </AvatarFallback>
+                </Avatar>
               </div>
             </div>
           </header>
