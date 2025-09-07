@@ -32,6 +32,7 @@ import {
 import { useAuth } from "@/contexts/AuthContext"
 import { Link } from "react-router-dom"
 import { Badge } from "@/components/ui/badge"
+import { NotificationPopover } from "@/components/NotificationPopover"
 
 const items = [
   {
@@ -100,14 +101,17 @@ export function AppSidebar() {
   return (
     <Sidebar className="border-r border-white/20 bg-white/95 backdrop-blur-md">
       <SidebarHeader className="border-b border-white/20 p-4 md:p-6 glass">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
-            <BookOpen className="w-6 h-6 text-white" />
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+              <BookOpen className="w-6 h-6 text-white" />
+            </div>
+            <div className="hidden sm:block">
+              <span className="font-bold text-lg text-slate-800">Student Library</span>
+              <p className="text-xs text-slate-500">Learning Platform</p>
+            </div>
           </div>
-          <div className="hidden sm:block">
-            <span className="font-bold text-lg text-slate-800">Student Library</span>
-            <p className="text-xs text-slate-500">Learning Platform</p>
-          </div>
+          <NotificationPopover />
         </div>
       </SidebarHeader>
       <SidebarContent className="glass">
@@ -151,23 +155,6 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-slate-600 font-medium px-3 py-2 text-xs uppercase tracking-wider">Account</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              <SidebarMenuItem>
-                <SidebarMenuButton asChild className="hover:bg-white/60 rounded-xl mx-2 my-1 transition-all duration-200 group">
-                  <Link to="/settings" className="flex items-center gap-3 px-3 py-3">
-                    <div className="p-1.5 rounded-lg bg-gradient-to-br from-slate-500 to-slate-600 group-hover:from-slate-600 group-hover:to-slate-700 transition-all">
-                      <Settings className="w-4 h-4 text-white" />
-                    </div>
-                    <span className="font-medium hidden sm:inline">Settings</span>
-                  </Link>
-                </SidebarMenuButton>
-              </SidebarMenuItem>
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
       </SidebarContent>
       
       <SidebarFooter className="border-t border-white/20 p-4 glass">
