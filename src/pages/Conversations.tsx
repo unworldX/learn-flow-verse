@@ -226,11 +226,11 @@ const Conversations = () => {
       to={conversation.type === 'direct' ? `/chat/${conversation.otherUserId}` : `/group-chat/${conversation.id}`}
       className="block"
     >
-      <div className="p-4 hover:bg-white/40 transition-all cursor-pointer border-b border-white/5">
+      <div className="p-4 m-2 hover:bg-white/60 transition-all duration-200 cursor-pointer rounded-2xl border border-white/30 hover:border-white/50 hover:shadow-lg backdrop-blur-sm">
         <div className="flex items-center space-x-3">
-          {/* Profile Picture */}
+          {/* Avatar */}
           <div className="relative">
-            <div className={`w-14 h-14 rounded-full flex items-center justify-center flex-shrink-0 shadow-md ${
+            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg ${
               conversation.type === 'direct' 
                 ? 'bg-gradient-to-br from-blue-500 to-purple-500' 
                 : 'bg-gradient-to-br from-green-500 to-teal-500'
@@ -243,23 +243,23 @@ const Conversations = () => {
                 <Users className="h-7 w-7 text-white" />
               )}
             </div>
-            {/* Online indicator for direct messages */}
+            {/* Online Status */}
             {conversation.type === 'direct' && (
-              <div className="absolute bottom-0 right-0 w-4 h-4 bg-green-500 border-2 border-white rounded-full"></div>
+              <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 border-3 border-white rounded-full shadow-sm"></div>
             )}
           </div>
           
           <div className="flex-1 min-w-0">
             <div className="flex items-center justify-between mb-1">
-              <p className="text-base font-semibold truncate text-slate-800 max-w-[180px]">
+              <h3 className="text-base font-semibold truncate text-slate-900 max-w-[180px]">
                 {conversation.name}
-              </p>
+              </h3>
               <div className="flex items-center gap-2">
                 <p className="text-xs text-slate-500 font-medium">
                   {formatTime(conversation.lastMessageTime)}
                 </p>
                 {conversation.unreadCount && conversation.unreadCount > 0 && (
-                  <Badge className="bg-green-500 text-white text-xs min-w-[20px] h-5 rounded-full flex items-center justify-center px-1.5">
+                  <Badge className="bg-red-500 text-white text-xs min-w-[20px] h-5 rounded-full flex items-center justify-center px-1.5 shadow-sm">
                     {conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}
                   </Badge>
                 )}
@@ -282,191 +282,241 @@ const Conversations = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen liquid-bg flex items-center justify-center">
-        <div className="glass-card p-6">
+      <div className="h-full bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
+        <div className="bg-white/70 backdrop-blur-sm rounded-3xl border border-white/50 shadow-xl p-8">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto"></div>
-          <p className="text-sm text-slate-600 mt-2">Loading conversations...</p>
+          <p className="text-sm text-slate-600 mt-4">Loading conversations...</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen liquid-bg relative">
-      <div className="container mx-auto px-3 py-4 md:px-4 md:py-6 max-w-4xl">
+    <div className="h-full bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
+      <div className="h-full flex flex-col">
+        {/* Modern Header Section */}
+        <div className="bg-white/80 backdrop-blur-sm border-b border-white/50 p-6">
+          <div className="max-w-7xl mx-auto">
+            <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+              {/* Title Section */}
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-purple-600 rounded-2xl flex items-center justify-center shadow-lg">
+                  <MessageCircle className="w-6 h-6 text-white" />
+                </div>
+                <div>
+                  <h1 className="text-2xl font-bold text-slate-900">Conversations</h1>
+                  <p className="text-slate-600">Connect with your study community</p>
+                </div>
+              </div>
 
-        {/* Tabs + Search (compact header) */}
-        <Tabs defaultValue="all" className="space-y-4">
-          <div className="glass-card p-2 mb-4 border border-white/20 rounded-2xl shadow-sm">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-2">
-              <TabsList className="bg-transparent p-1 rounded-xl h-9 w-full md:w-auto">
-                <TabsTrigger 
-                  value="all" 
-                  className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm text-xs md:text-sm px-3"
-                >
-                  Chats
-                  {conversations.length > 0 && (
-                    <Badge variant="secondary" className="ml-2 h-5 text-[10px] md:text-xs">
-                      {conversations.length}
-                    </Badge>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="groups" 
-                  className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm text-xs md:text-sm px-3"
-                >
-                  Groups
-                  {groupConversations.length > 0 && (
-                    <Badge variant="secondary" className="ml-2 h-5 text-[10px] md:text-xs">
-                      {groupConversations.length}
-                    </Badge>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="unread" 
-                  className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-sm text-xs md:text-sm px-3"
-                >
-                  Unread
-                  {unreadConversations.length > 0 && (
-                    <Badge className="ml-2 h-5 text-[10px] md:text-xs bg-green-500">
-                      {unreadConversations.length}
-                    </Badge>
-                  )}
-                </TabsTrigger>
-              </TabsList>
-              <div className="relative w-full md:w-80">
-                <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
+              {/* Search Bar */}
+              <div className="relative max-w-md w-full">
+                <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-400" />
                 <Input
-                  placeholder="Search..."
+                  placeholder="Search conversations..."
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="pl-9 bg-white/90 border-0 rounded-full text-sm h-9 shadow-sm"
+                  className="pl-12 pr-4 py-3 bg-white/90 border-2 border-white/50 rounded-2xl text-sm shadow-sm focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
                 />
               </div>
             </div>
+
+            {/* Tab Navigation */}
+            <div className="mt-8">
+              <Tabs defaultValue="all" className="w-full">
+                <TabsList className="bg-white/60 backdrop-blur-sm p-1 rounded-2xl border border-white/50 shadow-sm inline-flex">
+                  <TabsTrigger 
+                    value="all" 
+                    className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-md px-6 py-2 font-medium transition-all"
+                  >
+                    All Chats
+                    {conversations.length > 0 && (
+                      <Badge variant="secondary" className="ml-2 bg-blue-100 text-blue-700 text-xs">
+                        {conversations.length}
+                      </Badge>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="groups" 
+                    className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-md px-6 py-2 font-medium transition-all"
+                  >
+                    Groups
+                    {groupConversations.length > 0 && (
+                      <Badge variant="secondary" className="ml-2 bg-green-100 text-green-700 text-xs">
+                        {groupConversations.length}
+                      </Badge>
+                    )}
+                  </TabsTrigger>
+                  <TabsTrigger 
+                    value="unread" 
+                    className="rounded-xl data-[state=active]:bg-white data-[state=active]:shadow-md px-6 py-2 font-medium transition-all"
+                  >
+                    Unread
+                    {unreadConversations.length > 0 && (
+                      <Badge className="ml-2 bg-red-500 text-white text-xs">
+                        {unreadConversations.length}
+                      </Badge>
+                    )}
+                  </TabsTrigger>
+                </TabsList>
+                
+                {/* Content Area */}
+                <div className="flex-1 overflow-hidden mt-8">
+                  <div className="max-w-7xl mx-auto h-full">
+                    
+                    {/* All Conversations Tab */}
+                    <TabsContent value="all" className="h-full m-0">
+                      <div className="bg-white/70 backdrop-blur-sm rounded-3xl border border-white/50 shadow-xl h-[calc(100vh-300px)] overflow-hidden">
+                        <ScrollArea className="h-full">
+                          {filteredConversations.length > 0 ? (
+                            <div className="p-2">
+                              {filteredConversations.map((conversation) => (
+                                <ConversationItem key={conversation.id} conversation={conversation} />
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-center h-full">
+                              <div className="text-center py-16">
+                                <div className="w-24 h-24 bg-gradient-to-br from-blue-500 to-purple-500 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+                                  <MessageCircle className="w-12 h-12 text-white" />
+                                </div>
+                                <h3 className="text-xl font-semibold text-slate-800 mb-3">No conversations yet</h3>
+                                <p className="text-slate-500 mb-6 max-w-sm mx-auto">Start a new chat or join a study group to connect with your learning community</p>
+                              </div>
+                            </div>
+                          )}
+                        </ScrollArea>
+                      </div>
+                    </TabsContent>
+
+                    {/* Groups Tab */}
+                    <TabsContent value="groups" className="h-full m-0">
+                      <div className="bg-white/70 backdrop-blur-sm rounded-3xl border border-white/50 shadow-xl h-[calc(100vh-300px)] overflow-hidden">
+                        <ScrollArea className="h-full">
+                          {groupConversations.length > 0 ? (
+                            <div className="p-2">
+                              {groupConversations.map((conversation) => (
+                                <ConversationItem key={conversation.id} conversation={conversation} />
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-center h-full">
+                              <div className="text-center py-16">
+                                <div className="w-24 h-24 bg-gradient-to-br from-green-500 to-teal-500 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+                                  <Users className="w-12 h-12 text-white" />
+                                </div>
+                                <h3 className="text-xl font-semibold text-slate-800 mb-3">No group chats</h3>
+                                <p className="text-slate-500 mb-6 max-w-sm mx-auto">Join or create a study group to start collaborating with others</p>
+                              </div>
+                            </div>
+                          )}
+                        </ScrollArea>
+                      </div>
+                    </TabsContent>
+
+                    {/* Unread Tab */}
+                    <TabsContent value="unread" className="h-full m-0">
+                      <div className="bg-white/70 backdrop-blur-sm rounded-3xl border border-white/50 shadow-xl h-[calc(100vh-300px)] overflow-hidden">
+                        <ScrollArea className="h-full">
+                          {unreadConversations.length > 0 ? (
+                            <div className="p-2">
+                              {unreadConversations.map((conversation) => (
+                                <ConversationItem key={conversation.id} conversation={conversation} />
+                              ))}
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-center h-full">
+                              <div className="text-center py-16">
+                                <div className="w-24 h-24 bg-gradient-to-br from-orange-500 to-red-500 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+                                  <MessageCircle className="w-12 h-12 text-white" />
+                                </div>
+                                <h3 className="text-xl font-semibold text-slate-800 mb-3">All caught up!</h3>
+                                <p className="text-slate-500 mb-6 max-w-sm mx-auto">You have no unread messages</p>
+                              </div>
+                            </div>
+                          )}
+                        </ScrollArea>
+                      </div>
+                    </TabsContent>
+                  </div>
+                </div>
+              </Tabs>
+            </div>
           </div>
-
-          {/* All Conversations */}
-          <TabsContent value="all">
-            <div className="glass-card border border-white/20 rounded-2xl overflow-hidden shadow-lg">
-              <ScrollArea className="h-[calc(100vh-260px)] min-h-[420px]">
-                {filteredConversations.length > 0 ? (
-                  filteredConversations.map((conversation) => (
-                    <ConversationItem key={conversation.id} conversation={conversation} />
-                  ))
-                ) : (
-                  <div className="text-center py-16">
-                    <div className="w-20 h-20 bg-gradient-to-br from-blue-500 to-purple-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
-                      <MessageCircle className="w-10 h-10 text-white" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-slate-800 mb-2">No conversations yet</h3>
-                    <p className="text-slate-500 mb-6">Start a new chat or join a study group</p>
-                  </div>
-                )}
-              </ScrollArea>
-            </div>
-          </TabsContent>
-
-          {/* Groups Only */}
-          <TabsContent value="groups">
-            <div className="glass-card border border-white/20 rounded-2xl overflow-hidden shadow-lg">
-              <ScrollArea className="h-[calc(100vh-260px)] min-h-[420px]">
-                {groupConversations.length > 0 ? (
-                  groupConversations.map((conversation) => (
-                    <ConversationItem key={conversation.id} conversation={conversation} />
-                  ))
-                ) : (
-                  <div className="text-center py-16">
-                    <div className="w-20 h-20 bg-gradient-to-br from-green-500 to-teal-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
-                      <Users className="w-10 h-10 text-white" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-slate-800 mb-2">No group chats</h3>
-                    <p className="text-slate-500 mb-6">Join or create a study group to start collaborating</p>
-                  </div>
-                )}
-              </ScrollArea>
-            </div>
-          </TabsContent>
-
-          {/* Unread Only */}
-          <TabsContent value="unread">
-            <div className="glass-card border border-white/20 rounded-2xl overflow-hidden shadow-lg">
-              <ScrollArea className="h-[calc(100vh-260px)] min-h-[420px]">
-                {unreadConversations.length > 0 ? (
-                  unreadConversations.map((conversation) => (
-                    <ConversationItem key={conversation.id} conversation={conversation} />
-                  ))
-                ) : (
-                  <div className="text-center py-16">
-                    <div className="w-20 h-20 bg-gradient-to-br from-orange-500 to-red-500 rounded-full flex items-center justify-center mx-auto mb-6 shadow-lg">
-                      <MessageCircle className="w-10 h-10 text-white" />
-                    </div>
-                    <h3 className="text-lg font-semibold text-slate-800 mb-2">All caught up!</h3>
-                    <p className="text-slate-500 mb-6">You have no unread messages</p>
-                  </div>
-                )}
-              </ScrollArea>
-            </div>
-          </TabsContent>
-        </Tabs>
+        </div>
       </div>
 
-      {/* Speed-dial FAB */}
-      <div className="fixed bottom-6 right-6 z-50">
+      {/* Floating Action Button */}
+      <div className="fixed bottom-8 right-8 z-50">
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <Button 
               size="lg"
-              className="w-16 h-16 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-xl hover:shadow-2xl transition-all duration-200 hover:scale-110"
+              className="w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 shadow-2xl hover:shadow-3xl transition-all duration-300 hover:scale-110 border-0"
             >
-              <Plus className="w-7 h-7 text-white" />
+              <Plus className="w-8 h-8 text-white" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48 p-1">
+          <DropdownMenuContent align="end" className="w-52 p-2 bg-white/95 backdrop-blur-sm border border-white/50 shadow-xl rounded-2xl">
             <CreateGroupDialog>
-              <DropdownMenuItem className="flex items-center gap-2 cursor-pointer">
-                <Users className="w-4 h-4 text-teal-600" />
-                <span>Create Group</span>
+              <DropdownMenuItem className="flex items-center gap-3 cursor-pointer p-3 rounded-xl hover:bg-blue-50 transition-colors">
+                <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-teal-500 rounded-lg flex items-center justify-center">
+                  <Users className="w-4 h-4 text-white" />
+                </div>
+                <span className="font-medium">Create Group</span>
               </DropdownMenuItem>
             </CreateGroupDialog>
             <DropdownMenuItem 
-              className="flex items-center gap-2 cursor-pointer"
+              className="flex items-center gap-3 cursor-pointer p-3 rounded-xl hover:bg-blue-50 transition-colors"
               onClick={() => setShowNewChat(true)}
             >
-              <UserPlus className="w-4 h-4 text-blue-600" />
-              <span>New Chat</span>
+              <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-purple-500 rounded-lg flex items-center justify-center">
+                <UserPlus className="w-4 h-4 text-white" />
+              </div>
+              <span className="font-medium">New Chat</span>
             </DropdownMenuItem>
           </DropdownMenuContent>
         </DropdownMenu>
+      </div>
 
-        {/* New Chat Dialog */}
-        <Dialog open={showNewChat} onOpenChange={setShowNewChat}>
-          <DialogContent className="glass-card border-white/30 max-w-md mx-auto">
-            <DialogHeader>
-              <DialogTitle className="text-xl font-semibold">Start a conversation</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div className="relative">
-                <Search className="absolute left-3 top-3 h-5 w-5 text-slate-400" />
-                <Input
-                  placeholder="Enter email to find user"
-                  value={searchEmail}
-                  onChange={(e) => setSearchEmail(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && handleNewChat()}
-                  className="pl-12 py-3 bg-slate-50 border-slate-200 rounded-xl text-base"
-                />
-              </div>
+      {/* New Chat Dialog */}
+      <Dialog open={showNewChat} onOpenChange={setShowNewChat}>
+        <DialogContent className="sm:max-w-md bg-white/95 backdrop-blur-sm border border-white/50 shadow-xl rounded-2xl">
+          <DialogHeader>
+            <DialogTitle className="text-xl font-semibold">Start New Chat</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 p-2">
+            <div className="space-y-2">
+              <label htmlFor="email" className="text-sm font-medium text-slate-700">
+                Email Address
+              </label>
+              <Input
+                id="email"
+                placeholder="Enter user's email address"
+                value={searchEmail}
+                onChange={(e) => setSearchEmail(e.target.value)}
+                className="border-2 border-slate-200 rounded-xl focus:ring-2 focus:ring-blue-500/20 focus:border-blue-400"
+              />
+            </div>
+            <div className="flex gap-3 pt-2">
               <Button 
-                onClick={handleNewChat} 
-                className="w-full py-3 bg-gradient-to-r from-blue-500 to-purple-500 hover:from-blue-600 hover:to-purple-600 rounded-xl text-base font-medium"
+                variant="outline" 
+                onClick={() => setShowNewChat(false)}
+                className="flex-1 border-2 border-slate-200 hover:bg-slate-50 rounded-xl"
+              >
+                Cancel
+              </Button>
+              <Button 
+                onClick={handleNewChat}
                 disabled={!searchEmail.trim()}
+                className="flex-1 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-700 hover:to-purple-700 border-0 rounded-xl"
               >
                 Start Chat
               </Button>
             </div>
-          </DialogContent>
-        </Dialog>
-      </div>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };
