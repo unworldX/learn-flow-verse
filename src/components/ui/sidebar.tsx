@@ -21,8 +21,10 @@ const SIDEBAR_COOKIE_NAME = "sidebar:state"
 const SIDEBAR_COOKIE_MAX_AGE = 60 * 60 * 24 * 7
 const SIDEBAR_WIDTH = "16rem"
 const SIDEBAR_WIDTH_MOBILE = "18rem"
-const SIDEBAR_WIDTH_ICON = "3rem"
+const SIDEBAR_WIDTH_ICON = "4rem"
 const SIDEBAR_KEYBOARD_SHORTCUT = "b"
+
+type SidebarMode = "expanded" | "collapsed" | "hover"
 
 type SidebarContext = {
   state: "expanded" | "collapsed"
@@ -32,6 +34,10 @@ type SidebarContext = {
   setOpenMobile: (open: boolean) => void
   isMobile: boolean
   toggleSidebar: () => void
+  mode: SidebarMode
+  setMode: (mode: SidebarMode) => void
+  isHovering: boolean
+  setIsHovering: (hovering: boolean) => void
 }
 
 const SidebarContext = React.createContext<SidebarContext | null>(null)
@@ -67,6 +73,12 @@ const SidebarProvider = React.forwardRef<
   ) => {
     const isMobile = useIsMobile()
     const [openMobile, setOpenMobile] = React.useState(false)
+    const [mode, setMode] = React.useState<SidebarMode>(() => {
+      // Load mode from localStorage
+      const stored = localStorage.getItem("sidebar-mode-preference") as SidebarMode | null
+      return stored && ["expanded", "collapsed", "hover"].includes(stored) ? stored : "expanded"
+    })
+    const [isHovering, setIsHovering] = React.useState(false)
 
     // This is the internal state of the sidebar.
     // We use openProp and setOpenProp for control from outside the component.
@@ -112,19 +124,29 @@ const SidebarProvider = React.forwardRef<
 
     // We add a state so that we can do data-state="expanded" or "collapsed".
     // This makes it easier to style the sidebar with Tailwind classes.
-    const state = open ? "expanded" : "collapsed"
+    // In hover mode, the state depends on whether we're hovering
+    const state = React.useMemo(() => {
+      if (mode === "hover") {
+        return isHovering ? "expanded" : "collapsed"
+      }
+      return mode === "expanded" ? "expanded" : "collapsed"
+    }, [mode, isHovering])
 
     const contextValue = React.useMemo<SidebarContext>(
       () => ({
         state,
-        open,
+        open: mode === "expanded" || (mode === "hover" && isHovering),
         setOpen,
         isMobile,
         openMobile,
         setOpenMobile,
         toggleSidebar,
+        mode,
+        setMode,
+        isHovering,
+        setIsHovering,
       }),
-      [state, open, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
+      [state, mode, isHovering, setOpen, isMobile, openMobile, setOpenMobile, toggleSidebar]
     )
 
     return (
@@ -173,7 +195,19 @@ const Sidebar = React.forwardRef<
     },
     ref
   ) => {
-    const { isMobile, state, openMobile, setOpenMobile } = useSidebar()
+    const { isMobile, state, openMobile, setOpenMobile, mode, setIsHovering } = useSidebar()
+
+    const handleMouseEnter = React.useCallback(() => {
+      if (mode === "hover" && !isMobile) {
+        setIsHovering(true)
+      }
+    }, [mode, isMobile, setIsHovering])
+
+    const handleMouseLeave = React.useCallback(() => {
+      if (mode === "hover" && !isMobile) {
+        setIsHovering(false)
+      }
+    }, [mode, isMobile, setIsHovering])
 
     if (collapsible === "none") {
       return (
@@ -218,6 +252,9 @@ const Sidebar = React.forwardRef<
         data-collapsible={state === "collapsed" ? collapsible : ""}
         data-variant={variant}
         data-side={side}
+        data-mode={mode}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={handleMouseLeave}
       >
         {/* This is what handles the sidebar gap on desktop */}
         <div
@@ -612,7 +649,7 @@ const SidebarMenuAction = React.forwardRef<
         "peer-data-[size=lg]/menu-button:top-2.5",
         "group-data-[collapsible=icon]:hidden",
         showOnHover &&
-          "group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 peer-data-[active=true]/menu-button:text-sidebar-accent-foreground md:opacity-0",
+        "group-focus-within/menu-item:opacity-100 group-hover/menu-item:opacity-100 data-[state=open]:opacity-100 peer-data-[active=true]/menu-button:text-sidebar-accent-foreground md:opacity-0",
         className
       )}
       {...props}
@@ -759,3 +796,5 @@ export {
   SidebarTrigger,
   useSidebar,
 }
+
+export type { SidebarMode }

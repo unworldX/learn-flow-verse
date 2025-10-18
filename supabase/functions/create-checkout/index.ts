@@ -1,21 +1,30 @@
 
+// deno-lint-ignore-file
+// @ts-expect-error Deno URLs are resolved at runtime in Edge Functions
 import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+// @ts-expect-error Deno URLs are resolved at runtime in Edge Functions
 import Stripe from "https://esm.sh/stripe@14.21.0";
+// @ts-expect-error Deno URLs are resolved at runtime in Edge Functions
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.0";
+declare const Deno: { env: { get(key: string): string | undefined } };
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const logStep = (step: string, details?: any) => {
+const logStep = (step: string, details?: unknown) => {
   const detailsStr = details ? ` - ${JSON.stringify(details)}` : '';
   console.log(`[CREATE-CHECKOUT] ${step}${detailsStr}`);
 };
 
-serve(async (req) => {
+serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
-    return new Response(null, { headers: corsHeaders });
+    return new Response("ok", { headers: corsHeaders });
+  }
+  if (req.method !== 'POST') {
+    return new Response(JSON.stringify({ error: 'Method not allowed' }), { status: 405, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
   }
 
   try {
@@ -37,7 +46,9 @@ serve(async (req) => {
 
     logStep("User authenticated", { userId: user.id, email: user.email });
 
-    const stripe = new Stripe(Deno.env.get("STRIPE_SECRET_KEY") || "", { apiVersion: "2023-10-16" });
+  const stripeSecret = Deno.env.get("STRIPE_SECRET_KEY") || "";
+  if (!stripeSecret) throw new Error('STRIPE_SECRET_KEY not configured');
+  const stripe = new Stripe(stripeSecret, { apiVersion: "2023-10-16" });
 
     // Check for existing customer
     const customers = await stripe.customers.list({ email: user.email, limit: 1 });
@@ -58,7 +69,8 @@ serve(async (req) => {
 
     logStep("Creating checkout session", { planId, amount: selectedPlan.amount });
 
-    const session = await stripe.checkout.sessions.create({
+  const origin = req.headers.get("origin") || Deno.env.get('SITE_URL') || Deno.env.get('SUPABASE_URL') || 'http://localhost:5173';
+  const session = await stripe.checkout.sessions.create({
       customer: customerId,
       customer_email: customerId ? undefined : user.email,
       line_items: [
@@ -73,8 +85,8 @@ serve(async (req) => {
         },
       ],
       mode: "subscription",
-      success_url: `${req.headers.get("origin")}/settings?success=true`,
-      cancel_url: `${req.headers.get("origin")}/settings?cancelled=true`,
+  success_url: `${origin}/settings?success=true`,
+  cancel_url: `${origin}/settings?cancelled=true`,
       metadata: {
         user_id: user.id,
         plan_id: planId

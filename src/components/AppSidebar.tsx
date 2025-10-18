@@ -1,19 +1,17 @@
-
 import {
   Calendar,
   FileText,
   Home,
   MessageCircle,
   Upload,
-  User,
-  Users,
+  Settings,
+  Bell,
   BookOpen,
-  MessageSquare,
-  LogOut,
   Bot,
   Search,
   Globe,
-} from "lucide-react"
+  PlaySquare
+} from "lucide-react";
 
 import {
   Sidebar,
@@ -21,17 +19,15 @@ import {
   SidebarFooter,
   SidebarGroup,
   SidebarGroupContent,
-  SidebarGroupLabel,
   SidebarHeader,
   SidebarMenu,
   SidebarMenuButton,
   SidebarMenuItem,
-} from "@/components/ui/sidebar"
-import { useAuth } from "@/contexts/AuthContext"
-import { Link } from "react-router-dom"
-import { Badge } from "@/components/ui/badge"
-import { useProfile } from "@/hooks/useProfile"
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar"
+  SidebarSeparator,
+  useSidebar,
+} from "@/components/ui/sidebar";
+import { Link, useLocation } from "react-router-dom";
+import BrandLogo from '@/components/BrandLogo';
 
 const items = [
   {
@@ -50,9 +46,19 @@ const items = [
     icon: BookOpen,
   },
   {
+    title: "Video Courses",
+    url: "/courses",
+    icon: PlaySquare,
+  },
+  {
     title: "Notes",
-    url: "/notes",
+    url: "/NotesWorkspace",
     icon: FileText,
+  },
+  {
+    title: "Reminders",
+    url: "/reminders",
+    icon: Bell,
   },
   {
     title: "Upload",
@@ -60,16 +66,11 @@ const items = [
     icon: Upload,
   },
   {
-    title: "Profile",
-    url: "/profile",
-    icon: User,
-  },
-  {
     title: "Subscription",
     url: "/subscription",
     icon: Calendar,
   },
-]
+];
 
 const chatItems = [
   {
@@ -87,63 +88,66 @@ const chatItems = [
     url: "/forums",
     icon: Globe,
   },
-]
+];
 
 export function AppSidebar() {
-  const { signOut, user } = useAuth();
-  const { profile } = useProfile();
-  const displayName = user?.email?.split('@')[0] || '';
-  const shortName = displayName.length > 8 ? displayName.slice(0, 8) + '..' : displayName;
+  const location = useLocation();
+  const { state } = useSidebar();
+  const isCollapsed = state === "collapsed";
 
-  const handleSignOut = () => {
-    signOut();
-  };
   return (
-    <Sidebar className="border-r border-sidebar-border bg-sidebar/95 backdrop-blur-md">
-      <SidebarHeader className="border-b border-sidebar-border p-4 md:p-6">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-gradient-primary rounded-2xl flex items-center justify-center shadow-lg">
-            <BookOpen className="w-6 h-6 text-primary-foreground" />
+    <Sidebar
+      collapsible="icon"
+      className="border-r border-sidebar-border bg-sidebar transition-all duration-300 ease-in-out"
+    >
+      <SidebarHeader className="border-b border-sidebar-border h-14 p-2">
+        <div className="h-full flex items-center gap-3">
+          <div className="w-9 h-9 rounded-xl flex items-center justify-center bg-sidebar-accent text-sidebar-foreground/80 shrink-0">
+            <BrandLogo className="w-8 h-8" />
           </div>
-          <div className="hidden sm:block">
-            <span className="font-bold text-lg text-sidebar-foreground">Student Library</span>
-            <p className="text-xs text-muted-foreground">Learning Platform</p>
+          <div 
+            className={`hidden sm:block transition-all duration-300 overflow-hidden ${
+              isCollapsed ? 'w-0 opacity-0' : 'w-auto opacity-100'
+            }`}
+          >
+            <span className="font-semibold text-base text-sidebar-foreground whitespace-nowrap">
+              Student Library
+            </span>
+            <p className="text-[11px] text-sidebar-foreground/60 whitespace-nowrap">
+              Learning Platform
+            </p>
           </div>
         </div>
       </SidebarHeader>
       <SidebarContent>
         <SidebarGroup>
-          <SidebarGroupLabel className="text-muted-foreground font-medium px-3 py-2 text-xs uppercase tracking-wider">Navigation</SidebarGroupLabel>
           <SidebarGroupContent>
             <SidebarMenu>
               {items.map((item) => (
                 <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild className="hover:bg-sidebar-accent rounded-xl mx-2 my-1 transition-all duration-200 group">
-                    <Link to={item.url} className="flex items-center gap-3 px-3 py-3">
-                      <div className="p-1.5 rounded-lg bg-gradient-primary group-hover:shadow-md transition-all">
-                        <item.icon className="w-4 h-4 text-primary-foreground" />
-                      </div>
-                      <span className="font-medium hidden sm:inline text-sidebar-foreground">{item.title}</span>
-                    </Link>
-                  </SidebarMenuButton>
-                </SidebarMenuItem>
-              ))}
-            </SidebarMenu>
-          </SidebarGroupContent>
-        </SidebarGroup>
-        
-        <SidebarGroup>
-          <SidebarGroupLabel className="text-muted-foreground font-medium px-3 py-2 text-xs uppercase tracking-wider">Communication</SidebarGroupLabel>
-          <SidebarGroupContent>
-            <SidebarMenu>
-              {chatItems.map((item) => (
-                <SidebarMenuItem key={item.title}>
-                  <SidebarMenuButton asChild className="hover:bg-sidebar-accent rounded-xl mx-2 my-1 transition-all duration-200 group">
-                    <Link to={item.url} className="flex items-center gap-3 px-3 py-3">
-                      <div className="p-1.5 rounded-lg bg-gradient-secondary group-hover:shadow-md transition-all">
-                        <item.icon className="w-4 h-4 text-success-foreground" />
-                      </div>
-                      <span className="font-medium hidden sm:inline text-sidebar-foreground">{item.title}</span>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={
+                      location.pathname === item.url ||
+                      location.pathname.startsWith(item.url + "/")
+                    }
+                    className="mx-2 my-1 rounded-lg transition-all duration-200"
+                    tooltip={item.title}
+                  >
+                    <Link
+                      to={item.url}
+                      className="flex items-center gap-3 relative"
+                    >
+                      <item.icon className="w-4 h-4 shrink-0" />
+                      <span 
+                        className={`font-medium whitespace-nowrap transition-all duration-300 ${
+                          isCollapsed 
+                            ? 'w-0 opacity-0 overflow-hidden' 
+                            : 'w-auto opacity-100'
+                        }`}
+                      >
+                        {item.title}
+                      </span>
                     </Link>
                   </SidebarMenuButton>
                 </SidebarMenuItem>
@@ -152,33 +156,65 @@ export function AppSidebar() {
           </SidebarGroupContent>
         </SidebarGroup>
 
+        <SidebarSeparator className="my-2" />
+
+        <SidebarGroup>
+          <SidebarGroupContent>
+            <SidebarMenu>
+              {chatItems.map((item) => (
+                <SidebarMenuItem key={item.title}>
+                  <SidebarMenuButton
+                    asChild
+                    isActive={
+                      location.pathname === item.url ||
+                      location.pathname.startsWith(item.url + "/")
+                    }
+                    className="mx-2 my-1 rounded-lg transition-all duration-200"
+                    tooltip={item.title}
+                  >
+                    <Link
+                      to={item.url}
+                      className="flex items-center gap-3 relative"
+                    >
+                      <item.icon className="w-4 h-4 shrink-0" />
+                      <span 
+                        className={`font-medium whitespace-nowrap transition-all duration-300 ${
+                          isCollapsed 
+                            ? 'w-0 opacity-0 overflow-hidden' 
+                            : 'w-auto opacity-100'
+                        }`}
+                      >
+                        {item.title}
+                      </span>
+                    </Link>
+                  </SidebarMenuButton>
+                </SidebarMenuItem>
+              ))}
+            </SidebarMenu>
+          </SidebarGroupContent>
+        </SidebarGroup>
       </SidebarContent>
-      
-      <SidebarFooter className="border-t border-sidebar-border p-4">
-        {user && (
-          <div className="flex items-center justify-between px-2">
-            <div className="flex items-center gap-3">
-              <Avatar className="h-10 w-10 border-2 border-primary/20">
-                <AvatarImage src={profile?.avatar_url || ''} />
-                <AvatarFallback className="text-sm font-medium bg-gradient-primary text-primary-foreground">
-                  {profile?.full_name ? profile.full_name.charAt(0).toUpperCase() : user.email?.[0]?.toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-              {shortName && (
-                <span className="text-sidebar-foreground text-sm font-medium">{shortName}</span>
-              )}
-            </div>
-            <button
-              onClick={handleSignOut}
-              className="rounded-full p-2 text-destructive hover:text-destructive/80 hover:bg-destructive/10 transition-all duration-200"
-              aria-label="Sign out"
-              title="Sign out"
-            >
-              <LogOut className="w-5 h-5" />
-            </button>
-          </div>
-        )}
+
+      {/* Footer settings button */}
+      <SidebarFooter className="border-t border-sidebar-border p-2">
+        <Link
+          to="/settings"
+          className="flex items-center gap-3 h-10 px-3 rounded-lg hover:bg-sidebar-accent focus:bg-sidebar-accent text-sidebar-foreground transition-all duration-200 w-full"
+          aria-label="Settings"
+          title="Settings"
+        >
+          <Settings className="h-5 w-5 shrink-0" aria-hidden="true" />
+          <span 
+            className={`text-sm font-medium whitespace-nowrap transition-all duration-300 ${
+              isCollapsed 
+                ? 'w-0 opacity-0 overflow-hidden' 
+                : 'w-auto opacity-100'
+            }`}
+          >
+            Settings
+          </span>
+        </Link>
       </SidebarFooter>
     </Sidebar>
-  )
+  );
 }

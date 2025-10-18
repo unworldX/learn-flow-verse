@@ -45,7 +45,7 @@ const Upload = () => {
       class: formData.class,
       resourceType: formData.resourceType
     });
-    
+
     // Reset form
     setFormData({
       title: '',
@@ -79,12 +79,12 @@ const Upload = () => {
 
   const getFileIcon = (fileType: string | null) => {
     if (!fileType) return <File className="h-8 w-8 text-gray-500" />;
-    
+
     if (fileType.startsWith('image/')) return <File className="h-8 w-8 text-green-500" />;
     if (fileType.startsWith('video/')) return <File className="h-8 w-8 text-blue-500" />;
     if (fileType.includes('pdf')) return <File className="h-8 w-8 text-red-500" />;
     if (fileType.includes('document') || fileType.includes('word')) return <File className="h-8 w-8 text-blue-600" />;
-    
+
     return <File className="h-8 w-8 text-gray-500" />;
   };
 
@@ -96,13 +96,13 @@ const Upload = () => {
             <UploadIcon className="w-6 h-6 text-white" />
           </div>
           <div>
-            <h1 className="text-3xl font-bold">Upload Files</h1>
-            <p className="text-gray-600">Share your resources with the community</p>
+            <h1 className="text-3xl font-bold text-foreground">Upload Files</h1>
+            <p className="text-muted-foreground">Share your resources with the community</p>
           </div>
         </div>
-        
+
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-          <Card className="border-0 shadow-lg">
+          <Card className="shadow-lg bg-card border border-border">
             <CardHeader>
               <Skeleton className="h-6 w-1/2" />
             </CardHeader>
@@ -112,7 +112,7 @@ const Upload = () => {
               ))}
             </CardContent>
           </Card>
-          <Card className="border-0 shadow-lg">
+          <Card className="shadow-lg bg-card border border-border">
             <CardHeader>
               <Skeleton className="h-6 w-1/2" />
             </CardHeader>
@@ -129,6 +129,8 @@ const Upload = () => {
     );
   }
 
+  const VISIBLE_LIMIT = 100; // Increased from 8
+
   return (
     <div className="container mx-auto px-4 py-8">
       <div className="flex items-center gap-3 mb-8">
@@ -136,15 +138,15 @@ const Upload = () => {
           <UploadIcon className="w-6 h-6 text-white" />
         </div>
         <div>
-          <h1 className="text-3xl font-bold">Upload Files</h1>
-          <p className="text-gray-600">Share your resources with the community</p>
+          <h1 className="text-3xl font-bold text-foreground">Upload Files</h1>
+          <p className="text-muted-foreground">Share your resources with the community</p>
         </div>
       </div>
-      
+
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
         {/* Upload Form */}
-        <Card className="border-0 shadow-lg">
-          <CardHeader className="bg-gradient-to-r from-green-50 to-blue-50 rounded-t-lg">
+        <Card className="shadow-lg bg-card border border-border">
+          <CardHeader className="rounded-t-lg">
             <CardTitle>Upload New File</CardTitle>
           </CardHeader>
           <CardContent className="p-6">
@@ -244,12 +246,12 @@ const Upload = () => {
                   />
                 </div>
                 {formData.file && (
-                  <div className="mt-2 p-3 bg-gradient-to-r from-blue-50 to-green-50 rounded-lg flex items-center justify-between">
+                  <div className="mt-2 p-3 bg-muted rounded-lg flex items-center justify-between">
                     <div className="flex items-center">
                       {getFileIcon(formData.file.type)}
                       <div className="ml-3">
-                        <span className="text-sm font-medium">{formData.file.name}</span>
-                        <p className="text-xs text-gray-500">{formatFileSize(formData.file.size)}</p>
+                        <span className="text-sm font-medium text-foreground">{formData.file.name}</span>
+                        <p className="text-xs text-muted-foreground">{formatFileSize(formData.file.size)}</p>
                       </div>
                     </div>
                     <Button
@@ -286,8 +288,8 @@ const Upload = () => {
         </Card>
 
         {/* Recent Uploads */}
-        <Card className="border-0 shadow-lg">
-          <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-t-lg">
+        <Card className="shadow-lg bg-card border border-border">
+          <CardHeader className="rounded-t-lg">
             <div className="flex items-center justify-between">
               <CardTitle>Recent Uploads</CardTitle>
               <div className="flex gap-2">
@@ -301,29 +303,29 @@ const Upload = () => {
           <CardContent className="p-6">
             {uploads.length === 0 ? (
               <div className="text-center py-12">
-                <FolderOpen className="h-16 w-16 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500 text-lg">No uploads yet</p>
-                <p className="text-sm text-gray-400">Upload your first file to get started</p>
+                <FolderOpen className="h-16 w-16 text-muted-foreground mx-auto mb-4" />
+                <p className="text-muted-foreground text-lg">No uploads yet</p>
+                <p className="text-sm text-muted-foreground/80">Upload your first file to get started</p>
               </div>
             ) : (
               <div className="space-y-4">
-                {uploads.slice(0, 8).map((upload) => (
-                  <div key={upload.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                {uploads.slice(0, VISIBLE_LIMIT).map((upload) => (
+                  <div key={upload.id} className="flex items-center justify-between p-4 border border-border rounded-lg hover:bg-muted transition-colors">
                     <div className="flex items-center space-x-3">
                       {getFileIcon(upload.file_type)}
                       <div className="flex-1 min-w-0">
-                        <p className="font-medium text-sm truncate">{upload.file_name}</p>
+                        <p className="font-medium text-sm truncate text-foreground">{upload.file_name}</p>
                         <div className="flex items-center gap-2 mt-1">
-                          <p className="text-xs text-gray-500">
+                          <p className="text-xs text-muted-foreground">
                             {formatFileSize(upload.file_size)}
                           </p>
-                          <span className="text-xs text-gray-300">•</span>
-                          <p className="text-xs text-gray-500">
+                          <span className="text-xs text-muted-foreground">•</span>
+                          <p className="text-xs text-muted-foreground">
                             {new Date(upload.upload_date).toLocaleDateString()}
                           </p>
                           {upload.is_processed && (
                             <>
-                              <span className="text-xs text-gray-300">•</span>
+                              <span className="text-xs text-muted-foreground">•</span>
                               <Badge variant="secondary" className="text-xs">
                                 Processed
                               </Badge>
@@ -336,17 +338,17 @@ const Upload = () => {
                       variant="outline"
                       size="sm"
                       onClick={() => deleteFile(upload.id, upload.file_path)}
-                      className="text-red-600 hover:text-red-700 hover:bg-red-50"
+                      className="text-red-500 hover:text-red-500/90 hover:bg-muted"
                     >
                       Delete
                     </Button>
                   </div>
                 ))}
-                
-                {uploads.length > 8 && (
+
+                {uploads.length > VISIBLE_LIMIT && (
                   <div className="text-center pt-4">
-                    <p className="text-sm text-gray-500">
-                      Showing 8 of {uploads.length} uploads
+                    <p className="text-sm text-muted-foreground">
+                      Showing {VISIBLE_LIMIT} of {uploads.length} uploads
                     </p>
                   </div>
                 )}

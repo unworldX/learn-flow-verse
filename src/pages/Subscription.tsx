@@ -7,7 +7,7 @@ import { Progress } from "@/components/ui/progress";
 import { Crown, Download, Users, Calendar, CheckCircle } from "lucide-react";
 import { useSubscription } from "@/hooks/useSubscription";
 import { useSubscriptionStatus } from "@/hooks/useSubscriptionStatus";
-import { SubscriptionPlans } from "@/components/SubscriptionPlans";
+import { SubscriptionPlans } from "@/components/subscription/SubscriptionPlans";
 import { Skeleton } from "@/components/ui/skeleton";
 
 const Subscription = () => {
@@ -38,8 +38,8 @@ const Subscription = () => {
   const groupProgress = subscription ? (subscription.groups_joined / subscription.group_limit) * 100 : 0;
 
   return (
-    <div className="container mx-auto px-4 py-8">
-      <div className="flex items-center gap-3 mb-8">
+    <div className="container  mx-auto px-4 py-8">
+      {/* <div className="flex items-center gap-3 mb-8">
         <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl flex items-center justify-center">
           <Crown className="w-6 h-6 text-white" />
         </div>
@@ -47,7 +47,7 @@ const Subscription = () => {
           <h1 className="text-3xl font-bold">Subscription</h1>
           <p className="text-gray-600">Manage your subscription and usage</p>
         </div>
-      </div>
+      </div> */}
 
       {/* Current Subscription Status */}
       <Card className="mb-8">

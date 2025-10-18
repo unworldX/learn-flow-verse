@@ -1,7 +1,7 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/useAuth';
 import { useToast } from '@/hooks/use-toast';
 
 export interface UserProfile {
@@ -58,13 +58,21 @@ export const useProfile = () => {
 
       if (error) throw error;
 
+      // Update the local profile state immediately
+      setProfile(prevProfile => {
+        if (!prevProfile) return null;
+        const updatedProfile = { ...prevProfile, ...updates };
+        
+        // Manually trigger a re-fetch to ensure consistency with the backend
+        fetchProfile();
+        
+        return updatedProfile;
+      });
+
       toast({
         title: "Profile updated",
         description: "Your profile has been updated successfully"
       });
-
-      // Refetch profile to get updated data including avatar
-      await fetchProfile();
     } catch (error) {
       console.error('Error updating profile:', error);
       toast({

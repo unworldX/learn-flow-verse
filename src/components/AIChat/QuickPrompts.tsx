@@ -22,13 +22,13 @@ const QuickPrompts = ({ onPromptClick }: QuickPromptsProps) => {
           key={index}
           variant="outline"
           onClick={() => onPromptClick(prompt.text)}
-          className="p-2 md:p-3 h-auto text-left border-2 border-slate-200 hover:border-blue-300 hover:bg-blue-50 rounded-xl transition-all duration-300 group"
+          className="p-2 md:p-3 h-auto text-left border-2 border-slate-200 hover:border-blue-300 hover:text-slate-800 rounded-xl transition-all duration-300 group"
         >
           <div className="flex items-center gap-2 md:gap-3">
             <div className={`w-6 h-6 md:w-8 md:h-8 ${prompt.color} rounded-lg flex items-center justify-center text-white group-hover:scale-110 transition-transform duration-300`}>
               <prompt.icon className="w-3 h-3 md:w-4 md:h-4" />
             </div>
-            <span className="font-medium text-slate-800 text-xs md:text-sm">{prompt.text}</span>
+            <span className="font-medium border-slate-200 text-xs md:text-sm">{prompt.text}</span>
           </div>
         </Button>
       ))}

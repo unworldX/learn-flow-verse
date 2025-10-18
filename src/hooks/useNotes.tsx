@@ -1,8 +1,9 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { handleRLSError } from '@/lib/auth';
 import { cacheService } from '@/lib/cacheService';
 
 export interface Note {
@@ -22,7 +23,7 @@ export const useNotes = () => {
   const [notes, setNotes] = useState<Note[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
-  const fetchNotes = async () => {
+  const fetchNotes = useCallback(async () => {
     if (!user) return;
 
     setIsLoading(true);
@@ -30,7 +31,7 @@ export const useNotes = () => {
       const cacheKey = `notes_${user.id}`;
       
       // Try cache first
-      let cachedNotes = await cacheService.get<Note[]>(cacheKey);
+      const cachedNotes = await cacheService.get<Note[]>(cacheKey);
       if (cachedNotes) {
         setNotes(cachedNotes);
         setIsLoading(false);
@@ -39,7 +40,7 @@ export const useNotes = () => {
 
       const { data, error } = await supabase
         .from('notes')
-        .select('*')
+        .select('id, user_id, title, content, tags, created_at, updated_at, is_favorite')
         .eq('user_id', user.id)
         .order('updated_at', { ascending: false });
 
@@ -49,16 +50,17 @@ export const useNotes = () => {
       setNotes(notesData);
       await cacheService.set(cacheKey, notesData, { ttlMinutes: 30 });
     } catch (error) {
+      const friendlyMessage = handleRLSError(error);
       console.error('Error fetching notes:', error);
       toast({
         title: "Error loading notes",
-        description: "Unable to fetch notes from database",
+        description: friendlyMessage,
         variant: "destructive"
       });
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user, toast]);
 
   const createNote = async (title: string, content: string, tags: string[] = []) => {
     if (!user) return;
@@ -70,7 +72,8 @@ export const useNotes = () => {
           user_id: user.id,
           title: title.trim(),
           content: content.trim(),
-          tags
+          tags,
+          is_favorite: false
         });
 
       if (error) throw error;
@@ -84,10 +87,11 @@ export const useNotes = () => {
       await cacheService.invalidate(`notes_${user.id}`);
       fetchNotes();
     } catch (error) {
+      const friendlyMessage = handleRLSError(error);
       console.error('Error creating note:', error);
       toast({
         title: "Error",
-        description: "Failed to create note",
+        description: friendlyMessage,
         variant: "destructive"
       });
     }
@@ -114,10 +118,11 @@ export const useNotes = () => {
       await cacheService.invalidate(`notes_${user.id}`);
       fetchNotes();
     } catch (error) {
+      const friendlyMessage = handleRLSError(error);
       console.error('Error updating note:', error);
       toast({
         title: "Error",
-        description: "Failed to update note",
+        description: friendlyMessage,
         variant: "destructive"
       });
     }
@@ -144,10 +149,11 @@ export const useNotes = () => {
       await cacheService.invalidate(`notes_${user.id}`);
       fetchNotes();
     } catch (error) {
+      const friendlyMessage = handleRLSError(error);
       console.error('Error deleting note:', error);
       toast({
         title: "Error",
-        description: "Failed to delete note",
+        description: friendlyMessage,
         variant: "destructive"
       });
     }
@@ -157,7 +163,7 @@ export const useNotes = () => {
     if (user) {
       fetchNotes();
     }
-  }, [user]);
+  }, [user, fetchNotes]);
 
   return {
     notes,

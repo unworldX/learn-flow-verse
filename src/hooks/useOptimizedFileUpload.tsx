@@ -1,7 +1,7 @@
 
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { cacheService } from '@/lib/cacheService';
 
@@ -31,7 +31,7 @@ export const useOptimizedFileUpload = () => {
       const cacheKey = `file_uploads_${user.id}`;
       
       // Try cache first
-      let cachedUploads = await cacheService.get<OptimizedFileUpload[]>(cacheKey);
+      const cachedUploads = await cacheService.get<OptimizedFileUpload[]>(cacheKey);
       if (cachedUploads) {
         setUploads(cachedUploads);
         setIsLoading(false);
@@ -79,10 +79,10 @@ export const useOptimizedFileUpload = () => {
     setIsUploading(true);
     try {
       // Validate allowed file types
-      const allowed = ['txt','pdf','doc','docx'];
+      const allowed = ['txt','pdf','doc','docx', 'svg'];
       const ext = file.name.split('.').pop()?.toLowerCase();
       if (!ext || !allowed.includes(ext)) {
-        toast({ title: 'Unsupported file', description: 'Only .txt, .pdf, .doc, .docx are allowed', variant: 'destructive' });
+        toast({ title: 'Unsupported file', description: 'Only .txt, .pdf, .doc, .docx, and .svg are allowed', variant: 'destructive' });
         return null;
       }
 
@@ -148,7 +148,7 @@ export const useOptimizedFileUpload = () => {
       // Refresh uploads
       await fetchUploads();
       
-      return fileRecord;
+      return urlData.publicUrl;
     } catch (error) {
       console.error('Error uploading file:', error);
       toast({

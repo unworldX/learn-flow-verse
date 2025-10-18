@@ -2,95 +2,106 @@
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Check } from "lucide-react";
+import { Check, Star, Zap } from "lucide-react";
 import { useSubscription } from "@/hooks/useSubscription";
-import { useToast } from "@/hooks/use-toast";
+import { useSubscriptionStatus } from "@/hooks/useSubscriptionStatus";
 
 const plans = [
+  // {
+  //   id: 'free',
+  //   name: 'Free',
+  //   price: '₹0',
+  //   duration: 'month',
+  //   description: 'Perfect for getting started and exploring core features.',
+  //   features: [
+  //     '5 downloads PDFs per month',
+  //     'Access up to 1 course',
+  //     'Watch videos in 480p',
+  //     'Basic forum access'
+  //   ]
+  // },
   {
     id: 'basic',
     name: 'Basic',
     price: '₹40',
     duration: 'month',
-    downloads: 20,
-    groups: 3,
+    description: 'Ideal for casual learners who need the essentials for their studies.',
     features: [
-      '20 downloads per month',
-      'Join up to 3 study groups',
-      'Basic forum access',
+      '20 downloads PDFs per month',
+      'Access up to 3 courses',
+      'Watch videos in 720p',
+      'Full forum access',
       'Email support'
     ]
   },
   {
     id: 'premium',
     name: 'Premium',
-    price: '₹50',
+    price: '₹100',
     duration: 'month',
-    downloads: 50,
-    groups: 10,
     popular: true,
+    description: 'The best value for dedicated students, offering a full range of features.',
     features: [
-      '50 downloads per month',
-      'Join up to 10 study groups',
-      'Full forum access',
+      '50 downloads PDFs per month',
+      'Access up to 10 courses',
+      'Watch videos in 1080p',
       'Priority support',
-      'Exclusive resources'
+      'Exclusive resources & content'
     ]
   },
   {
-    id: 'enterprise',
-    name: 'Enterprise',
-    price: '₹100',
+    id: 'pro', // Renamed from Enterprise
+    name: 'Pro',
+    price: '₹200',
     duration: 'month',
-    downloads: 'Unlimited',
-    groups: 'Unlimited',
+    description: 'The ultimate package for power users who demand unlimited access.',
     features: [
-      'Unlimited downloads',
-      'Unlimited study groups',
-      'Full platform access',
+      'Unlimited downloads PDFs',
+      'Access up to 15 courses',
+      'Watch videos in highest quality',
       '24/7 support',
-      'Custom integrations',
-      'Analytics dashboard'
+      'Early access to new features'
     ]
   }
 ];
 
-const SubscriptionPlans = () => {
+export const SubscriptionPlans = () => {
   const { subscription } = useSubscription();
-  const { toast } = useToast();
+  const { createCheckoutSession } = useSubscriptionStatus();
 
-  const handleSubscribe = async (planId: string) => {
-    try {
-      // This would integrate with Stripe checkout
-      toast({
-        title: "Subscription",
-        description: `${planId} plan subscription would be handled here with Stripe integration`
-      });
-    } catch (error) {
-      toast({
-        title: "Error",
-        description: "Failed to start subscription process",
-        variant: "destructive"
-      });
-    }
+  const handleSubscribe = (planId: string) => {
+    createCheckoutSession(planId);
   };
 
+  const getCurrentPlan = () => {
+    if (!subscription?.subscribed) return null;
+    return subscription.subscription_tier;
+  };
+
+  const currentPlan = getCurrentPlan();
+
   return (
-    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 p-6">
+    <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
       {plans.map((plan) => (
         <Card key={plan.id} className={`relative ${plan.popular ? 'border-blue-500 shadow-lg' : ''}`}>
           {plan.popular && (
-            <Badge className="absolute -top-2 left-1/2 transform -translate-x-1/2 bg-blue-500">
-              Most Popular
-            </Badge>
+            <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
+              <Badge className="bg-blue-500 text-white">
+                <Star className="h-3 w-3 mr-1" />
+                Most Popular
+              </Badge>
+            </div>
           )}
+          
           <CardHeader className="text-center">
-            <CardTitle className="text-2xl">{plan.name}</CardTitle>
+            <CardTitle className="text-2xl font-bold">{plan.name}</CardTitle>
             <div className="text-3xl font-bold text-blue-600">
               {plan.price}
-              <span className="text-sm text-gray-500">/{plan.duration}</span>
+              <span className="text-sm font-normal text-gray-500">/month</span>
             </div>
+            <p className="text-gray-600">{plan.description}</p>
           </CardHeader>
+          
           <CardContent>
             <ul className="space-y-3 mb-6">
               {plan.features.map((feature, index) => (
@@ -100,19 +111,24 @@ const SubscriptionPlans = () => {
                 </li>
               ))}
             </ul>
-            <Button 
-              className="w-full" 
-              variant={subscription?.subscription_tier === plan.id ? "outline" : "default"}
-              onClick={() => handleSubscribe(plan.id)}
-              disabled={subscription?.subscription_tier === plan.id}
-            >
-              {subscription?.subscription_tier === plan.id ? 'Current Plan' : 'Subscribe'}
-            </Button>
+            
+            {currentPlan === plan.id ? (
+              <Button className="w-full" disabled>
+                Current Plan
+              </Button>
+            ) : (
+              <Button 
+                className="w-full" 
+                onClick={() => handleSubscribe(plan.id)}
+                variant={plan.popular ? "default" : "outline"}
+              >
+                <Zap className="h-4 w-4 mr-2" />
+                Subscribe Now
+              </Button>
+            )}
           </CardContent>
         </Card>
       ))}
     </div>
   );
 };
-
-export default SubscriptionPlans;

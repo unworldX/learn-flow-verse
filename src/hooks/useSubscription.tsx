@@ -1,9 +1,10 @@
 
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { cacheService } from '@/lib/cacheService';
+import { handleRLSError } from '@/lib/auth';
 
 export interface Subscription {
   id: string;
@@ -35,32 +36,37 @@ export const useSubscription = () => {
       const cacheKey = `subscription_${user.id}`;
       
       // Try cache first
-      let cachedSubscription = await cacheService.get<Subscription>(cacheKey);
+      const cachedSubscription = await cacheService.get<Subscription>(cacheKey);
       if (cachedSubscription) {
         setSubscription(cachedSubscription);
         setIsLoading(false);
         return;
       }
 
+      // Select only necessary columns to avoid serialization issues
       const { data, error } = await supabase
         .from('subscribers')
-        .select('*')
+        .select('id, user_id, email, stripe_customer_id, subscribed, subscription_tier, subscription_end, download_limit, downloads_used, group_limit, groups_joined, updated_at, created_at')
         .eq('user_id', user.id)
-        .single();
+        .maybeSingle(); // Use maybeSingle() instead of single() to avoid PGRST116
 
-      if (error && error.code !== 'PGRST116') throw error;
+      if (error) throw error;
       
       if (!data) {
-        // Create default subscription
+        // Create default subscription with explicit user_id
         const { data: newSub, error: createError } = await supabase
           .from('subscribers')
           .insert({
-            user_id: user.id,
+            user_id: user.id, // Explicit user_id for RLS
             email: user.email!,
             subscribed: false,
-            subscription_tier: null
+            subscription_tier: null,
+            download_limit: 5,
+            downloads_used: 0,
+            group_limit: 1,
+            groups_joined: 0
           })
-          .select()
+          .select('id, user_id, email, stripe_customer_id, subscribed, subscription_tier, subscription_end, download_limit, downloads_used, group_limit, groups_joined, updated_at, created_at')
           .single();
           
         if (createError) throw createError;
@@ -81,11 +87,12 @@ export const useSubscription = () => {
         setSubscription(typedSubscription as Subscription);
         await cacheService.set(cacheKey, typedSubscription, { ttlMinutes: 15 });
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching subscription:', error);
+      const friendlyMessage = handleRLSError(error);
       toast({
         title: "Error loading subscription",
-        description: "Unable to fetch subscription data",
+        description: friendlyMessage,
         variant: "destructive"
       });
     } finally {
@@ -117,9 +124,18 @@ export const useSubscription = () => {
       const { error } = await supabase
         .from('subscribers')
         .update(updates)
-        .eq('user_id', user.id);
+        .eq('user_id', user.id)
+        .eq('id', subscription.id); // Add ID for more precise targeting
 
-      if (error) throw error;
+      if (error) {
+        const friendlyMessage = handleRLSError(error);
+        toast({
+          title: "Error updating usage",
+          description: friendlyMessage,
+          variant: "destructive"
+        });
+        throw error;
+      }
       
       setSubscription(prev => prev ? { ...prev, ...updates } : null);
       
@@ -136,6 +152,7 @@ export const useSubscription = () => {
     if (user) {
       fetchSubscription();
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user]);
 
   return {

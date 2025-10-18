@@ -1,10 +1,9 @@
-
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { RefreshCw, Eye, EyeOff } from 'lucide-react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/useAuth'
 import { supabase } from '@/integrations/supabase/client';
 
 const DebugPanel = () => {
@@ -13,7 +12,7 @@ const DebugPanel = () => {
   const [debugInfo, setDebugInfo] = useState<any>({});
   const [isLoading, setIsLoading] = useState(false);
 
-  const collectDebugInfo = async () => {
+  const collectDebugInfo = useCallback(async () => {
     if (!user) return;
     
     setIsLoading(true);
@@ -55,13 +54,13 @@ const DebugPanel = () => {
     } finally {
       setIsLoading(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
     if (isVisible && user) {
       collectDebugInfo();
     }
-  }, [isVisible, user]);
+  }, [isVisible, user, collectDebugInfo]);
 
   if (!user) return null;
 

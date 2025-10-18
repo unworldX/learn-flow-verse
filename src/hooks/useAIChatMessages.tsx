@@ -1,6 +1,5 @@
-
 import { useState } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuth } from '@/contexts/useAuth';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { AIMessage } from '@/types/ai';
@@ -19,50 +18,50 @@ export const useAIChatMessages = () => {
   const getStoredSettings = () => {
     const provider = localStorage.getItem('ai-provider') || 'openai';
     const model = localStorage.getItem('ai-model') || 'gpt-4o-mini';
-    
+
     // Normalize provider name for consistency
     const normalizedProvider = normalizeProvider(provider);
-    
-    console.log('Stored settings:', { 
-      originalProvider: provider, 
-      normalizedProvider, 
+
+    console.log('Stored settings:', {
+      originalProvider: provider,
+      normalizedProvider,
       model,
       localStorage: {
         provider: localStorage.getItem('ai-provider'),
         model: localStorage.getItem('ai-model')
       }
     });
-    
+
     return { provider: normalizedProvider, model };
   };
 
   const checkApiKeyExists = async (provider: string) => {
     if (!user) return false;
-    
+
     try {
       const normalizedProvider = normalizeProvider(provider);
-      
+
       console.log('Checking API key for provider:', { original: provider, normalized: normalizedProvider });
-      
+
       const { data, error } = await supabase
         .from('user_api_keys')
         .select('id, encrypted_key, provider')
         .eq('user_id', user.id)
         .eq('provider', normalizedProvider)
         .maybeSingle();
-      
-      console.log('API key check result:', { 
-        hasData: !!data, 
+
+      console.log('API key check result:', {
+        hasData: !!data,
         hasKey: data && data.encrypted_key && data.encrypted_key.trim().length > 0,
         foundProvider: data?.provider,
-        error 
+        error
       });
-      
+
       if (error) {
         console.error('Error checking API key:', error);
         return false;
       }
-      
+
       return data && data.encrypted_key && data.encrypted_key.trim().length > 0;
     } catch (error) {
       console.error('Exception checking API key:', error);
@@ -70,7 +69,7 @@ export const useAIChatMessages = () => {
     }
   };
 
-  const sendMessage = async (content: string, reasoning: boolean = false) => {
+  const sendMessage = async (content: string, reasoning: boolean = false): Promise<AIMessage | undefined> => {
     if (!content.trim()) {
       toast({
         title: "Empty message",
@@ -90,8 +89,7 @@ export const useAIChatMessages = () => {
     }
 
     const { provider, model } = getStoredSettings();
-    
-    // Check if API key exists before proceeding
+
     const hasApiKey = await checkApiKeyExists(provider);
     if (!hasApiKey) {
       toast({
@@ -102,26 +100,17 @@ export const useAIChatMessages = () => {
       return;
     }
 
-    const userMessage: AIMessage = {
-      id: Math.random().toString(36).substr(2, 9),
-      type: 'user',
-      content: content.trim(),
-      timestamp: new Date(),
-    };
-
-    setMessages(prev => [...prev, userMessage]);
+    // Note: User message is now added optimistically in the component.
+    // This hook only handles the AI response part of the conversation flow.
     setIsLoading(true);
 
     try {
-      console.log('Sending message to AI:', { 
-        provider, 
-        model, 
-        reasoning, 
-        contentLength: content.length,
-        userId: user.id
-      });
-      
+      // Ensure we pass a fresh access token to avoid 401s due to race conditions
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
       const { data, error } = await supabase.functions.invoke('ai-chat', {
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
         body: {
           message: content.trim(),
           provider: provider,
@@ -131,52 +120,51 @@ export const useAIChatMessages = () => {
         }
       });
 
-      console.log('AI response received:', { hasData: !!data, error });
+      if (error) throw new Error(error.message || 'Failed to call AI service');
 
-      if (error) {
-        console.error('Supabase function error:', error);
-        throw new Error(error.message || 'Failed to call AI service');
+      // Edge function returns an envelope: { ok: true, data } | { ok: false, error }
+      type FnError = { code?: string; message: string; details?: unknown };
+      type FnEnvelope<T> = { ok: true; data: T } | { ok: false; error: FnError };
+      const envUnknown = data as unknown;
+      const isEnvelope = (v: unknown): v is FnEnvelope<{ content: string; model: string; provider: string }> =>
+        !!v && typeof v === 'object' && 'ok' in v;
+      if (!isEnvelope(envUnknown)) {
+        throw new Error('Invalid response from AI service');
       }
-
-      if (data?.error) {
-        console.error('AI API error:', data.error);
-        throw new Error(data.error);
+      const env = envUnknown as FnEnvelope<{ content: string; model: string; provider: string }>;
+      if (env.ok === false) {
+        const msg = env.error?.message || 'AI service error';
+        throw new Error(msg);
       }
-
-      if (!data?.content) {
+      const aiContent = env.data?.content;
+      if (!aiContent || typeof aiContent !== 'string' || aiContent.trim() === '') {
         throw new Error('Empty response from AI service');
       }
 
       const aiMessage: AIMessage = {
-        id: Math.random().toString(36).substr(2, 9),
+        id: crypto.randomUUID(),
         type: 'ai',
-        content: data.content,
+        content: aiContent,
         timestamp: new Date(),
       };
 
       setMessages(prev => [...prev, aiMessage]);
-      
-      toast({
-        title: "Message sent",
-        description: "AI response received successfully.",
-      });
-    } catch (error: any) {
-      console.error('Error sending message:', error);
-      
+      return aiMessage; // Return the successful AI message
+    } catch (e: unknown) {
+      const messageText = e instanceof Error ? e.message : 'Unknown error';
       const errorMessage: AIMessage = {
-        id: Math.random().toString(36).substr(2, 9),
+        id: crypto.randomUUID(),
         type: 'ai',
-        content: `Sorry, I encountered an error: ${error.message}. Please check your API keys in Settings and try again.`,
+        content: `Sorry, I encountered an error: ${messageText}. Please check your API keys in Settings and try again.`,
         timestamp: new Date(),
       };
-
       setMessages(prev => [...prev, errorMessage]);
-      
       toast({
         title: "AI Error",
-        description: error.message || "Failed to get AI response. Check your settings.",
+        description: messageText || "Failed to get AI response. Check your settings.",
         variant: "destructive"
       });
+      return undefined; // Return undefined on failure
     } finally {
       setIsLoading(false);
     }
@@ -186,8 +174,14 @@ export const useAIChatMessages = () => {
     setMessages([]);
   };
 
+  const addMessage = (message: AIMessage) => {
+    setMessages(prev => [...prev, message]);
+  };
+
   return {
     messages,
+    setMessages,
+    addMessage,
     sendMessage,
     clearMessages,
     isLoading

@@ -1,12 +1,12 @@
-
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { BookOpen, Eye, EyeOff } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
+import { Eye, EyeOff } from "lucide-react";
+import BrandLogo from '@/components/BrandLogo';
+import { useAuth } from "@/contexts/useAuth";
 
 const Signup = () => {
   const [showPassword, setShowPassword] = useState(false);
@@ -22,17 +22,17 @@ const Signup = () => {
 
   const handleSignup = async (e: React.FormEvent) => {
     e.preventDefault();
-    
+
     if (formData.password !== formData.confirmPassword) {
       // Handle password mismatch
       return;
     }
-    
+
     setLoading(true);
     console.log("Signup attempt:", formData);
-    
+
     await signUp(formData.email, formData.password, formData.username);
-    
+
     setLoading(false);
   };
 
@@ -45,8 +45,8 @@ const Signup = () => {
       <div className="w-full max-w-md space-y-6">
         {/* Logo */}
         <div className="text-center">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-gradient-to-r from-blue-600 to-purple-600 rounded-2xl mb-4">
-            <BookOpen className="w-8 h-8 text-white" />
+          <div className="inline-flex items-center justify-center rounded-2xl mb-4">
+            <BrandLogo className="w-20 h-20" alt="Studylib logo" />
           </div>
           <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
             Student Library
@@ -90,7 +90,7 @@ const Signup = () => {
                   disabled={loading}
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="password">Password</Label>
                 <div className="relative">

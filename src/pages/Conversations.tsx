@@ -1,520 +1,1015 @@
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from "react";
+import { ChatList } from "@/components/conversations/ChatList";
+import { ChatHeader } from "@/components/conversations/ChatHeader";
+import { MessageList } from "@/components/conversations/MessageList";
+import { MessageComposer } from "@/components/conversations/MessageComposer";
+
+import { Message } from "@/types/chat";
+import { useConversationsOptimized as useConversations } from "@/hooks/useConversationsOptimized";
+import { useToast } from "@/hooks/use-toast";
+import { GroupInfo } from "@/components/conversations/GroupInfo";
 import { Button } from "@/components/ui/button";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Textarea } from "@/components/ui/textarea";
+import { Label } from "@/components/ui/label";
+import { Badge } from "@/components/ui/badge";
+import { Separator } from "@/components/ui/separator";
+import { cn } from "@/lib/utils";
+import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Badge } from "@/components/ui/badge";
-import { Search, MessageCircle, Users, Plus, UserPlus } from "lucide-react";
-import { useAuth } from "@/contexts/AuthContext";
-import { Link } from "react-router-dom";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { CreateGroupDialog } from "@/components/CreateGroupDialog";
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from "@/components/ui/resizable";
+import { 
+  MessageCircle, 
+  Copy, 
+  Share2, 
+  Download, 
+  RefreshCw, 
+  QrCode, 
+  Plus 
+} from "lucide-react";
 
-interface Conversation {
-  id: string;
-  type: 'direct' | 'group';
-  name: string;
-  lastMessage?: string;
-  lastMessageTime?: string;
-  unreadCount?: number;
-  otherUserId?: string;
-  avatarUrl?: string;
-}
+const CURRENT_USER_ID = "me";
+const createId = () =>
+  typeof crypto !== "undefined" && "randomUUID" in crypto
+    ? crypto.randomUUID()
+    : Math.random().toString(36).slice(2, 10);
 
-const Conversations = () => {
-  const { user } = useAuth();
+export default function Conversations() {
+  const {
+    chats,
+    selectedChatId,
+    selectedChat,
+    currentMessages,
+    groupMetadata,
+    userProfiles,
+    isLoading,
+    setSelectedChatId,
+    createGroup,
+    sendMessage,
+    markAsRead,
+    markAllAsRead,
+    toggleReaction,
+    toggleStarred,
+    deleteMessage,
+    editMessage,
+    forwardMessage,
+    markMessagePinned,
+    createPoll,
+    startCall,
+    exportChat,
+    updateGroupSettings,
+    updateDisappearing,
+    togglePinChat,
+    toggleArchive,
+    toggleMarkUnread,
+    muteChat,
+    generateInviteLink,
+    joinViaInvite,
+    regenerateInviteLink,
+    typingIndicators,
+    broadcastTyping,
+    clearChatHistory,
+    leaveGroup,
+    deleteChat,
+    startDirectMessage,
+  } = useConversations();
+
+  
   const { toast } = useToast();
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  const [searchQuery, setSearchQuery] = useState('');
-  const [showNewChat, setShowNewChat] = useState(false);
-  const [searchEmail, setSearchEmail] = useState('');
-  const [isLoading, setIsLoading] = useState(true);
+  const [forwardOpen, setForwardOpen] = useState(false);
+  const [pollOpen, setPollOpen] = useState(false);
+  const [groupOpen, setGroupOpen] = useState(false);
+  const [qrOpen, setQrOpen] = useState(false);
+  const [inviteCodeInput, setInviteCodeInput] = useState("");
+  const [newGroupName, setNewGroupName] = useState("");
+  const [newGroupDescription, setNewGroupDescription] = useState("");
+  const [pollQuestion, setPollQuestion] = useState("What's the plan for retro snacks?");
+  const [pollOptions, setPollOptions] = useState(["Pizza", "Sushi", "Healthy bowls"]);
+  const [editingMessage, setEditingMessage] = useState<Message | null>(null);
+  const [messageSearchOpen, setMessageSearchOpen] = useState(false);
+  const [messageSearchTerm, setMessageSearchTerm] = useState("");
+  const [compactMode, setCompactMode] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [groupInfoOpen, setGroupInfoOpen] = useState(false);
+  const [replyToId, setReplyToId] = useState<string | null>(null);
+  const [searchTerm, setSearchTerm] = useState("");
+  const [chatFilter, setChatFilter] = useState<"all" | "unread" | "groups">("all");
+  const [dmDialogOpen, setDmDialogOpen] = useState(false);
+  const [dmInput, setDmInput] = useState("");
+  const [groupDialogMode, setGroupDialogMode] = useState<"create" | "join">("create");
 
-  useEffect(() => {
-    if (user) {
-      fetchConversations();
+  // Simplified data structures for compatibility
+  const activeMessages = currentMessages;
+  const activeChatId = selectedChatId;
+  const activeChat = selectedChat;
+  const filteredChats = useMemo(() => {
+    let filtered = chats;
+    if (chatFilter === "unread") {
+      filtered = filtered.filter(c => c.unreadCount > 0);
+    } else if (chatFilter === "groups") {
+      filtered = filtered.filter(c => c.type === "group");
     }
-  }, [user]);
-
-  const fetchConversations = async () => {
-    if (!user) return;
-
-    try {
-      // Fetch direct message conversations
-      const { data: directMessages, error: dmError } = await supabase
-        .from('direct_messages')
-          .select('id, sender_id, receiver_id, encrypted_content, created_at')
-          .or(`sender_id.eq.${user.id},receiver_id.eq.${user.id}`)
-          .order('created_at', { ascending: false });
-
-      if (dmError) throw dmError;
-      // Build user map for DM participants to avoid FK joins
-      const otherUserIds = Array.from(
-        new Set(
-          (directMessages || [])
-            .map((m: any) => (m.sender_id === user.id ? m.receiver_id : m.sender_id))
-            .filter(Boolean)
-        )
+    if (searchTerm) {
+      filtered = filtered.filter(c => 
+        c.title.toLowerCase().includes(searchTerm.toLowerCase())
       );
-      const userMap: Record<string, { full_name: string | null; email: string }> = {};
-      if (otherUserIds.length > 0) {
-        const { data: usersData, error: usersError } = await supabase
-          .from('users')
-          .select('id, full_name, email')
-          .in('id', otherUserIds as string[]);
-        if (usersError) throw usersError;
-        usersData?.forEach((u: any) => {
-          userMap[u.id] = { full_name: u.full_name, email: u.email };
-        });
-      }
-
-      // Fetch group conversations
-      const { data: groupMemberships, error: groupError } = await supabase
-        .from('study_group_members')
-        .select(`
-          group_id,
-          study_groups!inner(id, name, description)
-        `)
-        .eq('user_id', user.id);
-
-      if (groupError) throw groupError;
-      // Get latest group messages
-      const groupIds = groupMemberships?.map(m => m.group_id) || [];
-      let groupMessages: any[] = [];
+    }
+    
+    // Sort: pinned chats first, then by last activity
+    return filtered.sort((a, b) => {
+      // Pinned chats always come first
+      if (a.pinned && !b.pinned) return -1;
+      if (!a.pinned && b.pinned) return 1;
       
-      if (groupIds.length > 0) {
-        const { data: latestGroupMessages, error: groupMsgError } = await supabase
-          .from('group_messages')
-          .select('group_id, encrypted_content, created_at')
-          .in('group_id', groupIds)
-          .order('created_at', { ascending: false });
+      // Within same pinned status, sort by last activity
+      return new Date(b.lastActivityAt).getTime() - new Date(a.lastActivityAt).getTime();
+    });
+  }, [chats, chatFilter, searchTerm]);
 
-        if (groupMsgError) throw groupMsgError;
-        groupMessages = latestGroupMessages || [];
-      }
+  const replyToMessage = useMemo(() => {
+    if (!replyToId || !activeMessages.length) return null;
+    return activeMessages.find((message) => message.id === replyToId) ?? null;
+  }, [replyToId, activeMessages]);
 
-      // Process direct message conversations
-      const dmConversations = new Map<string, Conversation>();
-      
-      directMessages?.forEach((message: any) => {
-        const otherUserId = message.sender_id === user.id ? message.receiver_id : message.sender_id;
-        const otherUser = userMap[otherUserId];
-        
-        if (!dmConversations.has(otherUserId)) {
-          dmConversations.set(otherUserId, {
-            id: otherUserId,
-            type: 'direct',
-            name: (otherUser?.full_name || otherUser?.email?.split('@')[0] || 'Unknown User'),
-            lastMessage: message.encrypted_content,
-            lastMessageTime: message.created_at,
-            otherUserId: otherUserId,
-            unreadCount: 0
-          });
-        }
-      });
+  const selectedChatParticipants = useMemo(() => {
+    if (!activeChat) return [];
+    const metadata = groupMetadata[activeChatId || ''];
+    return activeChat.participants.map((id) => {
+      const profile = userProfiles[id];
+      // Provide fallback if profile hasn't loaded yet
+      return {
+        id: id,
+        name: profile?.name || `User ${id.slice(0, 6)}`,
+        avatarUrl: profile?.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${id}`,
+        role: (metadata?.settings?.admins?.includes(id) ? 'admin' : 'member') as 'admin' | 'member',
+      };
+    });
+  }, [activeChat, userProfiles, groupMetadata, activeChatId]);
 
-      // Process group conversations
-      const groupConversations: Conversation[] = groupMemberships?.map(membership => {
-        const group = membership.study_groups;
-        const latestMessage = groupMessages.find(msg => msg.group_id === group.id);
-        
-        return {
-          id: group.id,
-          type: 'group',
-          name: group.name,
-          lastMessage: latestMessage?.encrypted_content || 'No messages yet',
-          lastMessageTime: latestMessage?.created_at || new Date().toISOString(),
-          unreadCount: 0
-        };
-      }) || [];
+  const pinnedMessages = useMemo(
+    () => activeMessages.filter((message) => message.isPinned),
+    [activeMessages]
+  );
 
-      // Combine and sort all conversations
-      const allConversations = [
-        ...Array.from(dmConversations.values()),
-        ...groupConversations
-      ].sort((a, b) => {
-        const timeA = new Date(a.lastMessageTime || 0).getTime();
-        const timeB = new Date(b.lastMessageTime || 0).getTime();
-        return timeB - timeA;
-      });
+  const starredMessages = useMemo(() => {
+    if (!activeChat?.starredMessageIds) return [] as Message[];
+    return activeMessages.filter((message) => activeChat.starredMessageIds?.includes(message.id));
+  }, [activeMessages, activeChat]);
 
-      setConversations(allConversations);
-    } catch (error) {
-      console.error('Error fetching conversations:', error);
+  const chatPolls = useMemo(() => [], []);  // No polls in real version yet
+  const typingList: string[] = useMemo(() => {
+    if (!activeChatId || !typingIndicators[activeChatId]) return [];
+    const typingUsers = typingIndicators[activeChatId];
+    return typingUsers.map(t => userProfiles[t.userId]?.name).filter(Boolean) as string[];
+  }, [activeChatId, typingIndicators, userProfiles]);
+
+  // Convert typing indicators to the format ChatList expects
+  const chatListTypingIndicators = useMemo(() => {
+    const converted: Record<string, string[]> = {};
+    Object.keys(typingIndicators).forEach(chatId => {
+      converted[chatId] = typingIndicators[chatId].map(t => t.userId);
+    });
+    return converted;
+  }, [typingIndicators]);
+
+  const isDirectChat = activeChat?.type === "direct";
+
+  // Real function wrappers (no longer stubs)
+  const pushMessage = sendMessage;
+  
+  const [forwardSource, setForwardSource] = useState<Message | null>(null);
+  const linkPreviews = {};
+  const preferences = { 
+    readReceipts: true, 
+    multiDevice: false,
+    readReceiptsEnabled: true,
+    backupFrequency: "daily" as const,
+    multiDeviceEnabled: false,
+  };
+  
+  const filteredSearchMatches: { chatId: string; message: Message }[] = [];
+  
+  // Build messages map: chatId -> Message[]
+  const messages = useMemo(() => {
+    const messageMap: Record<string, Message[]> = {};
+    chats.forEach(chat => {
+      // For now, use empty array - messages will be loaded when chat is selected
+      messageMap[chat.id] = chat.id === selectedChatId ? currentMessages : [];
+    });
+    return messageMap;
+  }, [chats, selectedChatId, currentMessages]);
+  
+  const setActiveChatId = setSelectedChatId;
+  const users = userProfiles;
+  const toggleReadReceipts = () => toast({ title: "Feature coming soon" });
+  const toggleMultiDevice = () => toast({ title: "Feature coming soon" });
+  const triggerBackup = () => toast({ title: "Feature coming soon" });
+
+  const filteredMessages = useMemo(() => {
+    if (!messageSearchTerm) return activeMessages;
+    return activeMessages.filter((message) =>
+      message.body.toLowerCase().includes(messageSearchTerm.toLowerCase())
+    );
+  }, [activeMessages, messageSearchTerm]);
+
+  const handleSelectChat = (chatId: string) => {
+    setActiveChatId(chatId);
+    setSidebarOpen(false);
+    setGroupInfoOpen(false);
+  };
+
+  // Mark unread as read when opening a chat or receiving new messages
+  useEffect(() => {
+    if (!activeChatId) return;
+    markAllAsRead(activeChatId);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeChatId]);
+
+  const handleSendText = (text: string) => {
+    if (!activeChatId) return;
+    sendMessage(activeChatId, text, undefined, replyToId ?? undefined);
+    setReplyToId(null);
+  };
+
+  const handleSendMedia = (attachments: Message["attachments"] = [], caption?: string) => {
+    if (!activeChatId || !attachments.length) return;
+    sendMessage(activeChatId, caption ?? "", attachments, replyToId ?? undefined);
+    setReplyToId(null);
+  };
+
+  const handleSendSticker = (url: string) => {
+    if (!activeChatId) return;
+    handleSendMedia([
+      {
+        id: createId(),
+        type: "sticker",
+        url,
+      },
+    ]);
+  };
+
+  const handleSendGif = (url: string) => {
+    if (!activeChatId) return;
+    handleSendMedia([
+      {
+        id: createId(),
+        type: "gif",
+        url,
+      },
+    ]);
+  };
+
+  const handleSendVoice = (durationSeconds: number) => {
+    if (!activeChatId) return;
+    handleSendMedia([
+      {
+        id: createId(),
+        type: "voice-note",
+        url: "https://example.com/audio/demo.m4a",
+        durationSeconds,
+      },
+    ]);
+  };
+
+  const handleSaveEdit = (text: string) => {
+    if (!activeChatId || !editingMessage) return;
+    editMessage(activeChatId, editingMessage.id, text);
+    setEditingMessage(null);
+  };
+
+  const handleForward = (targetChatId: string) => {
+    if (!forwardSource || !activeChatId) return;
+    forwardMessage(activeChatId, forwardSource.id, targetChatId);
+    setForwardSource(null);
+    setForwardOpen(false);
+  };
+
+  const handleCreatePoll = () => {
+    if (!activeChatId) return;
+    createPoll(activeChatId, pollQuestion, pollOptions, false);
+    setPollOpen(false);
+  };
+
+  const handleCreateGroup = async () => {
+    if (!newGroupName.trim()) {
       toast({
-        title: "Error",
-        description: "Failed to load conversations",
-        variant: "destructive"
+        title: "Group name is required",
+        variant: "destructive",
       });
-    } finally {
-      setIsLoading(false);
+      return;
+    }
+    const groupId = await createGroup(newGroupName, newGroupDescription);
+    if (groupId) {
+      setGroupOpen(false);
+      setNewGroupName("");
+      setNewGroupDescription("");
+      setSelectedChatId(groupId);
+      toast({
+        title: "Group created",
+        description: "You can now start conversations in your new group.",
+      });
     }
   };
 
-  const filteredConversations = conversations.filter(conv =>
-    conv.name.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleJoinGroup = async () => {
+    if (!inviteCodeInput.trim()) {
+      toast({
+        title: "Invalid Code",
+        description: "Please enter an invite code",
+        variant: "destructive",
+      });
+      return;
+    }
 
-  const directConversations = filteredConversations.filter(conv => conv.type === 'direct');
-  const groupConversations = filteredConversations.filter(conv => conv.type === 'group');
-  const unreadConversations = filteredConversations.filter(conv => conv.unreadCount && conv.unreadCount > 0);
+    const result = await joinViaInvite(inviteCodeInput.trim());
+    if (result?.success) {
+      setGroupOpen(false);
+      setInviteCodeInput("");
+      // Optionally navigate to the newly joined group
+      if (result.groupId) {
+        setSelectedChatId(result.groupId);
+      }
+    }
+  };
 
-  const handleNewChat = async () => {
-    if (!searchEmail.trim()) return;
-
+  const handleCopyInvite = async () => {
+    if (!activeChat?.inviteLink) return;
     try {
-      // Search for user by email
-      const { data: users, error } = await supabase
-        .from('users')
-        .select('id, email, full_name')
-        .eq('email', searchEmail.trim().toLowerCase())
-        .limit(1);
-
-      if (error) throw error;
-
-      if (users && users.length > 0) {
-        const foundUser = users[0];
-        setShowNewChat(false);
-        setSearchEmail('');
-        // Navigate to chat with found user
-        window.location.href = `/chat/${foundUser.id}`;
+      if (typeof navigator !== "undefined" && navigator.clipboard) {
+        await navigator.clipboard.writeText(activeChat.inviteLink);
+        toast({
+          title: "Invite link copied",
+          description: "Share it with your favourite collaborators.",
+        });
       } else {
         toast({
-          title: "User not found",
-          description: "No user found with that email address",
-          variant: "destructive"
+          title: "Invite link",
+          description: activeChat.inviteLink,
         });
       }
     } catch (error) {
-      console.error('Error searching for user:', error);
-      toast({
-        title: "Error",
-        description: "Failed to search for user",
-        variant: "destructive"
-      });
+      console.warn("Clipboard copy failed", error);
+      toast({ title: "Copy failed", description: "We couldn't copy the link. Try again or share manually.", variant: "destructive" });
     }
   };
 
-  const formatTime = (timeString?: string) => {
-    if (!timeString) return '';
-    
-    const date = new Date(timeString);
-    const now = new Date();
-    const diffInHours = (now.getTime() - date.getTime()) / (1000 * 60 * 60);
-    
-    if (diffInHours < 24) {
-      return date.toLocaleTimeString('en-US', { 
-        hour: 'numeric', 
-        minute: '2-digit',
-        hour12: true 
-      });
-    } else if (diffInHours < 168) { // 7 days
-      return date.toLocaleDateString('en-US', { weekday: 'short' });
+  const handleShareInvite = async () => {
+    if (!activeChat?.inviteLink) return;
+    const shareData = {
+      url: activeChat.inviteLink,
+      title: activeChat.title,
+      text: `Join our ${activeChat.title} chat!`,
+    };
+    try {
+      if (typeof navigator !== "undefined" && navigator.share) {
+        await navigator.share(shareData);
+        toast({ title: "Invite shared", description: "Your contacts just got the link." });
+      } else if (typeof navigator !== "undefined" && navigator.clipboard) {
+        await navigator.clipboard.writeText(activeChat.inviteLink);
+        toast({
+          title: "Invite link copied",
+          description: "Share it anywhere – we saved it to your clipboard.",
+        });
+      } else {
+        toast({ title: "Invite link", description: activeChat.inviteLink });
+      }
+    } catch (error) {
+      console.warn("Invite share aborted", error);
+    }
+  };
+
+  const handleToggleAdminOnly = (field: "send" | "edit") => {
+    toast({ title: "Admin settings coming soon" });
+  };
+
+  const handleDisappearingMode = (mode: "off" | "24h" | "7d" | "90d") => {
+    toast({ title: "Disappearing messages coming soon" });
+  };
+
+  useEffect(() => {
+    if (isDirectChat) {
+      setCompactMode(true);
     } else {
-      return date.toLocaleDateString('en-US', { 
-        month: 'short', 
-        day: 'numeric' 
-      });
+      setCompactMode(false);
+      setSidebarOpen(false);
     }
-  };
-
-  const ConversationItem = ({ conversation }: { conversation: Conversation }) => (
-    <Link
-      to={conversation.type === 'direct' ? `/chat/${conversation.otherUserId}` : `/group-chat/${conversation.id}`}
-      className="block"
-    >
-      <div className="p-4 m-2 hover:bg-background/60 transition-all duration-200 cursor-pointer rounded-2xl border border-border/30 hover:border-border/50 hover:shadow-lg backdrop-blur-sm">
-        <div className="flex items-center space-x-3">
-          {/* Avatar */}
-          <div className="relative">
-            <div className={`w-14 h-14 rounded-2xl flex items-center justify-center flex-shrink-0 shadow-lg ${
-              conversation.type === 'direct' 
-                ? 'bg-gradient-primary' 
-                : 'bg-gradient-secondary'
-            }`}>
-              {conversation.type === 'direct' ? (
-                <span className="text-primary-foreground text-lg font-semibold">
-                  {conversation.name[0]?.toUpperCase()}
-                </span>
-              ) : (
-                <Users className="h-7 w-7 text-success-foreground" />
-              )}
-            </div>
-            {/* Online Status */}
-            {conversation.type === 'direct' && (
-              <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-success border-3 border-background rounded-full shadow-sm"></div>
-            )}
-          </div>
-          
-          <div className="flex-1 min-w-0">
-            <div className="flex items-center justify-between mb-1">
-              <h3 className="text-base font-semibold truncate text-foreground max-w-[180px]">
-                {conversation.name}
-              </h3>
-              <div className="flex items-center gap-2">
-                <p className="text-xs text-muted-foreground font-medium">
-                  {formatTime(conversation.lastMessageTime)}
-                </p>
-                {conversation.unreadCount && conversation.unreadCount > 0 && (
-                  <Badge className="bg-destructive text-destructive-foreground text-xs min-w-[20px] h-5 rounded-full flex items-center justify-center px-1.5 shadow-sm">
-                    {conversation.unreadCount > 99 ? '99+' : conversation.unreadCount}
-                  </Badge>
-                )}
-              </div>
-            </div>
-            <div className="flex items-center justify-between">
-              <p className="text-sm truncate text-muted-foreground max-w-[200px] leading-tight">
-                {conversation.lastMessage || (conversation.type === 'group' ? 'Tap to join the conversation' : 'Start a conversation')}
-              </p>
-              {/* Read receipts for sent messages */}
-              <div className="text-primary text-xs">
-                ✓✓
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-    </Link>
-  );
-
-  if (isLoading) {
-    return (
-      <div className="h-full bg-gradient-surface flex items-center justify-center">
-        <div className="bg-card/70 backdrop-blur-sm rounded-3xl border border-border/50 shadow-xl p-8">
-          <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
-          <p className="text-sm text-muted-foreground mt-4">Loading conversations...</p>
-        </div>
-      </div>
-    );
-  }
+  }, [isDirectChat]);
 
   return (
-    <div className="h-full bg-gradient-surface">
-      <div className="h-full flex flex-col p-4 lg:p-6">
-        {/* Modern Header Section */}
-        <div className="bg-card/95 backdrop-blur-sm border border-border/50 rounded-3xl p-6 shadow-xl mb-6">
-          <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
-            {/* Title Section */}
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 bg-gradient-primary rounded-2xl flex items-center justify-center shadow-lg">
-                <MessageCircle className="w-6 h-6 text-primary-foreground" />
-              </div>
-              <div>
-                <h1 className="text-2xl font-bold text-foreground">Conversations</h1>
-                <p className="text-muted-foreground">Connect with your study community</p>
-              </div>
-            </div>
-
-            {/* Search Bar */}
-            <div className="relative max-w-md w-full">
-              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
-              <Input
-                placeholder="Search conversations..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-12 pr-4 py-3 bg-background/90 border-2 border-border rounded-2xl text-sm shadow-sm focus:ring-2 focus:ring-ring/20 focus:border-ring"
+    <div className="flex h-[calc(100vh-var(--app-header-height,0px))] bg-gradient-to-br from-background via-background to-muted/20 text-foreground">
+      {!compactMode && (
+        <ResizablePanelGroup direction="horizontal" className="hidden md:flex">
+          <ResizablePanel defaultSize={30} minSize={20} maxSize={50} className="h-full">
+            <div className="h-full border-r border-border/40 shadow-lg">
+              <ChatList
+                chats={filteredChats}
+                messages={messages}
+                activeChatId={activeChatId}
+                onSelectChat={handleSelectChat}
+                searchTerm={searchTerm}
+                onSearchTermChange={setSearchTerm}
+                filter={chatFilter}
+                onFilterChange={setChatFilter}
+                onTogglePin={togglePinChat}
+                onMute={muteChat}
+                onMarkUnread={toggleMarkUnread}
+                onArchive={toggleArchive}
+                onDeleteChat={deleteChat}
+                onCreateGroup={() => setGroupOpen(true)}
+                onJoinGroup={() => {
+                  setGroupDialogMode("join");
+                  setGroupOpen(true);
+                }}
+                onStartDM={() => setDmDialogOpen(true)}
+                typingIndicators={chatListTypingIndicators}
+                searchMatches={filteredSearchMatches}
               />
             </div>
-          </div>
+          </ResizablePanel>
+          
+          <ResizableHandle withHandle />
+          
+          <ResizablePanel defaultSize={70} minSize={50}>
+            <div
+              className={cn(
+                "flex flex-1 flex-col h-full min-h-0 transition-all duration-300"
+              )}
+            >
+              {activeChat ? (
+                <>
+                  <ChatHeader
+                    chat={activeChat}
+                    participants={selectedChatParticipants}
+              onSearchChat={() => setMessageSearchOpen(true)}
+              onStartCall={(type) => activeChatId && startCall(activeChatId, type)}
+              preferences={preferences}
+              onToggleReadReceipts={toggleReadReceipts}
+              onToggleMultiDevice={toggleMultiDevice}
+              onExportChat={(includeMedia) => activeChatId && exportChat(activeChatId, includeMedia)}
+              onTriggerBackup={triggerBackup}
+              onOpenInfo={() => setGroupInfoOpen(true)}
+              onShareInvite={handleShareInvite}
+              onShowQr={() => setQrOpen(true)}
+              onMute={(duration?: "8h" | "1w" | "always" | "off") => activeChatId && muteChat(activeChatId, duration)}
+              onClearHistory={() => activeChatId && clearChatHistory(activeChatId)}
+              onDeleteChat={() => activeChatId && deleteChat(activeChatId)}
+              onLeaveGroup={() => activeChatId && leaveGroup(activeChatId)}
+              pinnedMessages={pinnedMessages}
+              typingUsers={typingList}
+              groupMetadata={groupMetadata[activeChatId]}
+              variant={compactMode ? "compact" : "default"}
+              onOpenSidebar={() => setSidebarOpen(true)}
+            />
 
-          {/* Tab Navigation */}
-          <div className="mt-8">
-            <Tabs defaultValue="all" className="w-full">
-              <TabsList className="bg-muted/60 backdrop-blur-sm p-1 rounded-2xl border border-border shadow-sm inline-flex">
-                <TabsTrigger 
-                  value="all" 
-                  className="rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-md px-6 py-2 font-medium transition-all"
-                >
-                  All Chats
-                  {conversations.length > 0 && (
-                    <Badge variant="secondary" className="ml-2 bg-primary/10 text-primary text-xs">
-                      {conversations.length}
-                    </Badge>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="groups" 
-                  className="rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-md px-6 py-2 font-medium transition-all"
-                >
-                  Groups
-                  {groupConversations.length > 0 && (
-                    <Badge variant="secondary" className="ml-2 bg-success/10 text-success text-xs">
-                      {groupConversations.length}
-                    </Badge>
-                  )}
-                </TabsTrigger>
-                <TabsTrigger 
-                  value="unread" 
-                  className="rounded-xl data-[state=active]:bg-background data-[state=active]:shadow-md px-6 py-2 font-medium transition-all"
-                >
-                  Unread
-                  {unreadConversations.length > 0 && (
-                    <Badge className="ml-2 bg-destructive text-destructive-foreground text-xs">
-                      {unreadConversations.length}
-                    </Badge>
-                  )}
-                </TabsTrigger>
-              </TabsList>
-              
-              {/* Content Area */}
-              <div className="flex-1 overflow-hidden mt-8">
-                
-                {/* All Conversations Tab */}
-                <TabsContent value="all" className="h-full m-0">
-                  <div className="bg-card/70 backdrop-blur-sm rounded-3xl border border-border/50 shadow-xl h-[calc(100vh-320px)] overflow-hidden">
-                    <ScrollArea className="h-full">
-                      {filteredConversations.length > 0 ? (
-                        <div className="p-2">
-                          {filteredConversations.map((conversation) => (
-                            <ConversationItem key={conversation.id} conversation={conversation} />
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-center h-full">
-                          <div className="text-center py-16">
-                            <div className="w-24 h-24 bg-gradient-primary rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-                              <MessageCircle className="w-12 h-12 text-primary-foreground" />
-                            </div>
-                            <h3 className="text-xl font-semibold text-foreground mb-3">No conversations yet</h3>
-                            <p className="text-muted-foreground mb-6 max-w-sm mx-auto">Start a new chat or join a study group to connect with your learning community</p>
-                          </div>
-                        </div>
-                      )}
-                    </ScrollArea>
-                  </div>
-                </TabsContent>
+            <div className="flex-1 overflow-y-auto scroll-smooth bg-gradient-to-b from-muted/5 to-background">
+              <MessageList
+                messages={filteredMessages}
+                allMessages={activeMessages}
+                users={users}
+                currentUserId={CURRENT_USER_ID}
+                readReceiptsEnabled={preferences.readReceiptsEnabled}
+                linkPreviews={linkPreviews}
+                onReply={(message) => setReplyToId(message.id)}
+                onForward={(message) => {
+                  setForwardSource(message);
+                  setForwardOpen(true);
+                }}
+                onStar={(message) => activeChatId && toggleStarred(activeChatId, message.id)}
+                onDelete={(message, scope) => activeChatId && deleteMessage(activeChatId, message.id, scope)}
+                onEdit={(message) => {
+                  setEditingMessage(message);
+                  setReplyToId(null);
+                }}
+                onPinChange={(message, pinned) => activeChatId && markMessagePinned(activeChatId, message.id, pinned)}
+                onReact={(message, emoji) => activeChatId && toggleReaction(activeChatId, message.id, emoji)}
+                typingUsers={typingList}
+              />
+            </div>
 
-                {/* Groups Tab */}
-                <TabsContent value="groups" className="h-full m-0">
-                  <div className="bg-card/70 backdrop-blur-sm rounded-3xl border border-border/50 shadow-xl h-[calc(100vh-320px)] overflow-hidden">
-                    <ScrollArea className="h-full">
-                      {groupConversations.length > 0 ? (
-                        <div className="p-2">
-                          {groupConversations.map((conversation) => (
-                            <ConversationItem key={conversation.id} conversation={conversation} />
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-center h-full">
-                          <div className="text-center py-16">
-                            <div className="w-24 h-24 bg-gradient-secondary rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-                              <Users className="w-12 h-12 text-success-foreground" />
-                            </div>
-                            <h3 className="text-xl font-semibold text-foreground mb-3">No group chats</h3>
-                            <p className="text-muted-foreground mb-6 max-w-sm mx-auto">Join or create a study group to start collaborating with others</p>
-                          </div>
-                        </div>
-                      )}
-                    </ScrollArea>
-                  </div>
-                </TabsContent>
-
-                {/* Unread Tab */}
-                <TabsContent value="unread" className="h-full m-0">
-                  <div className="bg-card/70 backdrop-blur-sm rounded-3xl border border-border/50 shadow-xl h-[calc(100vh-320px)] overflow-hidden">
-                    <ScrollArea className="h-full">
-                      {unreadConversations.length > 0 ? (
-                        <div className="p-2">
-                          {unreadConversations.map((conversation) => (
-                            <ConversationItem key={conversation.id} conversation={conversation} />
-                          ))}
-                        </div>
-                      ) : (
-                        <div className="flex items-center justify-center h-full">
-                          <div className="text-center py-16">
-                            <div className="w-24 h-24 bg-gradient-accent rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
-                              <MessageCircle className="w-12 h-12 text-info-foreground" />
-                            </div>
-                            <h3 className="text-xl font-semibold text-foreground mb-3">All caught up!</h3>
-                            <p className="text-muted-foreground mb-6 max-w-sm mx-auto">You have no unread messages</p>
-                          </div>
-                        </div>
-                      )}
-                    </ScrollArea>
-                  </div>
-                </TabsContent>
-              </div>
-            </Tabs>
-          </div>
-        </div>
-      </div>
-
-      {/* Floating Action Button */}
-      <div className="fixed bottom-8 right-8 z-50">
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
+            <MessageComposer
+              participants={selectedChatParticipants}
+              onSendText={handleSendText}
+              onSendMedia={(attachments, caption) => handleSendMedia(attachments, caption)}
+              onSendSticker={handleSendSticker}
+              onSendGif={handleSendGif}
+              onSendVoice={handleSendVoice}
+              onCreatePoll={() => setPollOpen(true)}
+              onTyping={() => void 0}
+              replyTo={replyToMessage}
+              onCancelReply={() => setReplyToId(null)}
+              editingMessage={editingMessage}
+              onSaveEdit={handleSaveEdit}
+            />
+          </>
+        ) : (
+          <div className="flex flex-1 flex-col items-center justify-center space-y-6 text-center text-muted-foreground p-8">
+            <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-4">
+              <MessageCircle className="w-12 h-12 text-primary" />
+            </div>
+            <h2 className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">Pick a chat to get started</h2>
+            <p className="max-w-md text-muted-foreground">
+              Conversations support text, voice notes, media, polls, and more. Create a new group to
+              experience the full demo.
+            </p>
             <Button 
-              size="lg"
-              className="w-16 h-16 rounded-2xl bg-gradient-primary hover:shadow-2xl transition-all duration-300 hover:scale-110 border-0 shadow-xl"
+              onClick={() => setGroupOpen(true)}
+              className="bg-gradient-to-r from-primary to-primary/80 shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
             >
-              <Plus className="w-8 h-8 text-primary-foreground" />
+              Create a group
             </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-52 p-2 bg-popover/95 backdrop-blur-sm border border-border shadow-xl rounded-2xl">
-            <CreateGroupDialog>
-              <DropdownMenuItem className="flex items-center gap-3 cursor-pointer p-3 rounded-xl hover:bg-accent transition-colors">
-                <div className="w-8 h-8 bg-gradient-secondary rounded-lg flex items-center justify-center">
-                  <Users className="w-4 h-4 text-success-foreground" />
-                </div>
-                <span className="font-medium">Create Group</span>
-              </DropdownMenuItem>
-            </CreateGroupDialog>
-            <DropdownMenuItem 
-              className="flex items-center gap-3 cursor-pointer p-3 rounded-xl hover:bg-accent transition-colors"
-              onClick={() => setShowNewChat(true)}
-            >
-              <div className="w-8 h-8 bg-gradient-primary rounded-lg flex items-center justify-center">
-                <UserPlus className="w-4 h-4 text-primary-foreground" />
-              </div>
-              <span className="font-medium">New Chat</span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
-
-      {/* New Chat Dialog */}
-      <Dialog open={showNewChat} onOpenChange={setShowNewChat}>
-        <DialogContent className="sm:max-w-md bg-popover/95 backdrop-blur-sm border border-border shadow-xl rounded-2xl">
-          <DialogHeader>
-            <DialogTitle className="text-xl font-semibold text-foreground">Start New Chat</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4 p-2">
-            <div className="space-y-2">
-              <label htmlFor="email" className="text-sm font-medium text-foreground">
-                Email Address
-              </label>
-              <Input
-                id="email"
-                placeholder="Enter user's email address"
-                value={searchEmail}
-                onChange={(e) => setSearchEmail(e.target.value)}
-                className="border-2 border-border rounded-xl focus:ring-2 focus:ring-ring/20 focus:border-ring"
-              />
-            </div>
-            <div className="flex gap-3 pt-2">
-              <Button 
-                variant="outline" 
-                onClick={() => setShowNewChat(false)}
-                className="flex-1 border-2 border-border hover:bg-accent rounded-xl"
-              >
-                Cancel
-              </Button>
-              <Button 
-                onClick={handleNewChat}
-                disabled={!searchEmail.trim()}
-                className="flex-1 bg-gradient-primary border-0 rounded-xl"
-              >
-                Start Chat
-              </Button>
-            </div>
           </div>
+        )}
+      </div>
+          </ResizablePanel>
+        </ResizablePanelGroup>
+      )}
+
+      {compactMode && (
+        <div
+          className={cn(
+            "flex flex-1 flex-col min-h-0 transition-all duration-300",
+            "mx-auto w-full max-w-3xl border-x border-border/40 shadow-2xl"
+          )}
+        >
+          {activeChat ? (
+            <>
+              <ChatHeader
+                chat={activeChat}
+                participants={selectedChatParticipants}
+                onSearchChat={() => setMessageSearchOpen(true)}
+                onStartCall={(type) => activeChatId && startCall(activeChatId, type)}
+                preferences={preferences}
+                onToggleReadReceipts={toggleReadReceipts}
+                onToggleMultiDevice={toggleMultiDevice}
+                onExportChat={(includeMedia) => activeChatId && exportChat(activeChatId, includeMedia)}
+                onTriggerBackup={triggerBackup}
+                onOpenInfo={() => setGroupInfoOpen(true)}
+                onShareInvite={handleShareInvite}
+                onShowQr={() => setQrOpen(true)}
+                onMute={(duration?: "8h" | "1w" | "always" | "off") => activeChatId && muteChat(activeChatId, duration)}
+                onClearHistory={() => activeChatId && clearChatHistory(activeChatId)}
+                onDeleteChat={() => activeChatId && deleteChat(activeChatId)}
+                onLeaveGroup={() => activeChatId && leaveGroup(activeChatId)}
+                pinnedMessages={pinnedMessages}
+                typingUsers={typingList}
+                groupMetadata={groupMetadata[activeChatId]}
+                variant="compact"
+                onOpenSidebar={() => setSidebarOpen(true)}
+              />
+
+              <div className="flex-1 overflow-y-auto scroll-smooth bg-gradient-to-b from-muted/5 to-background">
+                <MessageList
+                  messages={filteredMessages}
+                  allMessages={activeMessages}
+                  users={users}
+                  currentUserId={CURRENT_USER_ID}
+                  readReceiptsEnabled={preferences.readReceiptsEnabled}
+                  linkPreviews={linkPreviews}
+                  onReply={(message) => setReplyToId(message.id)}
+                  onForward={(message) => {
+                    setForwardSource(message);
+                    setForwardOpen(true);
+                  }}
+                  onStar={(message) => activeChatId && toggleStarred(activeChatId, message.id)}
+                  onDelete={(message, scope) => activeChatId && deleteMessage(activeChatId, message.id, scope)}
+                  onEdit={(message) => {
+                    setEditingMessage(message);
+                    setReplyToId(null);
+                  }}
+                  onPinChange={(message, pinned) => activeChatId && markMessagePinned(activeChatId, message.id, pinned)}
+                  onReact={(message, emoji) => activeChatId && toggleReaction(activeChatId, message.id, emoji)}
+                  typingUsers={typingList}
+                />
+              </div>
+
+              <MessageComposer
+                participants={selectedChatParticipants}
+                onSendText={handleSendText}
+                onSendMedia={(attachments, caption) => handleSendMedia(attachments, caption)}
+                onSendSticker={handleSendSticker}
+                onSendGif={handleSendGif}
+                onSendVoice={handleSendVoice}
+                onCreatePoll={() => setPollOpen(true)}
+                onTyping={() => void 0}
+                replyTo={replyToMessage}
+                onCancelReply={() => setReplyToId(null)}
+                editingMessage={editingMessage}
+                onSaveEdit={handleSaveEdit}
+              />
+            </>
+          ) : (
+            <div className="flex flex-1 flex-col items-center justify-center space-y-6 text-center text-muted-foreground p-8">
+              <div className="w-24 h-24 rounded-full bg-gradient-to-br from-primary/20 to-primary/5 flex items-center justify-center mb-4">
+                <MessageCircle className="w-12 h-12 text-primary" />
+              </div>
+              <h2 className="text-2xl font-bold bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">Pick a chat to get started</h2>
+              <p className="max-w-md text-muted-foreground">
+                Conversations support text, voice notes, media, polls, and more. Create a new group to
+                experience the full demo.
+              </p>
+              <Button 
+                onClick={() => setGroupOpen(true)}
+                className="bg-gradient-to-r from-primary to-primary/80 shadow-lg hover:shadow-xl transition-all duration-200 hover:scale-105"
+              >
+                Create a group
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
+
+      {activeChat && activeChat.type === "group" && (
+        <div
+          className={cn(
+            "hidden w-full max-w-sm flex-col",
+            groupInfoOpen && "md:flex"
+          )}
+        >
+          <GroupInfo
+            chat={activeChat}
+            participants={selectedChatParticipants}
+            starredMessages={starredMessages}
+            onClose={() => setGroupInfoOpen(false)}
+            onMute={(duration) => activeChatId && muteChat(activeChatId, duration)}
+            onAddParticipants={() => toast({ title: "Coming soon" })}
+            onInviteViaLink={() => setQrOpen(true)}
+            onLeaveGroup={() => {
+              if (activeChatId) {
+                leaveGroup(activeChatId);
+                setGroupInfoOpen(false);
+              }
+            }}
+          />
+        </div>
+      )}
+
+      <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+        <SheetContent side="left" className="w-full max-w-sm border-r p-0">
+          <SheetHeader className="border-b px-4 py-3">
+            <SheetTitle>Chats</SheetTitle>
+          </SheetHeader>
+          <div className="h-[calc(100%-4rem)]">
+            <ChatList
+              chats={filteredChats}
+              messages={messages}
+              activeChatId={activeChatId}
+              onSelectChat={handleSelectChat}
+              searchTerm={searchTerm}
+              onSearchTermChange={setSearchTerm}
+              filter={chatFilter}
+              onFilterChange={setChatFilter}
+              onTogglePin={togglePinChat}
+              onMute={muteChat}
+              onMarkUnread={toggleMarkUnread}
+              onArchive={toggleArchive}
+              onDeleteChat={deleteChat}
+              onCreateGroup={() => {
+                setSidebarOpen(false);
+                setGroupOpen(true);
+              }}
+              onJoinGroup={() => {
+                setSidebarOpen(false);
+                setGroupDialogMode("join");
+                setGroupOpen(true);
+              }}
+              onStartDM={() => {
+                setSidebarOpen(false);
+                setDmDialogOpen(true);
+              }}
+              typingIndicators={chatListTypingIndicators}
+              searchMatches={filteredSearchMatches}
+            />
+          </div>
+        </SheetContent>
+      </Sheet>
+
+      <Dialog open={forwardOpen} onOpenChange={setForwardOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Forward message</DialogTitle>
+            <DialogDescription>Select a chat to forward the message to.</DialogDescription>
+          </DialogHeader>
+          <ScrollArea className="max-h-60">
+            <div className="space-y-2 py-2">
+              {chats.map((chat) => (
+                <button
+                  key={chat.id}
+                  type="button"
+                  className={cn(
+                    "flex w-full items-center justify-between rounded-lg border px-3 py-2 text-left",
+                    chat.id === activeChatId ? "border-primary" : "border-transparent"
+                  )}
+                  onClick={() => handleForward(chat.id)}
+                >
+                  <span className="font-medium">{chat.title}</span>
+                  {chat.type === "group" && <Badge>Group</Badge>}
+                </button>
+              ))}
+            </div>
+          </ScrollArea>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setForwardOpen(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Dialog open={pollOpen} onOpenChange={setPollOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Create poll</DialogTitle>
+            <DialogDescription>Gather opinions quickly.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="poll-question">Question</Label>
+              <Textarea
+                id="poll-question"
+                value={pollQuestion}
+                onChange={(event) => setPollQuestion(event.target.value)}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label>Options</Label>
+              {pollOptions.map((option, index) => (
+                <Input
+                  key={index}
+                  value={option}
+                  onChange={(event) =>
+                    setPollOptions((prev) =>
+                      prev.map((value, idx) => (idx === index ? event.target.value : value))
+                    )
+                  }
+                />
+              ))}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => setPollOptions((prev) => [...prev, `Option ${prev.length + 1}`])}
+              >
+                Add option
+              </Button>
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setPollOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={handleCreatePoll}>Create</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={groupOpen} onOpenChange={setGroupOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Group Chat</DialogTitle>
+            <DialogDescription>Create a new group or join an existing one.</DialogDescription>
+          </DialogHeader>
+          <Tabs value={groupDialogMode} onValueChange={(v) => setGroupDialogMode(v as "create" | "join")}>
+            <TabsList className="grid w-full grid-cols-2">
+              <TabsTrigger value="create">Create New</TabsTrigger>
+              <TabsTrigger value="join">Join Group</TabsTrigger>
+            </TabsList>
+            <TabsContent value="create" className="space-y-3 mt-4">
+              <div className="space-y-2">
+                <Label htmlFor="group-name">Group name</Label>
+                <Input 
+                  id="group-name" 
+                  placeholder="Team Nebula" 
+                  value={newGroupName}
+                  onChange={(e) => setNewGroupName(e.target.value)}
+                />
+              </div>
+              <div className="space-y-1">
+                <Label>Description</Label>
+                <Textarea 
+                  placeholder="Project goals, daily stand-ups, etc."
+                  value={newGroupDescription}
+                  onChange={(e) => setNewGroupDescription(e.target.value)}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Note: For this demo, creating a group will add some predefined members.
+              </p>
+            </TabsContent>
+            <TabsContent value="join" className="space-y-3 mt-4">
+              <div className="space-y-2">
+                <Label htmlFor="invite-code">Invite Code</Label>
+                <Input
+                  id="invite-code"
+                  placeholder="abc123"
+                  value={inviteCodeInput}
+                  onChange={(e) => setInviteCodeInput(e.target.value)}
+                />
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Enter the invite code or link you received to join a group.
+              </p>
+            </TabsContent>
+          </Tabs>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setGroupOpen(false)}>
+              Cancel
+            </Button>
+            {groupDialogMode === "create" ? (
+              <Button onClick={handleCreateGroup}>Create</Button>
+            ) : (
+              <Button onClick={handleJoinGroup}>Join</Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={dmDialogOpen} onOpenChange={setDmDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Start Direct Message</DialogTitle>
+            <DialogDescription>Enter email or username to start a conversation.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-3">
+            <div className="space-y-2">
+              <Label htmlFor="dm-input">Email or Username</Label>
+              <Input
+                id="dm-input"
+                placeholder="user@example.com or username"
+                value={dmInput}
+                onChange={(e) => setDmInput(e.target.value)}
+              />
+            </div>
+            <p className="text-xs text-muted-foreground">
+              Search by email address or username to find and message users.
+            </p>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDmDialogOpen(false)}>
+              Cancel
+            </Button>
+            <Button onClick={async () => {
+              if (dmInput.trim()) {
+                await startDirectMessage(dmInput.trim());
+                setDmDialogOpen(false);
+                setDmInput("");
+              }
+            }}>Start Chat</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={messageSearchOpen} onOpenChange={setMessageSearchOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Search messages</DialogTitle>
+            <DialogDescription>Find any discussion quickly.</DialogDescription>
+          </DialogHeader>
+          <div className="space-y-2">
+            <Input
+              placeholder="Search this chat"
+              value={messageSearchTerm}
+              onChange={(event) => setMessageSearchTerm(event.target.value)}
+            />
+            <div className="max-h-64 space-y-2 overflow-y-auto">
+              {filteredMessages.length === 0 ? (
+                <p className="text-sm text-muted-foreground">No matches yet.</p>
+              ) : (
+                filteredMessages.map((message) => (
+                  <div key={message.id} className="rounded-lg border bg-muted/30 p-2 text-sm">
+                    <p className="font-medium">{message.body || message.attachments?.[0]?.fileName}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {new Date(message.timeline.sentAt).toLocaleString()}
+                    </p>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setMessageSearchOpen(false)}>
+              Close
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={qrOpen} onOpenChange={setQrOpen}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle>Share Invite Link</DialogTitle>
+            <DialogDescription>
+              Scan the QR code or share the link to invite people to this group.
+            </DialogDescription>
+          </DialogHeader>
+          {activeChat?.inviteLink ? (
+            <div className="flex flex-col items-center gap-4">
+              {/* QR Code */}
+              <div className="rounded-xl border bg-white p-6 shadow-md">
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=280x280&data=${encodeURIComponent(
+                    activeChat.inviteLink
+                  )}&margin=10&ecc=M`}
+                  alt="Group invite QR code"
+                  className="h-64 w-64"
+                  loading="lazy"
+                />
+              </div>
+
+              {/* Invite Link Display */}
+              <div className="w-full rounded-lg border bg-muted/50 p-3">
+                <p className="break-all text-center text-sm font-mono">
+                  {activeChat.inviteLink}
+                </p>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex w-full gap-2">
+                <Button 
+                  variant="secondary" 
+                  className="flex-1" 
+                  onClick={handleCopyInvite}
+                >
+                  <Copy className="mr-2 h-4 w-4" />
+                  Copy Link
+                </Button>
+                <Button 
+                  variant="secondary" 
+                  className="flex-1" 
+                  onClick={handleShareInvite}
+                >
+                  <Share2 className="mr-2 h-4 w-4" />
+                  Share
+                </Button>
+              </div>
+
+              {/* Download QR Code Button */}
+              <Button
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  const link = document.createElement('a');
+                  link.download = `${activeChat.title}-qr-code.png`;
+                  link.href = `https://api.qrserver.com/v1/create-qr-code/?size=500x500&data=${encodeURIComponent(
+                    activeChat.inviteLink
+                  )}&margin=20&ecc=H&format=png`;
+                  link.click();
+                  toast({ title: "QR code downloaded" });
+                }}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Download QR Code
+              </Button>
+
+              {/* Regenerate Link Button */}
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-muted-foreground"
+                onClick={async () => {
+                  if (activeChat && !activeChat.id.startsWith('dm-')) {
+                    await regenerateInviteLink(activeChat.id);
+                  }
+                }}
+              >
+                <RefreshCw className="mr-2 h-4 w-4" />
+                Regenerate Link
+              </Button>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-4 py-6">
+              <div className="rounded-full bg-muted p-4">
+                <QrCode className="h-12 w-12 text-muted-foreground" />
+              </div>
+              <div className="text-center">
+                <p className="text-sm font-medium">No Invite Link</p>
+                <p className="text-sm text-muted-foreground mt-1">
+                  Generate an invite link to share this group
+                </p>
+              </div>
+              <Button
+                onClick={async () => {
+                  if (activeChat && !activeChat.id.startsWith('dm-')) {
+                    await generateInviteLink(activeChat.id, 168); // 7 days
+                  }
+                }}
+              >
+                <Plus className="mr-2 h-4 w-4" />
+                Generate Invite Link
+              </Button>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Join Group Dialog */}
     </div>
   );
-};
-
-export default Conversations;
+}
