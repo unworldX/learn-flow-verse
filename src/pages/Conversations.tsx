@@ -5,7 +5,7 @@ import { MessageList } from "@/components/conversations/MessageList";
 import { MessageComposer } from "@/components/conversations/MessageComposer";
 
 import { Message } from "@/types/chat";
-import { useConversationsOptimized as useConversations } from "@/hooks/useConversationsOptimized";
+import { useConversations } from "@/hooks/useConversations";
 import { useToast } from "@/hooks/use-toast";
 import { GroupInfo } from "@/components/conversations/GroupInfo";
 import { Button } from "@/components/ui/button";

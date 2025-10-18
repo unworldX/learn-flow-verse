@@ -1,6 +1,5 @@
-
 import React, { useState, useMemo } from 'react';
-import { useNotesOptimized as useNotes, Note } from '@/hooks/useNotesOptimized';
+import { useNotes, Note } from '@/hooks/useNotes';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
@@ -31,15 +30,7 @@ const Notes = () => {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
   const [selectedNote, setSelectedNote] = useState<Note | null>(null);
 
-  // Get all unique categories and tags
-  const categories = useMemo(() => {
-    const cats = new Set<string>();
-    notes.forEach(note => {
-      if (note.category) cats.add(note.category);
-    });
-    return ['personal', 'work', 'study', 'ideas', 'other', ...Array.from(cats)];
-  }, [notes]);
-
+  // Get all unique tags
   const allTags = useMemo(() => {
     const tags = new Set<string>();
     notes.forEach(note => {
@@ -59,11 +50,6 @@ const Notes = () => {
         note.title.toLowerCase().includes(term) || 
         (note.content || '').toLowerCase().includes(term)
       );
-    }
-
-    // Filter by category
-    if (filterCategory !== 'all') {
-      filtered = filtered.filter(note => note.category === filterCategory);
     }
 
     // Filter by tag
@@ -89,18 +75,17 @@ const Notes = () => {
     });
 
     return filtered;
-  }, [notes, searchTerm, filterCategory, filterTag, sortBy, sortOrder]);
+  }, [notes, searchTerm, filterTag, sortBy, sortOrder]);
 
   const handleCreateNote = async () => {
     if (!newTitle.trim()) return;
 
     const tags = newTags.split(',').map(tag => tag.trim()).filter(tag => tag);
-    await createNote(newTitle, newContent, tags, newCategory);
+    await createNote(newTitle, newContent, tags);
     
     setNewTitle('');
     setNewContent('');
     setNewTags('');
-    setNewCategory('personal');
     setIsCreateDialogOpen(false);
   };
 
@@ -283,18 +268,6 @@ const Notes = () => {
                       Tip: Use **bold**, *italic*, `code`, # headings, - lists, and more!
                     </p>
                   </div>
-
-                  <div>
-                    <Label htmlFor="tags">Tags</Label>
-                    <Input
-                      id="tags"
-                      placeholder="comma, separated, tags"
-                      value={newTags}
-                      onChange={(e) => setNewTags(e.target.value)}
-                      className="mt-1"
-                    />
-                  </div>
-
                   <div className="flex gap-3 pt-2">
                     <Button onClick={() => setIsCreateDialogOpen(false)} variant="outline" className="flex-1">
                       <X className="w-4 h-4 mr-2" />
@@ -326,18 +299,6 @@ const Notes = () => {
                   className="pl-10"
                 />
               </div>
-              <Select value={filterCategory} onValueChange={setFilterCategory}>
-                <SelectTrigger className="w-full md:w-40">
-                  <Folder className="w-4 h-4 mr-2" />
-                  <SelectValue placeholder="Category" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Categories</SelectItem>
-                  {categories.map(cat => (
-                    <SelectItem key={cat} value={cat} className="capitalize">{cat}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
               <Select value={filterTag} onValueChange={setFilterTag}>
                 <SelectTrigger className="w-full md:w-40">
                   <Tag className="w-4 h-4 mr-2" />
@@ -377,12 +338,12 @@ const Notes = () => {
             <CardContent className="p-12 text-center">
               <FileText className="w-16 h-16 text-muted-foreground/40 mx-auto mb-4" />
               <h3 className="text-xl font-semibold mb-2">
-                {searchTerm || filterCategory !== 'all' || filterTag !== 'all' 
+                {searchTerm || filterTag !== 'all' 
                   ? 'No notes found' 
                   : 'No notes yet'}
               </h3>
               <p className="text-muted-foreground mb-6">
-                {searchTerm || filterCategory !== 'all' || filterTag !== 'all'
+                {searchTerm || filterTag !== 'all'
                   ? 'Try adjusting your filters'
                   : 'Create your first note to get started'}
               </p>
@@ -426,12 +387,6 @@ const Notes = () => {
                       </Button>
                     </div>
                   </div>
-                  {note.category && (
-                    <Badge variant="outline" className="w-fit capitalize">
-                      <Folder className="w-3 h-3 mr-1" />
-                      {note.category}
-                    </Badge>
-                  )}
                 </CardHeader>
                 <CardContent className="space-y-3">
                   <p className="text-sm text-muted-foreground line-clamp-4 whitespace-pre-wrap">
@@ -474,12 +429,6 @@ const Notes = () => {
           </DialogHeader>
           <ScrollArea className="max-h-[60vh] pr-4">
             <div className="space-y-4">
-              {selectedNote?.category && (
-                <Badge variant="outline" className="capitalize">
-                  <Folder className="w-3 h-3 mr-1" />
-                  {selectedNote.category}
-                </Badge>
-              )}
               <div className="prose prose-sm dark:prose-invert max-w-none">
                 <pre className="whitespace-pre-wrap font-sans bg-muted p-4 rounded-lg">
                   {selectedNote?.content || 'No content'}
