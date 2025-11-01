@@ -1,6 +1,8 @@
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 import { Message, UserProfile } from "@/types/chat";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { ImageAttachment } from "./ImageAttachment";
+import { VideoAttachment } from "./VideoAttachment";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
 import {
@@ -34,7 +36,7 @@ import {
   Pause,
   Volume2,
 } from "lucide-react";
-import { useState } from "react";
+import { Skeleton } from "@/components/ui/skeleton";
 
 interface MessageBubbleProps {
   message: Message;
@@ -146,34 +148,18 @@ export function MessageBubble({
           <div className="mb-1">
             {/* Image */}
             {firstAttachment.type === 'image' && (
-              <div className="relative">
-                <img 
-                  src={firstAttachment.url} 
-                  alt="Image" 
-                  className="max-w-full max-h-[300px] object-cover rounded-t-xl"
-                />
-                {message.body && (
-                  <div className="px-3 py-2 bg-background/95">
-                    <p className="text-sm leading-snug">{message.body}</p>
-                  </div>
-                )}
-              </div>
+              <ImageAttachment 
+                attachment={firstAttachment} 
+                caption={message.body} 
+              />
             )}
 
             {/* Video */}
             {firstAttachment.type === 'video' && (
-              <div className="relative">
-                <video 
-                  src={firstAttachment.url} 
-                  controls 
-                  className="max-w-full max-h-[300px] rounded-t-xl"
-                />
-                {message.body && (
-                  <div className="px-3 py-2 bg-background/95">
-                    <p className="text-sm leading-snug">{message.body}</p>
-                  </div>
-                )}
-              </div>
+              <VideoAttachment 
+                attachment={firstAttachment} 
+                caption={message.body} 
+              />
             )}
 
             {/* Sticker/GIF */}

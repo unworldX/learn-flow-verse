@@ -3,6 +3,7 @@ import { Attachment, Message, UserProfile } from "@/types/chat";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Progress } from "@/components/ui/progress";
 import {
   FileText,
   Image as ImageIcon,
@@ -52,6 +53,8 @@ export function MessageComposer({
 }: MessageComposerProps) {
   const [text, setText] = useState("");
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploadingFileName, setUploadingFileName] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
@@ -85,20 +88,29 @@ export function MessageComposer({
     if (!files || files.length === 0) return;
     
     setIsUploading(true);
+    setUploadProgress(0);
+    
     try {
       const file = files[0];
-      const uploaded = await uploadChatFile(file);
+      setUploadingFileName(file.name);
+      
+      const uploaded = await uploadChatFile(file, (progress) => {
+        setUploadProgress(progress);
+      });
+      
       onSendMedia([{
         id: crypto.randomUUID(),
         type: uploaded.type,
         url: uploaded.url,
+        thumbnailUrl: uploaded.thumbnailUrl,
         fileName: uploaded.fileName,
         fileSize: uploaded.fileSize,
       }], text || undefined);
+      
       setText("");
       toast({
-        title: "File uploaded",
-        description: `${file.name} uploaded successfully`,
+        title: "Shared successfully",
+        description: `${file.name} has been shared`,
       });
     } catch (error) {
       console.error('Error uploading file:', error);
@@ -109,6 +121,8 @@ export function MessageComposer({
       });
     } finally {
       setIsUploading(false);
+      setUploadProgress(0);
+      setUploadingFileName("");
     }
   };
 
@@ -117,6 +131,15 @@ export function MessageComposer({
 
   return (
     <div className="shrink-0 border-t border-border/40 bg-background p-2.5">
+      {isUploading && (
+        <div className="mb-2 rounded-lg bg-muted/50 border border-border/50 p-3">
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-xs font-medium">Uploading {uploadingFileName}...</p>
+            <span className="text-xs text-muted-foreground">{uploadProgress}%</span>
+          </div>
+          <Progress value={uploadProgress} className="h-1.5" />
+        </div>
+      )}
       {replyTo && (
         <div className="mb-2 flex items-center justify-between rounded-lg bg-muted/50 border border-border/50 p-2 text-sm">
           <div className="flex-1 min-w-0">
