@@ -28,6 +28,7 @@ import NotesWorkspace from "./pages/NotesWorkspace";
 import WatchCoursePage from "./pages/WatchCoursePage";
 import CoursesPage from "./pages/Courses";
 import CourseDetailPage from "./pages/CourseDetailPage";
+import Call from "./pages/Call";
 
 const queryClient = new QueryClient();
 
@@ -68,6 +69,7 @@ const App = () => {
                     <Route path="/resources/view/:resourceId" element={<PdfViewer />} />
                     <Route path="/courses" element={<CoursesPage />} />
                     <Route path="/courses/:courseId" element={<CourseDetailPage />} />
+                    <Route path="/call" element={<Call />} />
                   </Route>
                 </Route>
                 {/* Fallback */}
