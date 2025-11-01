@@ -264,61 +264,64 @@ export function MessageBubble({
         </div>
       </div>
 
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="h-6 w-6 rounded-md opacity-0 transition-opacity group-hover:opacity-100 hover:bg-muted"
-          >
-            <MoreHorizontal className="h-3.5 w-3.5" />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align={isOwnMessage ? "end" : "start"} className="w-36">
-          <DropdownMenuItem onSelect={(e) => {
-            e.preventDefault();
-          }} className="p-0">
-            <Popover>
-              <PopoverTrigger asChild>
-                <button className="w-full flex items-center px-2 py-1.5 text-sm hover:bg-muted rounded-sm">
-                  <Smile className="mr-2 h-3.5 w-3.5" /> React
+      <div className="flex items-center gap-1 opacity-0 transition-opacity group-hover:opacity-100">
+        <Popover>
+          <PopoverTrigger asChild>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-6 w-6 rounded-md hover:bg-muted"
+            >
+              <Smile className="h-3.5 w-3.5" />
+            </Button>
+          </PopoverTrigger>
+          <PopoverContent side="top" className="w-auto p-2">
+            <div className="flex gap-1">
+              {["❤️", "👍", "😂", "😮", "😢", "🙏"].map((emoji) => (
+                <button
+                  key={emoji}
+                  onClick={() => onReact(message, emoji)}
+                  className="text-xl hover:scale-125 transition-transform p-1 rounded hover:bg-muted"
+                >
+                  {emoji}
                 </button>
-              </PopoverTrigger>
-              <PopoverContent side="right" className="w-auto p-2">
-                <div className="flex gap-1">
-                  {["❤️", "👍", "😂", "😮", "😢", "🙏"].map((emoji) => (
-                    <button
-                      key={emoji}
-                      onClick={() => onReact(message, emoji)}
-                      className="text-xl hover:scale-125 transition-transform p-1 rounded hover:bg-muted"
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
-              </PopoverContent>
-            </Popover>
-          </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={() => onReply(message)}>
-            <CornerDownRight className="mr-2 h-3.5 w-3.5" /> Reply
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => onForward(message)}>
-            <Forward className="mr-2 h-3.5 w-3.5" /> Forward
-          </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => onStar(message)}>
-            <Star className="mr-2 h-3.5 w-3.5" /> Star
-          </DropdownMenuItem>
-          {isOwnMessage && (
-            <DropdownMenuItem onSelect={() => onEdit(message)}>
-              <Edit className="mr-2 h-3.5 w-3.5" /> Edit
+              ))}
+            </div>
+          </PopoverContent>
+        </Popover>
+
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button 
+              variant="ghost" 
+              size="icon" 
+              className="h-6 w-6 rounded-md hover:bg-muted"
+            >
+              <MoreHorizontal className="h-3.5 w-3.5" />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align={isOwnMessage ? "end" : "start"} className="w-36">
+            <DropdownMenuItem onSelect={() => onReply(message)}>
+              <CornerDownRight className="mr-2 h-3.5 w-3.5" /> Reply
             </DropdownMenuItem>
-          )}
-          <DropdownMenuItem onSelect={() => onDelete(message, "me")} className="text-destructive">
-            <Trash className="mr-2 h-3.5 w-3.5" /> Delete
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+            <DropdownMenuItem onSelect={() => onForward(message)}>
+              <Forward className="mr-2 h-3.5 w-3.5" /> Forward
+            </DropdownMenuItem>
+            <DropdownMenuItem onSelect={() => onStar(message)}>
+              <Star className="mr-2 h-3.5 w-3.5" /> Star
+            </DropdownMenuItem>
+            {isOwnMessage && (
+              <DropdownMenuItem onSelect={() => onEdit(message)}>
+                <Edit className="mr-2 h-3.5 w-3.5" /> Edit
+              </DropdownMenuItem>
+            )}
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => onDelete(message, "me")} className="text-destructive">
+              <Trash className="mr-2 h-3.5 w-3.5" /> Delete
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
     </div>
   );
 }
