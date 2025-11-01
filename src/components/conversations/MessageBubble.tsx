@@ -22,7 +22,13 @@ import {
   Trash,
   Edit,
   Forward,
+  FileText,
+  Download,
+  Play,
+  Pause,
+  Volume2,
 } from "lucide-react";
+import { useState } from "react";
 
 interface MessageBubbleProps {
   message: Message;
@@ -85,7 +91,12 @@ export function MessageBubble({
     return { author, summary };
   }, [replyTo, users]);
 
+  const [isPlayingAudio, setIsPlayingAudio] = useState(false);
+
   if (isDeletedForMe) return null;
+
+  const hasAttachments = message.attachments && message.attachments.length > 0;
+  const firstAttachment = hasAttachments ? message.attachments[0] : null;
 
   return (
     <div
@@ -96,14 +107,17 @@ export function MessageBubble({
     >
       <div
         className={cn(
-          "relative flex flex-col rounded-xl px-3 py-1.5",
+          "relative flex flex-col rounded-xl overflow-hidden",
+          hasAttachments && (firstAttachment?.type === 'image' || firstAttachment?.type === 'video' || firstAttachment?.type === 'sticker' || firstAttachment?.type === 'gif') 
+            ? "px-0 py-0" 
+            : "px-3 py-1.5",
           isOwnMessage
             ? "bg-primary text-primary-foreground rounded-br-sm"
             : "bg-muted text-foreground rounded-bl-sm"
         )}
       >
         {!isOwnMessage && (
-          <div className="mb-1 flex items-center gap-1.5">
+          <div className={cn("mb-1 flex items-center gap-1.5", hasAttachments && (firstAttachment?.type === 'image' || firstAttachment?.type === 'video' || firstAttachment?.type === 'sticker' || firstAttachment?.type === 'gif') && "px-3 pt-2")}>
             <Avatar className="h-4 w-4">
               <AvatarImage src={sender?.avatarUrl} />
               <AvatarFallback className="text-[8px]">{(sender?.name ?? "").slice(0, 1)}</AvatarFallback>
@@ -113,15 +127,121 @@ export function MessageBubble({
         )}
 
         {replySnippet && (
-          <div className="mb-1 rounded-md bg-black/10 p-1.5 text-xs">
+          <div className={cn("mb-1 rounded-md bg-black/10 p-1.5 text-xs", hasAttachments && (firstAttachment?.type === 'image' || firstAttachment?.type === 'video' || firstAttachment?.type === 'sticker' || firstAttachment?.type === 'gif') && "mx-3")}>
             <p className="font-semibold text-[11px]">{replySnippet.author}</p>
             <p className="line-clamp-1 text-[11px]">{replySnippet.summary}</p>
           </div>
         )}
 
-        <p className="text-sm leading-snug">{message.body}</p>
+        {/* Attachments Rendering */}
+        {hasAttachments && firstAttachment && (
+          <div className="mb-1">
+            {/* Image */}
+            {firstAttachment.type === 'image' && (
+              <div className="relative">
+                <img 
+                  src={firstAttachment.url} 
+                  alt="Image" 
+                  className="max-w-full max-h-[300px] object-cover rounded-t-xl"
+                />
+                {message.body && (
+                  <div className="px-3 py-2 bg-background/95">
+                    <p className="text-sm leading-snug">{message.body}</p>
+                  </div>
+                )}
+              </div>
+            )}
 
-        <div className="mt-0.5 flex items-center self-end gap-1.5 text-[10px] opacity-70">
+            {/* Video */}
+            {firstAttachment.type === 'video' && (
+              <div className="relative">
+                <video 
+                  src={firstAttachment.url} 
+                  controls 
+                  className="max-w-full max-h-[300px] rounded-t-xl"
+                />
+                {message.body && (
+                  <div className="px-3 py-2 bg-background/95">
+                    <p className="text-sm leading-snug">{message.body}</p>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* Sticker/GIF */}
+            {(firstAttachment.type === 'sticker' || firstAttachment.type === 'gif') && (
+              <img 
+                src={firstAttachment.url} 
+                alt={firstAttachment.type} 
+                className="max-w-[200px] max-h-[200px] object-contain"
+              />
+            )}
+
+            {/* Audio */}
+            {(firstAttachment.type === 'audio' || firstAttachment.type === 'voice-note') && (
+              <div className="flex items-center gap-2 px-3 py-2 bg-muted/50 rounded-lg">
+                <Button
+                  size="icon"
+                  variant="ghost"
+                  className="h-8 w-8"
+                  onClick={() => setIsPlayingAudio(!isPlayingAudio)}
+                >
+                  {isPlayingAudio ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+                </Button>
+                <div className="flex-1">
+                  <div className="h-1 bg-muted rounded-full overflow-hidden">
+                    <div className="h-full bg-primary w-1/3" />
+                  </div>
+                  <p className="text-xs mt-1">
+                    {firstAttachment.durationSeconds ? `${Math.floor(firstAttachment.durationSeconds / 60)}:${(firstAttachment.durationSeconds % 60).toString().padStart(2, '0')}` : '0:30'}
+                  </p>
+                </div>
+                <Volume2 className="h-4 w-4" />
+              </div>
+            )}
+
+            {/* Document */}
+            {firstAttachment.type === 'document' && (
+              <div className="flex items-center gap-3 px-3 py-2 bg-muted/50 rounded-lg">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <FileText className="h-5 w-5 text-primary" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium truncate">
+                    {firstAttachment.fileName || 'Document'}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    {firstAttachment.fileSize || 'Unknown size'}
+                  </p>
+                </div>
+                <Button size="icon" variant="ghost" className="h-8 w-8">
+                  <Download className="h-4 w-4" />
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Text message body (if no media attachment or has caption) */}
+        {message.body && !hasAttachments && (
+          <p className="text-sm leading-snug">{message.body}</p>
+        )}
+
+        {/* Reactions */}
+        {message.reactions && message.reactions.length > 0 && (
+          <div className={cn("flex flex-wrap gap-1 mt-1", hasAttachments && (firstAttachment?.type === 'image' || firstAttachment?.type === 'video' || firstAttachment?.type === 'sticker' || firstAttachment?.type === 'gif') && "px-3 pb-2")}>
+            {Array.from(new Set(message.reactions.map(r => r.emoji))).map(emoji => {
+              const count = message.reactions!.filter(r => r.emoji === emoji).length;
+              return (
+                <span key={emoji} className="text-xs bg-background/80 px-1.5 py-0.5 rounded-full">
+                  {emoji} {count > 1 && count}
+                </span>
+              );
+            })}
+          </div>
+        )}
+
+        <div className={cn("mt-0.5 flex items-center self-end gap-1.5 text-[10px] opacity-70", hasAttachments && (firstAttachment?.type === 'image' || firstAttachment?.type === 'video' || firstAttachment?.type === 'sticker' || firstAttachment?.type === 'gif') && "px-3 pb-2")}>
           {message.editedAt && <span>edited</span>}
           <span>{formatTime(message.timeline.sentAt)}</span>
           {renderStatusIcon(message.status, isOwnMessage, readReceiptsEnabled)}
