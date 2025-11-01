@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { Attachment, Message, UserProfile } from "@/types/chat";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -14,8 +14,11 @@ import {
   BarChart3,
   X,
   Video,
+  Loader2,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { uploadChatFile } from "@/lib/chatFileUpload";
+import { useToast } from "@/hooks/use-toast";
 
 interface MessageComposerProps {
   participants: UserProfile[];
@@ -48,6 +51,11 @@ export function MessageComposer({
   onSaveEdit,
 }: MessageComposerProps) {
   const [text, setText] = useState("");
+  const [isUploading, setIsUploading] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const imageInputRef = useRef<HTMLInputElement>(null);
+  const videoInputRef = useRef<HTMLInputElement>(null);
+  const { toast } = useToast();
 
   useEffect(() => {
     if (editingMessage) {
@@ -71,6 +79,37 @@ export function MessageComposer({
   const handleAddEmoji = (emoji: string) => {
     setText((prev) => `${prev}${emoji}`);
     onTyping();
+  };
+
+  const handleFileUpload = async (files: FileList | null, type: 'image' | 'video' | 'file') => {
+    if (!files || files.length === 0) return;
+    
+    setIsUploading(true);
+    try {
+      const file = files[0];
+      const uploaded = await uploadChatFile(file);
+      onSendMedia([{
+        id: crypto.randomUUID(),
+        type: uploaded.type,
+        url: uploaded.url,
+        fileName: uploaded.fileName,
+        fileSize: uploaded.fileSize,
+      }], text || undefined);
+      setText("");
+      toast({
+        title: "File uploaded",
+        description: `${file.name} uploaded successfully`,
+      });
+    } catch (error) {
+      console.error('Error uploading file:', error);
+      toast({
+        title: "Upload failed",
+        description: "Failed to upload file. Please try again.",
+        variant: "destructive",
+      });
+    } finally {
+      setIsUploading(false);
+    }
   };
 
   const showMic = text.trim().length === 0 && !editingMessage;
@@ -132,14 +171,36 @@ export function MessageComposer({
           </PopoverContent>
         </Popover>
 
+        <input
+          ref={imageInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={(e) => handleFileUpload(e.target.files, 'image')}
+        />
+        <input
+          ref={videoInputRef}
+          type="file"
+          accept="video/*"
+          className="hidden"
+          onChange={(e) => handleFileUpload(e.target.files, 'video')}
+        />
+        <input
+          ref={fileInputRef}
+          type="file"
+          className="hidden"
+          onChange={(e) => handleFileUpload(e.target.files, 'file')}
+        />
+
         <Popover>
           <PopoverTrigger asChild>
             <Button 
               variant="ghost" 
               size="icon" 
               className="h-8 w-8 shrink-0 rounded-lg hover:bg-muted"
+              disabled={isUploading}
             >
-              <Paperclip className="h-4 w-4" />
+              {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Paperclip className="h-4 w-4" />}
             </Button>
           </PopoverTrigger>
           <PopoverContent side="top" className="w-auto p-2">
@@ -147,7 +208,8 @@ export function MessageComposer({
               <Button 
                 variant="outline" 
                 className="flex h-auto flex-col gap-1.5 p-3 hover:bg-muted" 
-                onClick={() => onSendMedia([{ id: 'img-1', type: 'image', url: 'https://source.unsplash.com/random/800x600' }])}
+                onClick={() => imageInputRef.current?.click()}
+                disabled={isUploading}
               >
                 <ImageIcon className="h-5 w-5" />
                 <span className="text-[10px] font-medium">Image</span>
@@ -155,7 +217,8 @@ export function MessageComposer({
               <Button 
                 variant="outline" 
                 className="flex h-auto flex-col gap-1.5 p-3 hover:bg-muted" 
-                onClick={() => onSendMedia([{ id: 'vid-1', type: 'video', url: 'https://samplelib.com/lib/preview/mp4/sample-5s.mp4' }])}
+                onClick={() => videoInputRef.current?.click()}
+                disabled={isUploading}
               >
                 <Video className="h-5 w-5" />
                 <span className="text-[10px] font-medium">Video</span>
@@ -163,7 +226,8 @@ export function MessageComposer({
               <Button 
                 variant="outline" 
                 className="flex h-auto flex-col gap-1.5 p-3 hover:bg-muted" 
-                onClick={() => onSendMedia([{ id: 'doc-1', type: 'document', url: '#', fileName: 'document.pdf' }])}
+                onClick={() => fileInputRef.current?.click()}
+                disabled={isUploading}
               >
                 <FileText className="h-5 w-5" />
                 <span className="text-[10px] font-medium">Doc</span>
@@ -172,6 +236,7 @@ export function MessageComposer({
                 variant="outline" 
                 className="flex h-auto flex-col gap-1.5 p-3 hover:bg-muted" 
                 onClick={() => onSendSticker('https://media.tenor.com/2roX3uxz_68AAAAC/cat-computer.gif')}
+                disabled={isUploading}
               >
                 <Sticker className="h-5 w-5" />
                 <span className="text-[10px] font-medium">Sticker</span>
@@ -180,6 +245,7 @@ export function MessageComposer({
                 variant="outline" 
                 className="flex h-auto flex-col gap-1.5 p-3 hover:bg-muted col-span-2" 
                 onClick={onCreatePoll}
+                disabled={isUploading}
               >
                 <BarChart3 className="h-5 w-5" />
                 <span className="text-[10px] font-medium">Poll</span>
