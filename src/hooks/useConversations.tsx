@@ -20,6 +20,44 @@ const createId = () =>
     ? crypto.randomUUID()
     : Math.random().toString(36).slice(2, 10);
 
+// Map attachment types to database-allowed message types
+const mapAttachmentTypeToDBType = (type?: AttachmentType): string => {
+  if (!type) return 'text';
+  switch (type) {
+    case 'image':
+    case 'sticker':
+    case 'gif':
+      return 'image';
+    case 'video':
+      return 'video';
+    case 'audio':
+    case 'voice-note':
+    case 'document':
+      return 'file';
+    default:
+      return 'text';
+  }
+};
+
+// Map DB type back to attachment type with hints from filename
+const mapDBTypeToAttachmentType = (dbType: string, fileName?: string | null): AttachmentType => {
+  if (dbType === 'image') return 'image';
+  if (dbType === 'video') return 'video';
+  if (dbType === 'file') {
+    if (fileName) {
+      const lower = fileName.toLowerCase();
+      if (lower.endsWith('.mp3') || lower.endsWith('.m4a') || lower.endsWith('.wav')) {
+        return 'audio';
+      }
+      if (lower.endsWith('.pdf') || lower.endsWith('.doc') || lower.endsWith('.docx')) {
+        return 'document';
+      }
+    }
+    return 'document';
+  }
+  return 'document';
+};
+
 export function useConversations() {
   const { toast } = useToast();
   const { user } = useAuth();
@@ -351,35 +389,52 @@ export function useConversations() {
         // Fetch user profiles for all senders
         await fetchUserProfiles(Array.from(senderIds));
 
-        fetchedMessages = dms?.map(dm => ({
-          id: dm.id,
-          chatId: chatId,
-          senderId: dm.sender_id === user.id ? CURRENT_USER_ID : dm.sender_id,
-          kind: dm.message_type === "text" ? "text" : "media",
-          body: dm.encrypted_content || "",
-          attachments: dm.file_url ? [{
-            id: createId(),
-            type: (dm.message_type === "image" || dm.message_type === "video" || dm.message_type === "audio" 
-                  ? dm.message_type 
-                  : "document") as AttachmentType,
-            url: dm.file_url,
-            fileName: dm.file_name || undefined,
-            fileSize: dm.file_size ? `${(dm.file_size / 1024 / 1024).toFixed(2)} MB` : undefined,
-          }] : undefined,
-          timeline: {
-            sentAt: dm.created_at,
-            deliveredAt: dm.created_at,
-            readAt: dm.is_read ? dm.created_at : undefined,
-          },
-          status: dm.is_read ? "read" : "delivered",
-          replyTo: dm.reply_to_message_id && repliedToMessages[dm.reply_to_message_id]
-            ? {
-                messageId: dm.reply_to_message_id,
-                senderId: repliedToMessages[dm.reply_to_message_id].senderId,
-                body: repliedToMessages[dm.reply_to_message_id].body,
-              }
-            : undefined,
-        })) || [];
+        // Fetch reactions for these messages
+        const dmMessageIds = dms?.map(m => m.id) || [];
+        const { data: dmReactions } = await supabase
+          .from("message_reactions")
+          .select("*")
+          .eq("chat_type", "direct")
+          .in("message_id", dmMessageIds);
+
+        fetchedMessages = dms?.map(dm => {
+          const dmMsgReactions = dmReactions?.filter(r => r.message_id === dm.id).map(r => ({
+            emoji: r.reaction,
+            userId: r.user_id,
+            reactedAt: r.created_at || new Date().toISOString(),
+          })) || [];
+          
+          return {
+            id: dm.id,
+            chatId: chatId,
+            senderId: dm.sender_id === user.id ? CURRENT_USER_ID : dm.sender_id,
+            kind: dm.message_type === "text" ? "text" : "media",
+            body: dm.encrypted_content || "",
+            attachments: dm.file_url ? [{
+              id: createId(),
+              type: mapDBTypeToAttachmentType(dm.message_type, dm.file_name),
+              url: dm.file_url,
+              fileName: dm.file_name || undefined,
+              fileSize: dm.file_size ? `${(dm.file_size / 1024 / 1024).toFixed(2)} MB` : undefined,
+            }] : undefined,
+            timeline: {
+              sentAt: dm.created_at,
+              deliveredAt: dm.created_at,
+              readAt: dm.is_read ? dm.created_at : undefined,
+            },
+            status: dm.is_read ? "read" : "delivered",
+            reactions: dmMsgReactions,
+            replyTo: dm.reply_to_message_id && repliedToMessages[dm.reply_to_message_id]
+              ? {
+                  messageId: dm.reply_to_message_id,
+                  senderId: repliedToMessages[dm.reply_to_message_id].senderId,
+                  body: repliedToMessages[dm.reply_to_message_id].body,
+                }
+              : undefined,
+            isPinned: dm.is_pinned_by_sender || dm.is_pinned_by_receiver,
+            editedAt: dm.edited_at || undefined,
+          };
+        }) || [];
       } else {
         // Group conversation
         if (!chatId || chatId === 'undefined' || chatId === 'null') {
@@ -445,9 +500,21 @@ export function useConversations() {
           .select("*")
           .in("message_id", messageIds);
 
+        // Fetch reactions for these messages
+        const { data: reactions } = await supabase
+          .from("message_reactions")
+          .select("*")
+          .eq("chat_type", "group")
+          .in("message_id", messageIds);
+
         fetchedMessages = groupMsgs?.map(msg => {
           const msgReads = reads?.filter(r => r.message_id === msg.id) || [];
           const isRead = msgReads.some(r => r.user_id === user.id);
+          const msgReactions = reactions?.filter(r => r.message_id === msg.id).map(r => ({
+            emoji: r.reaction,
+            userId: r.user_id,
+            reactedAt: r.created_at || new Date().toISOString(),
+          })) || [];
           
           return {
             id: msg.id,
@@ -457,9 +524,7 @@ export function useConversations() {
             body: msg.encrypted_content || "",
             attachments: msg.file_url ? [{
               id: createId(),
-              type: (msg.message_type === "image" || msg.message_type === "video" || msg.message_type === "audio" 
-                    ? msg.message_type 
-                    : "document") as AttachmentType,
+              type: mapDBTypeToAttachmentType(msg.message_type, msg.file_name),
               url: msg.file_url,
               fileName: msg.file_name || undefined,
               fileSize: msg.file_size ? `${(msg.file_size / 1024 / 1024).toFixed(2)} MB` : undefined,
@@ -470,6 +535,7 @@ export function useConversations() {
               readAt: isRead ? msg.created_at : undefined,
             },
             status: isRead ? "read" : "delivered",
+            reactions: msgReactions,
             replyTo: msg.reply_to_message_id && repliedToMessages[msg.reply_to_message_id]
               ? {
                   messageId: msg.reply_to_message_id,
@@ -477,6 +543,8 @@ export function useConversations() {
                   body: repliedToMessages[msg.reply_to_message_id].body,
                 }
               : undefined,
+            isPinned: msg.is_pinned,
+            editedAt: msg.edited_at || undefined,
           };
         }) || [];
       }
@@ -506,6 +574,8 @@ export function useConversations() {
     if (!user?.id) return;
 
     try {
+      const dbMessageType = mapAttachmentTypeToDBType(attachments?.[0]?.type);
+      
       if (chatId.startsWith("dm-")) {
         // Send direct message
         const partnerId = chatId.replace("dm-", "");
@@ -515,10 +585,10 @@ export function useConversations() {
             sender_id: user.id,
             receiver_id: partnerId,
             encrypted_content: body,
-            message_type: attachments?.[0]?.type || "text",
+            message_type: dbMessageType,
             file_url: attachments?.[0]?.url,
             file_name: attachments?.[0]?.fileName,
-            file_size: attachments?.[0]?.fileSize ? parseInt(attachments[0].fileSize) : null,
+            file_size: attachments?.[0]?.fileSize ? parseInt(attachments[0].fileSize.replace(/[^0-9]/g, '')) : null,
             reply_to_message_id: replyToMessageId,
           })
           .select()
@@ -533,10 +603,10 @@ export function useConversations() {
             group_id: chatId,
             sender_id: user.id,
             encrypted_content: body,
-            message_type: attachments?.[0]?.type || "text",
+            message_type: dbMessageType,
             file_url: attachments?.[0]?.url,
             file_name: attachments?.[0]?.fileName,
-            file_size: attachments?.[0]?.fileSize ? parseInt(attachments[0].fileSize) : null,
+            file_size: attachments?.[0]?.fileSize ? parseInt(attachments[0].fileSize.replace(/[^0-9]/g, '')) : null,
             reply_to_message_id: replyToMessageId,
           })
           .select("id, group_id, sender_id, encrypted_content, message_type, created_at")

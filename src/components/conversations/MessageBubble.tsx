@@ -7,8 +7,14 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover";
 import { cn } from "@/lib/utils";
 import {
   Check,
@@ -79,6 +85,8 @@ export function MessageBubble({
   onStar,
   onDelete,
   onEdit,
+  onPinChange,
+  onReact,
   readReceiptsEnabled,
 }: MessageBubbleProps) {
   const sender = users[message.senderId];
@@ -232,10 +240,18 @@ export function MessageBubble({
           <div className={cn("flex flex-wrap gap-1 mt-1", hasAttachments && (firstAttachment?.type === 'image' || firstAttachment?.type === 'video' || firstAttachment?.type === 'sticker' || firstAttachment?.type === 'gif') && "px-3 pb-2")}>
             {Array.from(new Set(message.reactions.map(r => r.emoji))).map(emoji => {
               const count = message.reactions!.filter(r => r.emoji === emoji).length;
+              const hasReacted = message.reactions!.some(r => r.emoji === emoji && r.userId === currentUserId);
               return (
-                <span key={emoji} className="text-xs bg-background/80 px-1.5 py-0.5 rounded-full">
+                <button 
+                  key={emoji} 
+                  onClick={() => onReact(message, emoji)}
+                  className={cn(
+                    "text-xs px-1.5 py-0.5 rounded-full transition-colors hover:bg-muted",
+                    hasReacted ? "bg-primary/20 border border-primary/30" : "bg-background/80 border border-border/50"
+                  )}
+                >
                   {emoji} {count > 1 && count}
-                </span>
+                </button>
               );
             })}
           </div>
@@ -259,6 +275,31 @@ export function MessageBubble({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align={isOwnMessage ? "end" : "start"} className="w-36">
+          <DropdownMenuItem onSelect={(e) => {
+            e.preventDefault();
+          }} className="p-0">
+            <Popover>
+              <PopoverTrigger asChild>
+                <button className="w-full flex items-center px-2 py-1.5 text-sm hover:bg-muted rounded-sm">
+                  <Smile className="mr-2 h-3.5 w-3.5" /> React
+                </button>
+              </PopoverTrigger>
+              <PopoverContent side="right" className="w-auto p-2">
+                <div className="flex gap-1">
+                  {["❤️", "👍", "😂", "😮", "😢", "🙏"].map((emoji) => (
+                    <button
+                      key={emoji}
+                      onClick={() => onReact(message, emoji)}
+                      className="text-xl hover:scale-125 transition-transform p-1 rounded hover:bg-muted"
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              </PopoverContent>
+            </Popover>
+          </DropdownMenuItem>
+          <DropdownMenuSeparator />
           <DropdownMenuItem onSelect={() => onReply(message)}>
             <CornerDownRight className="mr-2 h-3.5 w-3.5" /> Reply
           </DropdownMenuItem>
