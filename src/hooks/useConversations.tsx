@@ -72,17 +72,71 @@ export function useConversations() {
 
   const broadcastTyping = useCallback((chatId: string) => {
     if (!user?.id) return;
+    
+    setTypingIndicators(prev => ({
+      ...prev,
+      [chatId]: [
+        ...(prev[chatId] || []).filter(t => t.userId !== user.id),
+        { userId: user.id, lastTyped: Date.now() }
+      ]
+    }));
+
     const channel = supabase.channel(`typing-${chatId}`);
     channel.subscribe(async (status) => {
       if (status === 'SUBSCRIBED') {
-        await channel.track({
+        await channel.send({
+          type: 'broadcast',
           event: 'typing',
-          payload: { userId: user.id },
+          payload: { userId: user.id, timestamp: Date.now() },
         });
       }
     });
-    setTimeout(() => channel.unsubscribe(), 1000);
+    
+    setTimeout(() => {
+      setTypingIndicators(prev => ({
+        ...prev,
+        [chatId]: (prev[chatId] || []).filter(t => t.userId !== user.id)
+      }));
+      channel.unsubscribe();
+    }, 3000);
   }, [user]);
+
+  // Subscribe to typing indicators for selected chat
+  useEffect(() => {
+    if (!selectedChatId || !user?.id) return;
+
+    const channel = supabase.channel(`typing-${selectedChatId}`);
+    
+    channel
+      .on('broadcast', { event: 'typing' }, (payload) => {
+        const typingUserId = payload.payload.userId;
+        if (typingUserId === user.id) return; // Ignore own typing
+        
+        setTypingIndicators(prev => {
+          const existing = prev[selectedChatId] || [];
+          const filtered = existing.filter(t => t.userId !== typingUserId);
+          return {
+            ...prev,
+            [selectedChatId]: [...filtered, { userId: typingUserId, lastTyped: Date.now() }]
+          };
+        });
+
+        // Auto-remove typing indicator after 3 seconds
+        setTimeout(() => {
+          setTypingIndicators(prev => ({
+            ...prev,
+            [selectedChatId]: (prev[selectedChatId] || []).filter(t => 
+              t.userId !== typingUserId || Date.now() - t.lastTyped < 3000
+            )
+          }));
+        }, 3000);
+      })
+      .subscribe();
+
+    return () => {
+      channel.unsubscribe();
+    };
+  }, [selectedChatId, user]);
 
   const fetchUserProfiles = useCallback(async (userIds: string[]) => {
     const idsToFetch = userIds.filter(id => !userProfiles[id] && id !== user?.id);

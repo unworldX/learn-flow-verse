@@ -44,6 +44,7 @@ export function MessageComposer({
   onSendText,
   onSendMedia,
   onSendSticker,
+  onSendGif,
   onSendVoice,
   onCreatePoll,
   onTyping,
@@ -61,6 +62,13 @@ export function MessageComposer({
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+
+  // Trigger typing indicator when user types
+  useEffect(() => {
+    if (text.length > 0 && onTyping) {
+      onTyping();
+    }
+  }, [text, onTyping]);
 
   useEffect(() => {
     if (editingMessage) {
