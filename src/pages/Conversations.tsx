@@ -478,6 +478,7 @@ export default function Conversations() {
                 currentUserId={CURRENT_USER_ID}
                 readReceiptsEnabled={preferences.readReceiptsEnabled}
                 linkPreviews={linkPreviews}
+                conversationId={activeChatId || undefined}
                 onReply={(message) => setReplyToId(message.id)}
                 onForward={(message) => {
                   setForwardSource(message);
@@ -497,13 +498,14 @@ export default function Conversations() {
 
             <MessageComposer
               participants={selectedChatParticipants}
+              conversationId={activeChatId || undefined}
               onSendText={handleSendText}
               onSendMedia={(attachments, caption) => handleSendMedia(attachments, caption)}
               onSendSticker={handleSendSticker}
               onSendGif={handleSendGif}
               onSendVoice={handleSendVoice}
               onCreatePoll={() => setPollOpen(true)}
-              onTyping={() => void 0}
+              onTyping={() => activeChatId && broadcastTyping(activeChatId)}
               replyTo={replyToMessage}
               onCancelReply={() => setReplyToId(null)}
               editingMessage={editingMessage}
@@ -574,6 +576,7 @@ export default function Conversations() {
                   currentUserId={CURRENT_USER_ID}
                   readReceiptsEnabled={preferences.readReceiptsEnabled}
                   linkPreviews={linkPreviews}
+                  conversationId={activeChatId || undefined}
                   onReply={(message) => setReplyToId(message.id)}
                   onForward={(message) => {
                     setForwardSource(message);
@@ -593,13 +596,14 @@ export default function Conversations() {
 
               <MessageComposer
                 participants={selectedChatParticipants}
+                conversationId={activeChatId || undefined}
                 onSendText={handleSendText}
                 onSendMedia={(attachments, caption) => handleSendMedia(attachments, caption)}
                 onSendSticker={handleSendSticker}
                 onSendGif={handleSendGif}
                 onSendVoice={handleSendVoice}
                 onCreatePoll={() => setPollOpen(true)}
-                onTyping={() => void 0}
+                onTyping={() => activeChatId && broadcastTyping(activeChatId)}
                 replyTo={replyToMessage}
                 onCancelReply={() => setReplyToId(null)}
                 editingMessage={editingMessage}

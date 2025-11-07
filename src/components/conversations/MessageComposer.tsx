@@ -20,6 +20,8 @@ import {
 import { cn } from "@/lib/utils";
 import { uploadChatFile } from "@/lib/chatFileUpload";
 import { useToast } from "@/hooks/use-toast";
+import { useTypingIndicator } from "@/hooks/useTypingIndicator";
+import { useAuth } from "@/contexts/useAuth";
 
 interface MessageComposerProps {
   participants: UserProfile[];
@@ -34,6 +36,7 @@ interface MessageComposerProps {
   onCancelReply: () => void;
   editingMessage?: Message | null;
   onSaveEdit: (text: string) => void;
+  conversationId?: string;
 }
 
 const emojiPalette = ["😀", "😂", "😍", "🤔", "🙌", "🔥", "🎉", "👍"];
@@ -50,6 +53,7 @@ export function MessageComposer({
   onCancelReply,
   editingMessage,
   onSaveEdit,
+  conversationId,
 }: MessageComposerProps) {
   const [text, setText] = useState("");
   const [isUploading, setIsUploading] = useState(false);
@@ -59,6 +63,21 @@ export function MessageComposer({
   const imageInputRef = useRef<HTMLInputElement>(null);
   const videoInputRef = useRef<HTMLInputElement>(null);
   const { toast } = useToast();
+  const { user } = useAuth();
+  
+  // Typing indicator
+  const { sendTyping } = useTypingIndicator({
+    channelKey: conversationId || '',
+    currentUserId: user?.id,
+    mode: conversationId?.startsWith('dm-') ? 'direct' : 'group'
+  });
+
+  // Send typing indicator when user types
+  useEffect(() => {
+    if (text.length > 0) {
+      sendTyping();
+    }
+  }, [text, sendTyping]);
 
   useEffect(() => {
     if (editingMessage) {

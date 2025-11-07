@@ -3,6 +3,8 @@ import { Message, UserProfile } from "@/types/chat";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { MessageBubble } from "./MessageBubble";
+import { useTypingIndicator } from "@/hooks/useTypingIndicator";
+import { useAuth } from "@/contexts/useAuth";
 
 interface MessageListProps {
   messages: Message[];
@@ -19,6 +21,7 @@ interface MessageListProps {
   onPinChange: (message: Message, pinned: boolean) => void;
   onReact: (message: Message, emoji: string) => void;
   typingUsers: string[];
+  conversationId?: string;
 }
 
 const dayKey = (iso?: string) => {
@@ -45,9 +48,18 @@ export function MessageList({
   onPinChange,
   onReact,
   typingUsers,
+  conversationId,
 }: MessageListProps) {
+  const { user } = useAuth();
   const scrollAreaRef = useRef<HTMLDivElement | null>(null);
   const lastMessageId = messages.at(-1)?.id;
+  
+  // Real-time typing indicator
+  const { typingUsers: realtimeTyping } = useTypingIndicator({
+    channelKey: conversationId || '',
+    currentUserId: user?.id,
+    mode: conversationId?.startsWith('dm-') ? 'direct' : 'group'
+  });
 
   const grouped = useMemo(() => {
     return messages.reduce<Record<string, Message[]>>((acc, message) => {
@@ -102,13 +114,19 @@ export function MessageList({
               ))}
             </div>
           </div>
-        ))}        {typingUsers.length > 0 && (
-          <div className="flex items-center gap-2 text-xs text-muted-foreground">
-            <span className="relative inline-flex h-2 w-2">
-              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary opacity-75" />
-              <span className="relative inline-flex h-2 w-2 rounded-full bg-primary" />
+        ))}
+        
+        {/* Real-time typing indicator */}
+        {realtimeTyping.length > 0 && (
+          <div className="flex items-center gap-2 px-4 py-2 animate-fade-in">
+            <div className="flex gap-1">
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" />
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.1s' }} />
+              <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
+            </div>
+            <span className="text-xs text-muted-foreground italic">
+              {realtimeTyping.map(u => users[u.id]?.name || 'Someone').join(', ')} typing...
             </span>
-            {typingUsers.join(", ")} typing...
           </div>
         )}
       </div>
