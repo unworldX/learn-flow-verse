@@ -3,8 +3,6 @@ import { Message, UserProfile } from "@/types/chat";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { Separator } from "@/components/ui/separator";
 import { MessageBubble } from "./MessageBubble";
-import { useTypingIndicator } from "@/hooks/useTypingIndicator";
-import { useAuth } from "@/contexts/useAuth";
 
 interface MessageListProps {
   messages: Message[];
@@ -50,16 +48,8 @@ export function MessageList({
   typingUsers,
   conversationId,
 }: MessageListProps) {
-  const { user } = useAuth();
   const scrollAreaRef = useRef<HTMLDivElement | null>(null);
   const lastMessageId = messages.at(-1)?.id;
-  
-  // Real-time typing indicator
-  const { typingUsers: realtimeTyping } = useTypingIndicator({
-    channelKey: conversationId || '',
-    currentUserId: user?.id,
-    mode: conversationId?.startsWith('dm-') ? 'direct' : 'group'
-  });
 
   const grouped = useMemo(() => {
     return messages.reduce<Record<string, Message[]>>((acc, message) => {
@@ -116,8 +106,8 @@ export function MessageList({
           </div>
         ))}
         
-        {/* Real-time typing indicator */}
-        {realtimeTyping.length > 0 && (
+        {/* Typing indicator */}
+        {typingUsers.length > 0 && (
           <div className="flex items-center gap-2 px-4 py-2 animate-fade-in">
             <div className="flex gap-1">
               <div className="w-2 h-2 bg-primary rounded-full animate-bounce" />
@@ -125,7 +115,7 @@ export function MessageList({
               <div className="w-2 h-2 bg-primary rounded-full animate-bounce" style={{ animationDelay: '0.2s' }} />
             </div>
             <span className="text-xs text-muted-foreground italic">
-              {realtimeTyping.map(u => users[u.id]?.name || 'Someone').join(', ')} typing...
+              {typingUsers.join(', ')} typing...
             </span>
           </div>
         )}
