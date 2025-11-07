@@ -1157,6 +1157,9 @@ export function useConversations() {
         });
 
       toast({ title: `${callType === "voice" ? "Voice" : "Video"} call started` });
+      
+      // Navigate to call page
+      window.location.href = `/call?conversationId=${actualChatId}&type=${callType}`;
     } catch (error) {
       console.error("Error starting call:", error);
       toast({

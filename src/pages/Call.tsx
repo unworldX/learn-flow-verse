@@ -23,7 +23,7 @@ export default function Call() {
   const { user } = useAuth();
   const { toast } = useToast();
 
-  const roomId = searchParams.get("room");
+  const roomId = searchParams.get("conversationId") || searchParams.get("room");
   const callType = (searchParams.get("type") as "voice" | "video") || "voice";
 
   const [status, setStatus] = useState<CallStatus>("idle");
